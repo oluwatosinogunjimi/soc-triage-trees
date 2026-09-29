@@ -19,6 +19,7 @@
   --tp: #b42323;      --tp-soft: #fbe6e4;
   --inc: #9a6200;     --inc-soft: #fbf0d9;
   --focus: #1f47c7;
+  --edge: #aeb6ad;
   --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -29,7 +30,7 @@
     --bg: #121519; --surface: #1a1f25; --surface-2: #20262d; --ink: #e6e9ec; --muted: #9aa4ae;
     --line: #2d353e; --accent: #8aa6ff; --accent-soft: #232d4a; --code-bg: #14181d;
     --fp: #a3b1c4; --fp-soft: #262d37; --btp: #5fcf93; --btp-soft: #1b3127;
-    --tp: #ff8a80; --tp-soft: #3a2020; --inc: #f0b64a; --inc-soft: #3a2f17; --focus: #8aa6ff;
+    --tp: #ff8a80; --tp-soft: #3a2020; --inc: #f0b64a; --inc-soft: #3a2f17; --focus: #8aa6ff; --edge: #4a5561;
     color-scheme: dark;
   }
 }
@@ -37,7 +38,7 @@
   --bg: #121519; --surface: #1a1f25; --surface-2: #20262d; --ink: #e6e9ec; --muted: #9aa4ae;
   --line: #2d353e; --accent: #8aa6ff; --accent-soft: #232d4a; --code-bg: #14181d;
   --fp: #a3b1c4; --fp-soft: #262d37; --btp: #5fcf93; --btp-soft: #1b3127;
-  --tp: #ff8a80; --tp-soft: #3a2020; --inc: #f0b64a; --inc-soft: #3a2f17; --focus: #8aa6ff;
+  --tp: #ff8a80; --tp-soft: #3a2020; --inc: #f0b64a; --inc-soft: #3a2f17; --focus: #8aa6ff; --edge: #4a5561;
   color-scheme: dark;
 }
 
@@ -188,13 +189,88 @@ textarea { resize: vertical; min-height: 64px; }
 .a-yes { color: var(--btp); } .a-no { color: var(--tp); } .a-unknown { color: var(--inc); } .a-other { color: var(--accent); }
 .empty { color: var(--muted); font-size: 13px; margin: 0; }
 
-/* Map */
-.map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); padding: 12px; }
-.map-wrap svg { height: auto; display: block; margin: 0 auto; }
-.map-wrap.fit svg { max-width: 100% !important; }
-.map-wrap:not(.fit) svg { max-width: none !important; }
-.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); align-items: center; }
-.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--line); }
+/* Map: left-to-right expandable decision tree */
+.mm-toolbar { gap: 8px; }
+.mm-canvas { overflow: auto; max-height: 72vh; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); padding: 18px; }
+.mm-tree { display: inline-flex; min-width: 100%; }
+.mm-row { display: flex; align-items: center; }
+.mm-children { display: flex; flex-direction: column; justify-content: center; position: relative; margin-left: 26px; }
+.mm-children::before { content: ""; position: absolute; left: -26px; top: 50%; width: 26px; border-top: 1.5px solid var(--edge); }
+.mm-branch { position: relative; display: flex; align-items: center; gap: 0; padding: 5px 0 5px 22px; }
+.mm-branch::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1.5px solid var(--edge); }
+.mm-branch:first-child::before { top: 50%; }
+.mm-branch:last-child::before { bottom: 50%; }
+.mm-branch:only-child::before { display: none; }
+.mm-branch::after { content: ""; position: absolute; left: 0; top: 50%; width: 22px; border-top: 1.5px solid var(--edge); }
+.mm-took-branch::after { border-top-color: var(--accent); border-top-width: 2.5px; }
+.mm-edge {
+  font-family: var(--font-mono); font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-right: 8px; white-space: nowrap;
+  background: var(--surface); border: 1px solid var(--line); color: var(--muted); position: relative; z-index: 1;
+}
+.mm-e-yes { color: var(--btp); } .mm-e-no { color: var(--tp); } .mm-e-unknown { color: var(--inc); } .mm-e-option { color: var(--accent); }
+.mm-edge.mm-took { border-color: var(--accent); background: var(--accent-soft); font-weight: 500; }
+.mm-card {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "tag toggle" "label label";
+  gap: 2px 8px; width: 230px; text-align: left; cursor: pointer; padding: 8px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); flex-shrink: 0;
+  transition: border-color .12s, box-shadow .12s;
+}
+.mm-card:hover { border-color: var(--ink); }
+.mm-tag { grid-area: tag; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.mm-label { grid-area: label; font-size: 13px; line-height: 1.35; }
+.mm-toggle { grid-area: toggle; font-family: var(--font-mono); font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0 5px; align-self: start; }
+.mm-question { border-left: 3px solid var(--accent); }
+.mm-choice { border-left: 3px solid var(--accent); border-style: solid solid solid double; border-left-width: 4px; }
+.mm-check { border-left: 3px solid var(--muted); }
+.mm-link { border-style: dashed; }
+.mm-outcome { border-left-width: 4px; }
+.mm-v-false_positive { background: var(--fp-soft); border-left-color: var(--fp); }
+.mm-v-benign_positive { background: var(--btp-soft); border-left-color: var(--btp); }
+.mm-v-true_positive { background: var(--tp-soft); border-left-color: var(--tp); }
+.mm-v-inconclusive { background: var(--inc-soft); border-left-color: var(--inc); }
+.mm-v-false_positive .mm-tag { color: var(--fp); } .mm-v-benign_positive .mm-tag { color: var(--btp); }
+.mm-v-true_positive .mm-tag { color: var(--tp); } .mm-v-inconclusive .mm-tag { color: var(--inc); }
+.mm-seen { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
+.mm-here { box-shadow: 0 0 0 3px var(--accent); }
+.mm-selected { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mm-detail { border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 8px; }
+.mm-detail p { margin: 0; max-width: 72ch; }
+.mm-detail-text { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+
+/* At a glance */
+.glance { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.glance > summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; list-style: none; }
+.glance > summary::-webkit-details-marker { display: none; }
+.glance > summary::before { content: "\25B8"; color: var(--muted); transition: transform .15s; }
+.glance[open] > summary::before { transform: rotate(90deg); }
+.glance-title { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.glance-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; margin-top: 10px; }
+@media (max-width: 900px) { .glance-grid { grid-template-columns: minmax(0, 1fr); } }
+.glance-steps { list-style: none; margin: 4px 0 0; padding: 0; counter-reset: g; display: grid; gap: 2px; }
+.glance-steps li { counter-increment: g; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.glance-steps li:last-child { border-bottom: 0; }
+.glance-steps li::before { content: counter(g, decimal-leading-zero); font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 4px; }
+.g-alts { display: grid; gap: 1px; min-width: 0; }
+.g-alt-row { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: baseline; gap: 2px; }
+.g-alt-row .g-step { justify-self: start; }
+.g-or { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.g-step {
+  all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; gap: 6px; align-items: baseline;
+  padding: 3px 6px; border-radius: 4px; font-size: 13.5px; max-width: 100%;
+}
+.g-step:hover { background: var(--surface-2); }
+.g-step:hover .g-text { text-decoration: underline; }
+.g-step:focus-visible { outline: 2px solid var(--focus); }
+.g-type { font-family: var(--font-mono); font-size: 11px; text-align: center; min-width: 18px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+.g-question, .g-choice { color: var(--accent); }
+.g-text { overflow-wrap: anywhere; }
+.g-done .g-text { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.g-here { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.glance-outcomes { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+.glance-outcomes .cat-label { flex-basis: 100%; margin-top: 0; }
+.g-out { border: 0; cursor: pointer; font-size: 12.5px; padding: 4px 9px; border-radius: 4px; text-align: left; }
+.g-out:hover { filter: brightness(0.96); text-decoration: underline; }
+.g-link { background: var(--surface-2); color: var(--accent); border: 1px dashed var(--line); }
 
 /* Note */
 .note-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
@@ -255,7 +331,6 @@ footer.foot a { color: var(--muted); }
 </div>
 <footer class="foot">Trees are YAML in the repository and validated in CI. Edit a tree, open a pull request, and the site rebuilds.</footer>
 
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>
 const EMBEDDED = /*__TREE_DATA__*/null;
 
@@ -408,6 +483,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         h("ul", { class: "look-for", style: "margin-top:6px;font-size:13px" }, t.sources.map(s => h("li", {}, h("a", { href: s.url, target: "_blank", rel: "noopener" }, s.title)))));
       head.append(src);
     }
+    head.append(renderGlance(t));
   }
 
   // ---------- walkthrough ----------
@@ -503,67 +579,228 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     });
   }
 
-  // ---------- map ----------
-  let mapSeq = 0;
-  let mapFit = true;
-  function mermaidText(t) {
-    const id = s => s.replace(/[^a-zA-Z0-9]/g, "_");
-    const esc = s => String(s).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/g, "$1").replace(/"/g, "#quot;").replace(/[<>{}]/g, "");
-    const trim = s => { s = String(s); return s.length > 64 ? s.slice(0, 61) + "..." : s; };
-    const visited = new Set(S.path.filter(p => p.tree === t.id).map(p => p.node));
-    if (S.tree === t.id) visited.add(S.node);
-    const lines = ["flowchart TD"];
-    for (const [nid, n] of Object.entries(t.nodes)) {
-      const label = esc(trim(n.type === "outcome" ? VERDICT_LABEL[n.verdict] + ": " + n.title : n.type === "link" ? "Go to: " + TREES[n.tree].title : n.text));
-      const shape = { question: `{{"${label}"}}`, choice: `{{"${label}"}}`, check: `["${label}"]`, outcome: `(["${label}"])`, link: `[["${label}"]]` }[n.type];
-      lines.push(`  ${id(nid)}${shape}`);
+  // ---------- graph helpers (shared by map and glance) ----------
+  function childrenOf(n) {
+    if (n.type === "question") {
+      const out = [{ label: "Yes", ans: "yes", to: n.yes }, { label: "No", ans: "no", to: n.no }];
+      if (n.unknown) out.push({ label: "Can't tell", ans: "unknown", to: n.unknown });
+      return out;
     }
-    for (const [nid, n] of Object.entries(t.nodes)) {
-      if (n.type === "question") { lines.push(`  ${id(nid)} -->|yes| ${id(n.yes)}`, `  ${id(nid)} -->|no| ${id(n.no)}`); if (n.unknown) lines.push(`  ${id(nid)} -.->|unknown| ${id(n.unknown)}`); }
-      if (n.type === "check") lines.push(`  ${id(nid)} --> ${id(n.next)}`);
-      if (n.type === "choice") n.options.forEach(o => lines.push(`  ${id(nid)} -->|"${esc(trim(o.label).slice(0, 28))}"| ${id(o.next)}`));
-    }
-    const css = getComputedStyle(document.documentElement);
-    const c = v => css.getPropertyValue(v).trim();
-    lines.push(`  classDef fp fill:${c("--fp-soft")},stroke:${c("--fp")},color:${c("--ink")}`);
-    lines.push(`  classDef btp fill:${c("--btp-soft")},stroke:${c("--btp")},color:${c("--ink")}`);
-    lines.push(`  classDef tp fill:${c("--tp-soft")},stroke:${c("--tp")},color:${c("--ink")}`);
-    lines.push(`  classDef inc fill:${c("--inc-soft")},stroke:${c("--inc")},color:${c("--ink")}`);
-    lines.push(`  classDef seen stroke:${c("--accent")},stroke-width:3px`);
-    const vmap = { false_positive: "fp", benign_positive: "btp", true_positive: "tp", inconclusive: "inc" };
-    for (const [nid, n] of Object.entries(t.nodes)) if (n.type === "outcome") lines.push(`  class ${id(nid)} ${vmap[n.verdict]}`);
-    if (visited.size) lines.push(`  class ${[...visited].map(id).join(",")} seen`);
-    return lines.join("\n");
+    if (n.type === "check") return [{ label: "", ans: "next", to: n.next }];
+    if (n.type === "choice") return n.options.map(o => ({ label: o.label, ans: "option:" + o.label, to: o.next }));
+    return [];
   }
-  async function renderMap() {
-    const v = document.getElementById("view-map"); v.replaceChildren();
-    const t = TREES[S.tree];
-    v.append(h("div", { class: "legend" },
-      h("span", {}, h("span", { class: "swatch", style: "background:var(--surface);border:2px solid var(--accent)" }), "On your path"),
-      h("span", {}, h("span", { class: "swatch", style: "background:var(--fp-soft)" }), "False positive"),
-      h("span", {}, h("span", { class: "swatch", style: "background:var(--btp-soft)" }), "Benign true positive"),
-      h("span", {}, h("span", { class: "swatch", style: "background:var(--tp-soft)" }), "True positive"),
-      h("span", {}, h("span", { class: "swatch", style: "background:var(--inc-soft)" }), "Inconclusive"),
-      h("span", {}, "Hexagon: question · Box: check · Pill: outcome")));
-    const wrap = h("div", { class: "map-wrap" + (mapFit ? " fit" : "") }, h("p", { class: "empty" }, "Drawing the map..."));
-    const fitBtn = h("button", { class: "btn small", type: "button", onclick: () => {
-      mapFit = !mapFit; wrap.classList.toggle("fit", mapFit); fitBtn.textContent = mapFit ? "Actual size" : "Fit to width";
-    } }, mapFit ? "Actual size" : "Fit to width");
-    v.append(h("div", { class: "row" }, fitBtn, h("span", { class: "empty" }, "Scroll sideways at actual size. Nodes on your path are outlined.")), wrap);
-    if (!window.mermaid) { wrap.replaceChildren(h("p", { class: "empty" }, "The diagram library did not load. The walkthrough still works.")); return; }
-    try {
-      const css = getComputedStyle(document.documentElement);
-      window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base",
-        flowchart: { htmlLabels: true, curve: "basis", useMaxWidth: true, nodeSpacing: 30, rankSpacing: 45 },
-        themeVariables: { fontFamily: "IBM Plex Sans, system-ui, sans-serif", fontSize: "13px",
-          primaryColor: css.getPropertyValue("--surface").trim(), primaryBorderColor: css.getPropertyValue("--line").trim(),
-          primaryTextColor: css.getPropertyValue("--ink").trim(), lineColor: css.getPropertyValue("--muted").trim(),
-          edgeLabelBackground: css.getPropertyValue("--surface-2").trim(), tertiaryColor: css.getPropertyValue("--surface-2").trim() } });
-      const { svg } = await window.mermaid.render("m" + (++mapSeq), mermaidText(t));
-      wrap.innerHTML = svg;
-    } catch (e) {
-      wrap.replaceChildren(h("p", { class: "empty" }, "Could not draw this map: " + e.message));
+  function shortText(s) {
+    s = fill(s).replace(/\s*\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+    return s.length > 96 ? s.slice(0, 93).replace(/\s+\S*$/, "") + "..." : s;
+  }
+  function bfsOrder(t) {
+    // Nodes in breadth-first order from start, each with its shallowest depth.
+    const seen = new Map(); const q = [[t.start, 0]];
+    while (q.length) {
+      const [nid, d] = q.shift();
+      if (seen.has(nid)) continue;
+      seen.set(nid, d);
+      childrenOf(t.nodes[nid]).forEach(c => q.push([c.to, d + 1]));
     }
+    return [...seen.entries()];
+  }
+  function pathInTree(tid) {
+    // Visited nodes and taken edges in this tree, from the case path.
+    const visited = new Set(); const taken = new Set();
+    S.path.forEach(st => {
+      if (st.tree !== tid) return;
+      visited.add(st.node);
+      taken.add(st.node + "|" + (st.answer === "option" ? "option:" + st.label : st.answer));
+    });
+    if (S.tree === tid) visited.add(S.node);
+    return { visited, taken };
+  }
+
+  // ---------- map (expandable decision tree) ----------
+  const mm = { tree: null, open: new Set(), selected: null };
+  let glanceOpen = null;
+  const TYPE_TAG = { question: "Q", check: "Check", choice: "Route", outcome: "Outcome", link: "Link" };
+
+  function mmReset(t) {
+    mm.tree = t.id; mm.open = new Set([t.start]); mm.selected = t.start;
+    mmRevealPath(t);
+  }
+  function mmRevealPath(t) {
+    // Expand the chain of nodes the analyst actually walked in this tree.
+    const steps = S.path.filter(st => st.tree === t.id);
+    if (!steps.length || steps[0].node !== t.start) return;
+    let k = t.start; mm.open.add(k);
+    steps.forEach(st => {
+      const n = t.nodes[st.node];
+      const want = st.answer === "option" ? "option:" + st.label : st.answer;
+      const edge = childrenOf(n).find(c => c.ans === want);
+      if (!edge) return;
+      k = k + "/" + edge.ans + ">" + edge.to;
+      mm.open.add(k);
+    });
+    mm.selected = k;
+  }
+  function mmFindKey(t, target) {
+    // Shortest instance key reaching a node, so a click in the glance list can reveal it.
+    const q = [[t.start, t.start]]; const seen = new Set();
+    while (q.length) {
+      const [nid, k] = q.shift();
+      if (nid === target) return k;
+      if (seen.has(nid)) continue; seen.add(nid);
+      childrenOf(t.nodes[nid]).forEach(c => q.push([c.to, k + "/" + c.ans + ">" + c.to]));
+    }
+    return null;
+  }
+  function mmOpenAncestors(k) {
+    const parts = k.split("/"); let acc = parts[0]; mm.open.add(acc);
+    for (let i = 1; i < parts.length; i++) { acc += "/" + parts[i]; mm.open.add(acc); }
+  }
+  function mmAllKeys(t, nid, k, out, depth) {
+    out.add(k); if (depth > 40) return;
+    childrenOf(t.nodes[nid]).forEach(c => mmAllKeys(t, c.to, k + "/" + c.ans + ">" + c.to, out, depth + 1));
+  }
+  function nidOf(k) { const i = k.lastIndexOf(">"); return i < 0 ? k : k.slice(i + 1); }
+
+  function mmCard(t, nid, k, info) {
+    const n = t.nodes[nid];
+    const kids = childrenOf(n);
+    const isOpen = mm.open.has(k);
+    const cls = ["mm-card", "mm-" + n.type];
+    if (n.type === "outcome") cls.push("mm-v-" + n.verdict);
+    if (info.visited.has(nid)) cls.push("mm-seen");
+    if (S.tree === t.id && S.node === nid) cls.push("mm-here");
+    if (mm.selected === k) cls.push("mm-selected");
+    const label = n.type === "outcome" ? n.title : n.type === "link" ? "Continues in " + TREES[n.tree].title : shortText(n.text);
+    const tag = n.type === "outcome" ? VERDICT_LABEL[n.verdict] : TYPE_TAG[n.type];
+    return h("button", {
+      class: cls.join(" "), type: "button", "data-key": k,
+      "aria-expanded": kids.length ? String(isOpen) : null,
+      title: n.type === "outcome" || n.type === "link" ? label : fill(n.text),
+      onclick: () => {
+        mm.selected = k;
+        if (kids.length) { if (isOpen) { [...mm.open].forEach(x => { if (x === k || x.startsWith(k + "/")) mm.open.delete(x); }); } else mm.open.add(k); }
+        drawMap({ focus: true });
+      }
+    }, h("span", { class: "mm-tag" }, tag),
+       h("span", { class: "mm-label" }, label),
+       kids.length ? h("span", { class: "mm-toggle", "aria-hidden": "true" }, isOpen ? "−" : "+" + kids.length) : null);
+  }
+  function mmBranch(t, nid, k, info, depth) {
+    const row = h("div", { class: "mm-row" }, mmCard(t, nid, k, info));
+    if (mm.open.has(k) && depth < 40) {
+      const kids = childrenOf(t.nodes[nid]);
+      const col = h("div", { class: "mm-children" + (kids.length === 1 ? " mm-single" : "") });
+      kids.forEach(c => {
+        const ck = k + "/" + c.ans + ">" + c.to;
+        const took = info.taken.has(nid + "|" + c.ans);
+        const pill = c.label ? h("span", { class: "mm-edge mm-e-" + c.ans.split(":")[0] + (took ? " mm-took" : "") }, c.label.length > 34 ? c.label.slice(0, 31) + "..." : c.label) : null;
+        col.append(h("div", { class: "mm-branch" + (took ? " mm-took-branch" : "") }, pill, mmBranch(t, c.to, ck, info, depth + 1)));
+      });
+      row.append(col);
+    }
+    return row;
+  }
+  function mmDetail(t) {
+    const box = h("div", { class: "mm-detail" });
+    if (!mm.selected) return box;
+    const nid = nidOf(mm.selected); const n = t.nodes[nid];
+    box.append(h("div", { class: "node-kind" }, h("span", {}, n.type === "outcome" ? "Outcome" : TYPE_TAG[n.type] === "Q" ? "Question" : TYPE_TAG[n.type]), h("span", {}, nid)));
+    if (n.type === "outcome") {
+      box.append(h("div", { class: "row" }, h("span", { class: "verdict v-" + n.verdict }, VERDICT_LABEL[n.verdict]), h("strong", {}, n.title)));
+      box.append(h("p", {}, fill(n.anchor)), h("p", { class: "why" }, fill(n.risk)));
+      box.append(h("ol", { class: "look-for" }, n.actions.map(a => h("li", {}, fill(a)))));
+    } else if (n.type === "link") {
+      box.append(h("p", {}, n.text));
+      box.append(h("div", {}, h("button", { class: "btn small", type: "button", onclick: () => startTree(n.tree) }, "Open " + TREES[n.tree].title)));
+    } else {
+      box.append(h("p", { class: "mm-detail-text" }, fill(n.text)));
+      if (n.why) box.append(h("p", { class: "why" }, fill(n.why)));
+      if (n.look_for) box.append(h("ul", { class: "look-for" }, n.look_for.map(x => h("li", {}, fill(x)))));
+      if (n.kql && n.kql.length) box.append(h("p", { class: "empty" }, n.kql.length + " KQL " + (n.kql.length === 1 ? "query" : "queries") + " in the walkthrough for this step."));
+    }
+    return box;
+  }
+  function drawMap(opts) {
+    opts = opts || {};
+    const v = document.getElementById("view-map");
+    const t = TREES[S.tree];
+    if (mm.tree !== t.id) mmReset(t);
+    const info = pathInTree(t.id);
+    const canvas = v.querySelector(".mm-canvas");
+    const keepX = canvas ? canvas.scrollLeft : 0, keepY = canvas ? canvas.scrollTop : 0;
+    v.replaceChildren();
+    const all = new Set(); mmAllKeys(t, t.start, t.start, all, 0);
+    v.append(h("div", { class: "row mm-toolbar" },
+      h("button", { class: "btn small", type: "button", onclick: () => { mm.open = all; drawMap({ reset: true }); } }, "Expand all"),
+      h("button", { class: "btn small", type: "button", onclick: () => { mm.open = new Set([t.start]); mm.selected = t.start; drawMap({ reset: true }); } }, "Collapse"),
+      h("button", { class: "btn small", type: "button", onclick: () => { mm.open = new Set([t.start]); mmRevealPath(t); drawMap({ focus: true }); } }, "Show my path"),
+      h("span", { class: "empty" }, "Click a step to open its branches. Click again to fold them.")));
+    const cv = h("div", { class: "mm-canvas" }, h("div", { class: "mm-tree" }, mmBranch(t, t.start, t.start, info, 0)));
+    v.append(cv, mmDetail(t));
+    if (!opts.reset) { cv.scrollLeft = keepX; cv.scrollTop = keepY; }
+    const sel = opts.focus ? cv.querySelector(".mm-selected") : null;
+    if (sel) {
+      const cr0 = cv.getBoundingClientRect(), sr0 = sel.getBoundingClientRect();
+      cv.scrollTop += (sr0.top - cr0.top) - cv.clientHeight / 2 + sr0.height / 2;
+      const cr = cv.getBoundingClientRect(), sr = sel.getBoundingClientRect();
+      if (sr.right + 260 > cr.right || sr.left < cr.left) cv.scrollLeft += sr.left - cr.left - 60;
+    }
+  }
+  function renderMap() { drawMap({ focus: true }); }
+  function revealInMap(nid) {
+    const t = TREES[S.tree];
+    if (mm.tree !== t.id) mmReset(t);
+    const k = mmFindKey(t, nid); if (!k) return;
+    mmOpenAncestors(k.slice(0, k.lastIndexOf("/")) || t.start);
+    mm.selected = k;
+    current = "map";
+    ["walk", "map", "note"].forEach(x => {
+      document.getElementById("tab-" + x).setAttribute("aria-selected", String(x === "map"));
+      document.getElementById("view-" + x).hidden = x !== "map";
+    });
+    drawMap({ focus: true });
+    document.getElementById("view-map").scrollIntoView({ block: "start" });
+    const el = document.querySelector('.mm-card[data-key="' + CSS.escape(k) + '"]');
+    if (el) el.focus({ preventScroll: true });
+  }
+
+  // ---------- at a glance ----------
+  function renderGlance(t) {
+    const order = bfsOrder(t);
+    const info = pathInTree(t.id);
+    const steps = order.filter(([nid]) => ["check", "question", "choice"].includes(t.nodes[nid].type));
+    const outcomes = order.filter(([nid]) => t.nodes[nid].type === "outcome");
+    const links = order.filter(([nid]) => t.nodes[nid].type === "link");
+    const openState = glanceOpen === null ? S.path.length === 0 : glanceOpen;
+    const det = h("details", { class: "glance", open: openState ? true : null },
+      h("summary", {}, h("span", { class: "glance-title" }, "At a glance"),
+        h("span", { class: "empty" }, steps.length + " steps · " + outcomes.length + " outcomes" + (links.length ? " · links to " + links.length + " other playbook" + (links.length > 1 ? "s" : "") : ""))));
+    det.addEventListener("toggle", () => { glanceOpen = det.open; });
+    const stages = new Map();
+    steps.forEach(([nid, d]) => { if (!stages.has(d)) stages.set(d, []); stages.get(d).push(nid); });
+    const list = h("ol", { class: "glance-steps" });
+    [...stages.values()].forEach(ids => {
+      const li = h("li", {});
+      const alts = h("div", { class: "g-alts" });
+      ids.forEach((nid, i) => {
+        const n = t.nodes[nid];
+        const done = info.visited.has(nid) && !(S.tree === t.id && S.node === nid);
+        const here = S.tree === t.id && S.node === nid;
+        alts.append(h("div", { class: "g-alt-row" }, h("span", { class: "g-or" }, i ? "or" : ""), h("button", { type: "button", class: "g-step" + (done ? " g-done" : "") + (here ? " g-here" : ""), title: "Show in map" + (done ? " (done)" : here ? " (you are here)" : ""), onclick: () => revealInMap(nid) },
+          h("span", { class: "g-type g-" + n.type }, n.type === "question" ? "?" : n.type === "check" ? "\u2713" : "\u21C4"),
+          h("span", { class: "g-text" }, shortText(n.text)))));
+      });
+      li.append(alts); list.append(li);
+    });
+    const verdictOrder = ["true_positive", "inconclusive", "benign_positive", "false_positive"];
+    const outs = h("div", { class: "glance-outcomes" }, h("div", { class: "cat-label" }, "Where it can end"));
+    verdictOrder.forEach(v => outcomes.filter(([nid]) => t.nodes[nid].verdict === v).forEach(([nid]) => {
+      outs.append(h("button", { class: "g-out v-" + v, type: "button", title: VERDICT_LABEL[v] + ": show in map", onclick: () => revealInMap(nid) }, t.nodes[nid].title));
+    }));
+    links.forEach(([nid]) => outs.append(h("button", { class: "g-out g-link", type: "button", onclick: () => revealInMap(nid) }, "→ " + TREES[t.nodes[nid].tree].title)));
+    det.append(h("div", { class: "glance-grid" }, h("div", {}, h("div", { class: "cat-label" }, "Stages in order, with the alternatives at each"), list), outs));
+    return det;
   }
 
   // ---------- closure note ----------
