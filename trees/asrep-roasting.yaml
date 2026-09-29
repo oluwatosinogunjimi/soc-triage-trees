@@ -10,7 +10,7 @@ applies_to:
   - Possible AS-REP roasting attack
   - TGT request without pre-authentication (Event 4768, PreAuthType 0)
 mitre: [T1558.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-requests:
     type: check
     text: Find the pre-authentication-free TGT requests and their source.
+    also_check:
+      - "Has {{account}} logged on from hosts it does not normally use since the requests?"
+      - "Did {{src_host}} run LDAP queries or tools such as BloodHound to find accounts without pre-authentication?"
     kql:
       - title: TGT requests without pre-auth (Event 4768, 24h)
         platform: sentinel
@@ -40,6 +43,9 @@ nodes:
   q-many:
     type: question
     text: Did one source request tickets for several no-preauth accounts, or for an account it never normally uses?
+    also_check:
+      - "Has {{src_host}} also requested service tickets for many SPNs (Kerberoasting)?"
+      - "Has {{src_host}} made failed authentications against multiple accounts (password spray)?"
     yes: q-approved
     no: q-legacy
     notes:
@@ -49,6 +55,8 @@ nodes:
   q-legacy:
     type: question
     text: Is {{account}} a documented legacy account that needs pre-auth disabled, used from its own system?
+    also_check:
+      - "Was pre-authentication recently disabled on {{account}}, or its password or settings changed unexpectedly?"
     yes: o-benign-config
     no: q-approved
     notes:
@@ -58,6 +66,10 @@ nodes:
   q-approved:
     type: question
     text: Is the source an approved scanner or penetration test?
+    also_check:
+      - "Has {{src_host}} been accessed from an unusual or untrusted source?"
+      - "Has {{src_host}} used WMI, RDP or SMB to run commands on other hosts?"
+      - "Has anyone tried to disable AV, EDR or logging on {{src_host}}?"
     yes: o-benign-test
     no: o-tp
     notes:

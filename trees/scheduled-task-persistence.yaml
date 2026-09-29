@@ -10,7 +10,7 @@ applies_to:
   - Scheduled task created by unusual process
   - Persistence via scheduled task (Event 4698)
 mitre: [T1053.005]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,10 @@ nodes:
   c-task:
     type: check
     text: Read the task definition and who created it.
+    also_check:
+      - "Was task \"{{task}}\" created remotely from another host (network logon just before creation)?"
+      - "Was task \"{{task}}\" set to run as SYSTEM or an account with more privilege than its creator?"
+      - "Has {{device}} been accessed from an unusual or untrusted source?"
     kql:
       - title: Task creation and updates on the device (7d)
         platform: xdr
@@ -50,6 +54,11 @@ nodes:
   q-action-suspicious:
     type: question
     text: Does the action run a script host, encoded command, LOLBin, or a binary from a user-writable path?
+    also_check:
+      - "Were other autostart entries changed on {{device}} around the same time (Run keys, services, WMI subscriptions)?"
+      - "Has anyone tried to disable security monitoring (antivirus, EDR, logging) on {{device}}?"
+      - "Was a new local account created or added to a privileged group on {{device}}?"
+      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
     yes: q-executed
     no: o-inconclusive
     notes:

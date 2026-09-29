@@ -10,7 +10,7 @@ applies_to:
   - HTML smuggling detected
   - Malicious SVG attachment
 mitre: [T1027.006, T1566.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,8 @@ nodes:
   c-attachment:
     type: check
     text: Pull the attachment and its analysis.
+    also_check:
+      - "Has {{recipient}} received other messages with malicious links or attachments in the last 30 days?"
     kql:
       - title: HTML and SVG attachments on the message
         platform: xdr
@@ -41,6 +43,8 @@ nodes:
   q-opened:
     type: question
     text: Did the recipient open the attachment in a browser?
+    also_check:
+      - "Was the same attachment opened on other devices in the organisation?"
     kql:
       - title: Browser opening an HTML file from Outlook temp (7d)
         platform: xdr
@@ -60,6 +64,9 @@ nodes:
   q-dropped:
     type: question
     text: Did the browser save an assembled file (ZIP, ISO, IMG, JS, LNK) or show a login page?
+    also_check:
+      - "Did a script host (PowerShell, cmd, MSHTA, wscript) run on {{device}} shortly after the attachment was opened?"
+      - "Did {{device}} connect to suspicious or previously unseen domains or IPs after the attachment was opened?"
     kql:
       - title: Files written by the browser after opening (7d)
         platform: xdr
@@ -79,6 +86,10 @@ nodes:
   q-login-page:
     type: question
     text: Was the attachment a local fake login page, and did the user submit credentials?
+    also_check:
+      - "Has {{recipient}} signed in from an unrecognised IP or device since opening the attachment?"
+      - "Has {{recipient}} registered or changed an MFA method since opening the attachment?"
+      - "Has {{recipient}} created inbox rules that forward, delete or hide mail since opening the attachment?"
     yes: l-aitm
     no: o-opened-nothing
     notes:

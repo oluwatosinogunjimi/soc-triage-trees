@@ -10,7 +10,7 @@ applies_to:
   - DLP removable media policy match
   - USB mass storage device mounted (policy violation)
 mitre: [T1052.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,9 @@ nodes:
   c-copy:
     type: check
     text: Measure what was copied and to which device.
+    also_check:
+      - "Were the files compressed, archived or renamed before they were copied to the drive?"
+      - "Did {{user}} access an unusual number of files, or shares and repositories outside their normal role, before the copy?"
     kql:
       - title: USB mounts and files written to removable drives (7d)
         platform: xdr
@@ -55,6 +58,10 @@ nodes:
   q-sensitive:
     type: question
     text: Does the copied data include sensitive material (customer data, source code, finance, labelled confidential)?
+    also_check:
+      - "Has {{user}} uploaded files to personal or unsanctioned cloud storage recently?"
+      - "Has {{user}} sent large volumes of files or email outside the organisation recently?"
+      - "Has {{user}} sent encrypted or password-protected archives externally?"
     yes: q-hr-context
     no: o-policy
     notes:

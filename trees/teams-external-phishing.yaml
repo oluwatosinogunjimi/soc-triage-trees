@@ -10,7 +10,7 @@ applies_to:
   - Teams phishing message detected
   - Email bombing followed by Teams contact
 mitre: [T1566.003, T1656, T1219]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -50,6 +50,8 @@ nodes:
   q-known-partner:
     type: question
     text: Is the external contact a known partner or supplier the user works with?
+    also_check:
+      - "Is the external tenant or domain newly created rather than long established?"
     yes: o-fp
     no: q-remote-access
     notes:
@@ -59,6 +61,13 @@ nodes:
   q-remote-access:
     type: question
     text: Did the user start Quick Assist or another remote tool, or download a file after the chat?
+    also_check:
+      - "Did {{user}} share sign-in details or approve an MFA prompt during the chat or call?"
+      - "Has {{user}} signed in from an unrecognised IP or device since the chat?"
+      - "Has {{user}} registered or changed an MFA method since the chat?"
+      - "Has {{device}} been accessed from an unusual or untrusted source since the chat?"
+      - "Did a script host (PowerShell, cmd, MSHTA) run on {{device}} after the chat?"
+      - "Did {{device}} connect to suspicious or previously unseen domains or IPs after the chat?"
     kql:
       - title: Quick Assist and remote tools after the chat (48h)
         platform: xdr

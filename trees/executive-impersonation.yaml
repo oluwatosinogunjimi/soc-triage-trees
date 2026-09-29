@@ -10,7 +10,7 @@ applies_to:
   - Domain impersonation detected
   - Display name spoofing of executive
 mitre: [T1656, T1566.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -31,6 +31,8 @@ nodes:
       - Display name matching the executive with an external or lookalike address
       - Reply-To pointing somewhere else
       - Targets in finance, HR, payroll or executive assistants
+    also_check:
+      - "Is the sender domain newly registered or recently changed?"
     kql:
       - title: Messages from the sender (7d)
         platform: xdr
@@ -45,6 +47,8 @@ nodes:
   q-exec-own:
     type: question
     text: Is the address actually the executive's own personal account (confirmed with the executive or their assistant)?
+    also_check:
+      - "Does the real mailbox of {{executive}} show sign-ins from an unrecognised IP, or new inbox rules or forwarding?"
     yes: o-fp
     no: q-engaged
     notes:
@@ -54,6 +58,8 @@ nodes:
   q-engaged:
     type: question
     text: Did anyone reply, move to another channel (WhatsApp, text), buy gift cards or make a payment?
+    also_check:
+      - "Did {{recipient}} send payroll, tax or other sensitive files to the sender or another external address?"
     kql:
       - title: Replies to the sender (7d)
         platform: xdr

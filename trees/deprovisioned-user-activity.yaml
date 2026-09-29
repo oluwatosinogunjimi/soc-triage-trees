@@ -11,7 +11,7 @@ applies_to:
   - Suspicious on-premises account enablement after disruption
   - Sign-in by disabled account
 mitre: [T1078, T1098]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -31,6 +31,11 @@ nodes:
       - Leave date from HR, when the account was disabled, and any re-enablement
       - The activity itself (interactive sign-in, token refresh, mailbox access, VPN)
       - Whether the activity used an existing session or a fresh authentication
+    also_check:
+      - "Has {{user}} downloaded, synced or exported a large volume of files or mail since leaving?"
+      - "Has {{user}} sent mail or files to personal or external addresses since leaving?"
+      - "Have inbox rules or external forwarding been set on the mailbox of {{user}}?"
+      - "Has {{user}} deleted files, mail or other resources since leaving?"
     kql:
       - title: Account enable, disable and sign-in timeline (30d)
         platform: sentinel
@@ -49,6 +54,10 @@ nodes:
   q-reenabled:
     type: question
     text: Was the account re-enabled after it was disabled?
+    also_check:
+      - "Were the MFA methods, password or recovery details of {{user}} changed after the leave date?"
+      - "Was {{user}} given a role or group membership after the leave date?"
+      - "Has {{user}} added app credentials or granted OAuth consent since leaving?"
     yes: q-reenable-approved
     no: q-succeeded
     notes:
@@ -76,6 +85,9 @@ nodes:
   q-who:
     type: question
     text: Is the activity from a device or network the leaver used, or from shared or service use (a shared mailbox, a scheduled job)?
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
+      - "Has {{ip}} signed in to other accounts in the tenant?"
     yes: o-offboarding-gap
     no: o-tp
     notes:

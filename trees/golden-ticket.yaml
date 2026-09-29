@@ -11,7 +11,7 @@ applies_to:
   - Possible golden ticket attack (CVE-2021-42287 exploitation)
   - Suspicious Kerberos authentication (TGT request using TGS-REQ)
 mitre: [T1558.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -31,6 +31,10 @@ nodes:
       - What was anomalous (lifetime, encryption downgrade, nonexistent or disabled account, missing TGT request)
       - Host and target resources the ticket was used against
       - Any DCSync, NTDS.dit access or DC compromise in the preceding weeks
+    also_check:
+      - "Has Mimikatz or a similar tool run on {{src_host}}?"
+      - "Has {{src_host}} been accessed from an unusual or untrusted source?"
+      - "Did {{src_host}} create services or scheduled tasks on other hosts (PsExec, WMI, SMB)?"
     kql:
       - title: Logons by the account from the host (Defender for Identity, 7d)
         platform: xdr
@@ -55,6 +59,11 @@ nodes:
   q-prior-compromise:
     type: question
     text: Is there evidence of earlier domain compromise (DCSync, NTDS.dit copy, DC logon by unusual account, LSASS dump on a DC)?
+    also_check:
+      - "Were accounts recently created or added to privileged groups in the domain?"
+      - "Were security logs cleared or AV and EDR disabled on {{src_host}} or the domain controllers?"
+      - "Has {{src_host}} connected to previously unseen external domains or IPs, or shown beaconing?"
+      - "Is there evidence of data being staged, compressed or sent out from {{src_host}}?"
     kql:
       - title: NTDS access and DC credential dumping signs (30d)
         platform: xdr

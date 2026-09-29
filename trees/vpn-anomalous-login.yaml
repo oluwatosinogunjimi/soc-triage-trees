@@ -10,7 +10,7 @@ applies_to:
   - VPN brute force followed by success
   - Concurrent VPN sessions from different locations
 mitre: [T1133, T1078]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,9 @@ nodes:
   c-sessions:
     type: check
     text: Pull the user's VPN history and this session.
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
+      - "Has {{ip}} been used to sign in to other accounts or to spray passwords across multiple accounts?"
     kql:
       - title: VPN events for the user from firewall logs (30d)
         platform: sentinel
@@ -39,6 +42,9 @@ nodes:
   q-mfa:
     type: question
     text: Does the VPN enforce MFA, and did this session complete it?
+    also_check:
+      - "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
+      - "Did the password or sign-in settings of {{user}} change unexpectedly before the session?"
     yes: q-baseline
     no: q-baseline
     notes:
@@ -48,6 +54,8 @@ nodes:
   q-baseline:
     type: question
     text: Is the source consistent with the user (known country or ISP, travel confirmed, usual hours)?
+    also_check:
+      - "Did {{user}} have concurrent sessions from other locations at the same time?"
     yes: o-benign
     no: q-preceded
     notes:
@@ -57,6 +65,9 @@ nodes:
   q-preceded:
     type: question
     text: Was the session preceded by failures (brute force) or followed by internal scanning, RDP or admin share access?
+    also_check:
+      - "Has {{user}} recently been given a privileged role or added to a privileged group?"
+      - "Did the VPN session access sensitive file shares or move large volumes of data?"
     yes: o-tp
     no: q-user-confirm
     notes:

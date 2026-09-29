@@ -10,7 +10,7 @@ applies_to:
   - Suspicious additions to sensitive groups
   - Group Membership changed (Defender for Identity)
 mitre: [T1098, T1078.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,11 @@ nodes:
   c-change:
     type: check
     text: Pull the membership change and the actor's logon.
+    also_check:
+      - "Was {{account}} created or re-enabled shortly before it was added to {{group}}?"
+      - "Has {{account}} signed in to domain controllers or servers it does not normally use since the change?"
+      - "Has {{account}} created scheduled tasks, services or registry run keys since the change?"
+      - "Has {{account}} attempted credential dumping (LSASS, SAM, NTDS.dit) since the change?"
     kql:
       - title: Privileged group membership changes (7d)
         platform: sentinel
@@ -60,6 +65,12 @@ nodes:
   q-actor-normal:
     type: question
     text: Did the actor make the change from their usual admin host and tool, with no recent risk?
+    also_check:
+      - "Did {{actor}} have multiple failed sign-ins before the change (brute force or password spray)?"
+      - "Did the password or sign-in settings of {{actor}} change unexpectedly before the change?"
+      - "Has {{actor}} made other privileged group or permission changes in the same period?"
+      - "Did {{actor}} run reconnaissance (net group, whoami, BloodHound) before the change?"
+      - "Were security logs cleared or auditing disabled around the time of the change?"
     yes: q-request
     no: o-tp
     notes:

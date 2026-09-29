@@ -10,7 +10,7 @@ applies_to:
   - Internal phishing campaign detected
   - Suspicious email sending patterns (suspiciousSendingPatterns)
 mitre: [T1534, T1566.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,9 @@ nodes:
   c-volume:
     type: check
     text: Measure what the account sent and to whom.
+    also_check:
+      - "Has {{sender}} sent attachments or sensitive files to external or personal addresses in the same period?"
+      - "Did {{sender}} export mail, contacts or files in bulk in the same period?"
     kql:
       - title: Outbound and internal mail from the sender (7d)
         platform: xdr
@@ -41,6 +44,8 @@ nodes:
   q-content:
     type: question
     text: Is the content phishing (credential lure, shared document link to an external login page, invoice with a link) rather than a genuine bulk mail?
+    also_check:
+      - "Did {{sender}} receive a phishing message with a similar lure shortly before the burst?"
     yes: q-signin
     no: o-fp
     notes:
@@ -50,6 +55,12 @@ nodes:
   q-signin:
     type: question
     text: Were the messages sent from a session on unfamiliar infrastructure?
+    also_check:
+      - "Were multiple failed sign-ins for {{sender}} seen before the successful sign-in?"
+      - "Has {{sender}} registered or changed an MFA method from an unrecognised IP?"
+      - "Has {{sender}} consented to a new OAuth app or created new app credentials?"
+      - "Has the mailbox of {{sender}} got new inbox rules or forwarding that delete, hide or send mail externally?"
+      - "Did {{sender}} try to access other mailboxes, accounts or systems in the tenant?"
     kql:
       - title: Send operations and their client IPs (7d)
         platform: sentinel

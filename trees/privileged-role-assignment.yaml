@@ -11,7 +11,7 @@ applies_to:
   - Risky sign in followed by privilege role grant
   - PIM role activation outside business hours
 mitre: [T1098.003, T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -51,6 +51,9 @@ nodes:
   q-actor-session:
     type: question
     text: Was the actor's session clean (usual IP and device, no risk detections, not a newly created or recently compromised account)?
+    also_check:
+      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
+      - "Were there multiple failed sign-ins or MFA denials for {{actor}} before the session that granted the role?"
     kql:
       - title: The actor's sign-ins and risk (7d)
         platform: sentinel
@@ -80,6 +83,13 @@ nodes:
   q-new-admin-activity:
     type: question
     text: Has the new admin done anything unexpected (created users, apps or credentials, changed Conditional Access, federation or MFA settings)?
+    also_check:
+      - "Has {{user}} disabled or changed audit logging, diagnostic settings or security alerts?"
+      - "Has {{user}} elevated access to Azure subscriptions or read secrets from Azure Key Vault?"
+      - "Has {{user}} run eDiscovery or content searches, or exported mailboxes or files in bulk?"
+      - "Has {{user}} deleted users, groups or other critical resources?"
+      - "Has {{user}} reset passwords or issued Temporary Access Passes for other accounts?"
+      - "Has {{user}} changed PIM role settings, such as removing approval or MFA on activation?"
     kql:
       - title: Actions by the new admin since the grant (7d)
         platform: sentinel

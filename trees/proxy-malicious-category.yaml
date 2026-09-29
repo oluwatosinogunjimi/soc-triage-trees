@@ -10,7 +10,7 @@ applies_to:
   - Secure web gateway malware category hit
   - Access to phishing category allowed
 mitre: [T1071.001, T1189]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,9 @@ nodes:
   c-requests:
     type: check
     text: Pull the requests and the proxy action.
+    also_check:
+      - "Have other users or hosts requested {{url}} in the same period?"
+      - "Is {{url}} linked to a known phishing campaign or earlier attacks against the organisation?"
     kql:
       - title: Proxy requests to the URL (7d)
         platform: sentinel
@@ -39,6 +42,9 @@ nodes:
   q-allowed:
     type: question
     text: Was any request allowed?
+    also_check:
+      - "Is the domain of {{url}} newly registered or on dynamic DNS?"
+      - "Does {{url}} use a shortener or redirect chain to hide its destination?"
     yes: q-what
     no: q-repeated
     notes:
@@ -48,6 +54,8 @@ nodes:
   q-repeated:
     type: question
     text: Are the blocked requests repeating at intervals or from a non-browser user agent?
+    also_check:
+      - "Has the device used by {{user}} contacted other suspicious or previously unseen domains?"
     yes: l-domain
     no: o-blocked
     notes:
@@ -57,6 +65,9 @@ nodes:
   q-what:
     type: question
     text: Did the allowed request download a file or present a login page?
+    also_check:
+      - "Did {{user}} receive unexpected authentication prompts or MFA requests after the visit?"
+      - "Has {{user}} signed in from an unrecognised location or device since the visit?"
     yes: l-click
     no: o-benign
     notes:

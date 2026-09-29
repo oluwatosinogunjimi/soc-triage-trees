@@ -10,7 +10,7 @@ applies_to:
   - Email reported by user as malware or phish
   - Suspicious email sending patterns
 mitre: [T1566.001, T1566.002, T1204.001, T1204.002, T1534]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -138,6 +138,9 @@ nodes:
     type: check
     text: Scope the campaign. Who else received it?
     why: If several users got it, you are working a campaign, not a single email. Every recipient needs the interaction checks below.
+    also_check:
+      - "Did any recipient forward the message to colleagues or external addresses?"
+      - "Has {{recipient}} received other messages with malicious links or attachments in the last 30 days?"
     kql:
       - title: Recipients of the same campaign (7d)
         platform: xdr
@@ -217,6 +220,8 @@ nodes:
   q-clicked:
     type: question
     text: Did any recipient click the link (click allowed, or clicked through a warning)?
+    also_check:
+      - "Did anyone reach the URL or its domain by another route, such as direct browsing or another device, outside Safe Links?"
     kql:
       - title: Clicks on URLs from this message
         platform: xdr
@@ -237,6 +242,11 @@ nodes:
     why: >-
       A credential-harvesting page is only the first stage. The proof of compromise is a
       successful sign-in from attacker infrastructure, usually within minutes.
+    also_check:
+      - "Were multiple failed sign-ins for {{recipient}} seen after the click?"
+      - "Did {{recipient}} report an unexpected MFA prompt or sign-in request after the click?"
+      - "Has {{recipient}} consented to a new OAuth app since the click?"
+      - "Has {{recipient}} created inbox rules that forward, delete or hide mail since the click?"
     kql:
       - title: Sign-ins for the recipient after the click (7d)
         platform: sentinel
@@ -258,6 +268,8 @@ nodes:
   q-download:
     type: question
     text: Did the click lead to a file download or process execution on the endpoint?
+    also_check:
+      - "Did the endpoint of {{recipient}} connect to previously unseen domains or IPs shortly after the click?"
     kql:
       - title: Files downloaded around the click
         platform: xdr

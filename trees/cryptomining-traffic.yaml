@@ -10,7 +10,7 @@ applies_to:
   - Impact:EC2/BitcoinDomainRequest.Reputation
   - Firewall detected Stratum mining protocol
 mitre: [T1496]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,10 @@ nodes:
   c-flows:
     type: check
     text: Confirm the pool traffic and identify the source device.
+    also_check:
+      - "Are other internal hosts connecting to the same mining pools?"
+      - "Is {{src_ip}} communicating with known command-and-control infrastructure besides the pool?"
+      - "Has a large volume of data left {{src_ip}} for destinations other than the pool?"
     kql:
       - title: Firewall sessions to mining pools (7d)
         platform: sentinel
@@ -55,6 +59,11 @@ nodes:
   q-kind:
     type: question
     text: Is it an internet-facing server, appliance or cloud workload (rather than a personal device on guest Wi-Fi)?
+    also_check:
+      - "Were there successful logons or admin sessions to {{src_ip}} from an unusual or untrusted source?"
+      - "Is {{src_ip}} scanning or connecting to many other internal hosts?"
+      - "Were new accounts, roles or keys created or changed on {{src_ip}} or its cloud account since the mining started?"
+      - "Were logging or monitoring services on {{src_ip}} disabled or changed?"
     yes: o-tp-server
     no: o-policy
     notes:

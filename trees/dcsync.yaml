@@ -10,7 +10,7 @@ applies_to:
   - Suspected DCSync attack
   - Directory Services replication from non-DC (Event 4662)
 mitre: [T1003.006]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,10 @@ nodes:
   c-replication:
     type: check
     text: Confirm the replication request and its source.
+    also_check:
+      - "Was {{account}} recently granted replication rights or added to a privileged group?"
+      - "Did {{src_host}} run domain reconnaissance (net group, BloodHound) before the replication?"
+      - "Has Mimikatz or a similar credential dumping tool run on {{src_host}}?"
     kql:
       - title: Replication rights used by non-machine accounts (Event 4662, 7d)
         platform: sentinel
@@ -58,6 +62,12 @@ nodes:
   q-tooling:
     type: question
     text: Is it an approved penetration test or identity audit with written authorisation?
+    also_check:
+      - "Has {{src_host}} been accessed from an unusual or untrusted source?"
+      - "Has {{account}} signed in to domain controllers or servers it does not normally use?"
+      - "Were security logs cleared or auditing changed on {{src_host}} or the domain controllers?"
+      - "Has {{src_host}} connected to previously unseen external domains or IPs, or shown beaconing?"
+      - "Have Kerberos tickets been requested or used anomalously since the replication (possible golden ticket)?"
     yes: o-benign-test
     no: o-tp
     notes:

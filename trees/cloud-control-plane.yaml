@@ -12,7 +12,7 @@ applies_to:
   - New access key created for IAM user
   - Unusual instance type launched
 mitre: [T1078.004, T1562.008, T1098.001, T1496, T1578]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -35,6 +35,8 @@ nodes:
       - Exact operation or event name and whether it succeeded
       - Target resource, subscription or account, and region
       - Source IP, user agent (console, CLI, SDK, Terraform)
+    also_check:
+      - "Is {{principal}} privileged, or able to reach sensitive data or production resources?"
     kql:
       - title: Azure activity by the principal (7d)
         platform: sentinel
@@ -71,6 +73,9 @@ nodes:
   q-normal-for-principal:
     type: question
     text: Has this principal performed this kind of operation, from this IP or region, in the last 30 days?
+    also_check:
+      - "Did {{principal}} enumerate resources, roles or permissions in bulk (many List, Describe or Get calls)?"
+      - "Did {{principal}} act in more than one subscription or AWS account in the same session?"
     kql:
       - title: Azure operation history for the principal (30d)
         platform: sentinel
@@ -102,6 +107,9 @@ nodes:
       settings deleted, GuardDuty or Defender disabled), new credentials or keys, new role
       assignments or policies, security groups opened to 0.0.0.0/0, snapshots or buckets
       made public or shared, compute launched in unused regions or GPU sizes, secrets read.
+    also_check:
+      - "Did {{principal}} delete resources, snapshots or backups?"
+      - "Did {{principal}} change DNS records or domain settings?"
     kql:
       - title: High-impact AWS events by the principal (7d)
         platform: sentinel
@@ -135,6 +143,10 @@ nodes:
   q-source:
     type: question
     text: Did the call come from an unexpected source (unfamiliar IP, ASN or country, TOR or VPS, unusual user agent, key used outside its workload)?
+    also_check:
+      - "Has {{ip}} been used by any other principal in the tenant or account?"
+      - "Were there failed sign-ins or MFA attempts for {{principal}} from {{ip}} before the call?"
+      - "Have credentials for {{principal}} been exposed recently in a repository, log or paste?"
     yes: o-tp-cloud
     no: q-owner-confirm
     unknown: q-owner-confirm

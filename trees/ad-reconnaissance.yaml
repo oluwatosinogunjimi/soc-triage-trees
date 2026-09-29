@@ -12,7 +12,7 @@ applies_to:
   - Possible Active Directory enumeration via ADWS
   - Suspected account enumeration (Kerberos, NTLM)
 mitre: [T1087.002, T1069.002, T1482]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,6 +28,10 @@ nodes:
   c-queries:
     type: check
     text: See what was queried, by whom and with which tool.
+    also_check:
+      - "Were the recon tools launched by an unexpected parent process, such as Office, a browser or a script host?"
+      - "Did {{src_host}} run obfuscated or encoded PowerShell commands?"
+      - "Has anyone tried to disable AV, EDR or logging on {{src_host}}?"
     kql:
       - title: Directory queries from the host (24h)
         platform: xdr
@@ -52,6 +56,10 @@ nodes:
   q-admin-tool:
     type: question
     text: Is this an IT or security team member doing their job, or an approved tool (identity audit, PingCastle, approved pen test)?
+    also_check:
+      - "Did {{account}} run the queries from a host it does not normally use?"
+      - "Has {{src_host}} been accessed from an unusual or untrusted source?"
+      - "Has {{src_host}} connected to previously unseen external domains or IPs, or shown beaconing?"
     yes: o-benign
     no: q-scope
     notes:
@@ -61,6 +69,9 @@ nodes:
   q-scope:
     type: question
     text: Is the enumeration broad or targeted at privilege (all users, admin groups, SPNs, trusts, AD CS templates, ACLs)?
+    also_check:
+      - "Has {{src_host}} scanned ports or connected to many internal hosts in a short period?"
+      - "Were enumeration results compressed, staged or sent off {{src_host}}?"
     yes: q-followon
     no: o-inconclusive
     notes:

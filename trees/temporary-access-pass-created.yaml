@@ -10,7 +10,7 @@ applies_to:
   - Reciprocal Temporary Access Pass creation between users
   - Admin registered security info (TAP)
 mitre: [T1098.005, T1556.006]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,10 @@ nodes:
   c-tap:
     type: check
     text: Pull the TAP creation and every use of it.
+    also_check:
+      - "Has {{user}} created inbox rules or enabled forwarding to an external address since the pass was used?"
+      - "Has {{user}} consented to an OAuth app or registered a new device since the pass was used?"
+      - "Has {{user}} downloaded or shared an unusual volume of files since the pass was used?"
     kql:
       - title: TAP events and sign-ins using it (7d)
         platform: sentinel
@@ -48,6 +52,8 @@ nodes:
     type: question
     text: Is there a helpdesk ticket, and was the requester's identity verified out of band (call-back to a known number, manager approval, in person)?
     why: Groups like Scattered Spider call the helpdesk pretending to be the user. A ticket alone is not verification.
+    also_check:
+      - "Is {{user}} a privileged or high-value account (admin role, finance, executive)?"
     yes: q-reciprocal
     no: q-user-confirm
     notes:
@@ -57,6 +63,9 @@ nodes:
   q-reciprocal:
     type: question
     text: Did the issuer and target issue passes to each other, or did the issuer's session show risk?
+    also_check:
+      - "Has {{actor}} reset passwords or authentication methods for other accounts in the same period?"
+      - "Has {{actor}} recently been given Authentication Administrator or another privileged role unexpectedly?"
     yes: o-tp
     no: q-usage
     notes:
@@ -66,6 +75,8 @@ nodes:
   q-user-confirm:
     type: question
     text: Does the user confirm they asked for the pass and used it themselves?
+    also_check:
+      - "Did {{user}} receive calls, messages or MFA prompts asking for sign-in details or codes around the time of the request?"
     yes: q-usage
     no: o-tp
     unknown: o-tp
@@ -77,6 +88,8 @@ nodes:
   q-usage:
     type: question
     text: Was the pass used from the user's normal location and device, followed by normal MFA registration?
+    also_check:
+      - "Is the IP that used the pass flagged in threat intelligence for malicious activity?"
     yes: o-benign
     no: o-tp
     notes:

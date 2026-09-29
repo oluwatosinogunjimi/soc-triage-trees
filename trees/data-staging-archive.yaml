@@ -10,7 +10,7 @@ applies_to:
   - Data compressed with password (7z -p / rar -hp)
   - Large archive created in staging directory
 mitre: [T1560.001, T1074.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,8 @@ nodes:
   c-archive:
     type: check
     text: See what was archived, how, and where the archive went.
+    also_check:
+      - "Did {{account}} run discovery commands (net view, net share, whoami, domain queries) on {{device}} before the archiving?"
     kql:
       - title: Archiving commands and resulting files (48h)
         platform: xdr
@@ -46,6 +48,9 @@ nodes:
   q-routine:
     type: question
     text: Is it a routine job (backup, log rotation, a user zipping their own project) by the expected account?
+    also_check:
+      - "Was {{account}} used on {{device}} from an unfamiliar source IP or remote session?"
+      - "Has {{account}} recently been added to a privileged group or given local admin rights?"
     yes: o-benign
     no: q-signals
     notes:
@@ -55,6 +60,13 @@ nodes:
   q-signals:
     type: question
     text: Are there staging signals (password-protected, file shares or many users' data, a temp or public folder, followed by uploads with rclone, WinSCP or a browser)?
+    also_check:
+      - "Was a removable drive connected to {{device}} after the archiving?"
+      - "Were the archives renamed, split or given a misleading extension before they moved?"
+      - "Has {{device}} shown beaconing or connections to previously unseen domains or IPs?"
+      - "Was LSASS or another credential store accessed on {{device}} around the same time?"
+      - "Has anyone tried to disable AV, EDR or logging on {{device}}?"
+      - "Were shadow copies or backups deleted, or files mass-encrypted, on {{device}}?"
     kql:
       - title: Exfiltration tools and large uploads after archiving (48h)
         platform: xdr

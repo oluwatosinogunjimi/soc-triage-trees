@@ -10,7 +10,7 @@ applies_to:
   - User clicked through to a malicious URL
   - Safe Links click allowed, URL later weaponized
 mitre: [T1204.001, T1566.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-click:
     type: check
     text: Pull the click, the source message and the URL verdict.
+    also_check:
+      - "Did other users click {{url}} or visit its domain in the same period?"
+      - "Has {{user}} received other messages with malicious links or attachments in the last 30 days?"
     kql:
       - title: Clicks on the URL across the tenant (7d)
         platform: xdr
@@ -40,6 +43,8 @@ nodes:
   q-malicious:
     type: question
     text: Is the URL confirmed malicious (credential harvesting, malware delivery) rather than a false detection?
+    also_check:
+      - "Is the domain of {{url}} newly registered or recently changed?"
     yes: q-clickthrough
     no: o-fp
     unknown: q-clickthrough
@@ -51,6 +56,8 @@ nodes:
   q-clickthrough:
     type: question
     text: Did the click reach the page (ClickAllowed or clicked through the warning), rather than being blocked?
+    also_check:
+      - "Did {{user}} reach {{url}} or its domain by another route, such as a later click, direct browsing or another device?"
     yes: ch-page
     no: o-blocked
     notes:
@@ -60,6 +67,11 @@ nodes:
   ch-page:
     type: choice
     text: What kind of page was it?
+    also_check:
+      - "Has {{user}} signed in from an unrecognised IP or device since the click?"
+      - "Has {{user}} registered or changed an MFA method since the click?"
+      - "Did the device of {{user}} connect to other previously unseen domains or IPs shortly after the click?"
+      - "Has {{user}} created inbox rules that forward, delete or hide mail since the click?"
     options:
       - { label: Credential harvesting or fake login page, next: l-aitm, note: "The page was a credential harvesting login page." }
       - { label: File download or malware delivery, next: l-edr, note: "The page delivered a file download." }

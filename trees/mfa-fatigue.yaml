@@ -11,7 +11,7 @@ applies_to:
   - User reported suspicious activity (MFA)
   - Multiple MFA denials followed by success
 mitre: [T1621, T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -32,6 +32,8 @@ nodes:
       - Source IP, ASN and country of the sign-ins that triggered them
       - Whether any challenge ended in success (ResultType 0)
       - Whether the user reported the prompts (user reported suspicious activity)
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
     kql:
       - title: MFA challenges and outcomes for the user (48h)
         platform: sentinel
@@ -62,6 +64,10 @@ nodes:
   q-approved:
     type: question
     text: Did any prompt get approved, producing a successful sign-in from the unfamiliar IP?
+    also_check:
+      - "Has {{ip}} triggered MFA prompts or failed sign-ins for other accounts in the tenant?"
+      - "Has the password for {{user}} been used in a successful sign-in that did not require MFA, such as legacy authentication?"
+      - "Do the credentials for {{user}} appear in a recent leak or infostealer log?"
     yes: q-post-auth
     no: o-password-compromised
     notes:
@@ -71,6 +77,11 @@ nodes:
   q-post-auth:
     type: question
     text: Did the attacker do anything after getting in (new MFA method, inbox rule, consent, mail sent, file access)?
+    also_check:
+      - "Has {{user}} registered or joined a new device to Entra ID since the approval?"
+      - "Has mailbox forwarding to an external address been enabled for {{user}} since the approval?"
+      - "Has {{user}} been given a privileged role or added to a privileged group since the approval?"
+      - "Has {{user}} created external sharing links for files since the approval?"
     kql:
       - title: Directory and mailbox changes after the approval (7d)
         platform: sentinel

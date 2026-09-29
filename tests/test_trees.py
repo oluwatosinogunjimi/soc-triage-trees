@@ -131,3 +131,32 @@ def test_every_playbook_is_reachable_from_universal_triage():
     linked = {n["tree"] for n in trees["universal-triage"]["nodes"].values() if n["type"] == "link"}
     missing = sorted(t for t, tree in trees.items() if tree["category"] != "triage" and t not in linked)
     assert not missing, f"Not routed from universal-triage: {missing}"
+
+
+def test_repeated_also_check_is_caught(tmp_path):
+    _write(tmp_path, "t-also", BASE.format(id="t-also") + """
+  q-a:
+    type: question
+    text: A?
+    also_check:
+      - "Did anything else happen?"
+    yes: c-b
+    no: c-b
+    notes: {yes: y, no: n}
+  c-b:
+    type: check
+    text: B
+    also_check:
+      - "Did anything else happen?"
+    note: b
+    next: o-done
+  o-done:
+    type: outcome
+    verdict: false_positive
+    title: Done
+    anchor: a
+    risk: r
+    actions: [x]
+""")
+    _, errors, _ = validate(tmp_path)
+    assert any("also_check repeated" in e for e in errors), errors

@@ -11,7 +11,7 @@ applies_to:
   - Logging disabled on firewall
   - Admin login to network device from unusual source
 mitre: [T1562.004, T1098]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-change:
     type: check
     text: Pull the admin session and the configuration changes.
+    also_check:
+      - "Did {{ip}} make failed logons to {{device}} or other network devices before the session?"
+      - "Has {{admin}} logged on to other network devices it does not normally manage?"
     kql:
       - title: Admin logons and config events on the device (7d)
         platform: sentinel
@@ -51,6 +54,9 @@ nodes:
   q-source:
     type: question
     text: Did the admin connect from the management network or jump host, with their named account?
+    also_check:
+      - "Did {{admin}} authenticate without MFA where MFA is required?"
+      - "Has {{admin}} recently been given higher privileges or had its password changed unexpectedly?"
     yes: o-benign
     no: q-impact
     notes:
@@ -60,6 +66,9 @@ nodes:
   q-impact:
     type: question
     text: Does the change open inbound access, add admin accounts, weaken VPN or disable logging?
+    also_check:
+      - "Did the change alter DNS, routing, NAT or proxy settings in a way that could redirect traffic?"
+      - "Did the session export the configuration or access stored credentials or key material on {{device}}?"
     yes: o-tp
     no: o-inconclusive
     notes:

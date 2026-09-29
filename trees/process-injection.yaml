@@ -10,7 +10,7 @@ applies_to:
   - Process hollowing detected
   - A process was injected with potentially malicious code
 mitre: [T1055, T1055.012]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,10 @@ nodes:
   c-injection:
     type: check
     text: Identify the injecting process, the target and what the target did after.
+    also_check:
+      - "Did {{source}} run from a temporary or user-writable directory, or start from an unexpected parent?"
+      - "Were new scheduled tasks, services or Run keys created on {{device}} that launch {{source}}?"
+      - "Has anyone tried to disable AV, EDR or logging on {{device}}?"
     kql:
       - title: Remote thread and memory API calls (48h)
         platform: xdr
@@ -56,6 +60,12 @@ nodes:
   q-target-behaviour:
     type: question
     text: Did the target process then do something out of character (network beacons, spawning shells, touching LSASS)?
+    also_check:
+      - "Did {{target}} run at a higher integrity level than {{source}}, or spawn a SYSTEM child process?"
+      - "Did {{target}} capture keystrokes, screenshots or clipboard data?"
+      - "Did {{target}} enumerate users, groups or domain configuration?"
+      - "Has {{device}} used SMB, WMI or RDP for remote execution to other internal hosts since the injection?"
+      - "Has a large volume of data left {{device}} through {{target}}?"
     yes: o-tp
     no: l-edr
     notes:

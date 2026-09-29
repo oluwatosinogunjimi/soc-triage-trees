@@ -11,7 +11,7 @@ applies_to:
   - Malicious registration of an attacker controlled MFA device
   - User registered security info
 mitre: [T1098.005, T1556.006]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -32,6 +32,12 @@ nodes:
       - Registration time, IP and user agent
       - Whether an admin or the user registered it
       - Other methods removed or changed at the same time
+    also_check:
+      - "Has {{user}} created inbox rules or enabled forwarding to an external address since the registration?"
+      - "Has {{user}} consented to an OAuth app or registered a new device since the registration?"
+      - "Has {{user}} downloaded or shared an unusual volume of files since the registration?"
+      - "Has {{user}} sent unusual mail to many colleagues since the registration, possibly spreading phishing?"
+      - "Has {{user}} been given a privileged role or changed group memberships since the registration?"
     kql:
       - title: Security info changes for the user (30d)
         platform: sentinel
@@ -49,6 +55,9 @@ nodes:
   q-known-source:
     type: question
     text: Was the method registered from the user's normal network and device, during normal working pattern?
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
+      - "Has {{ip}} been used to sign in to or register MFA for other accounts in the tenant?"
     kql:
       - title: Sign-ins around the registration (7d)
         platform: sentinel
@@ -70,6 +79,9 @@ nodes:
     type: question
     text: Was the registering session preceded by risk (phishing click, risky sign-in, AiTM or token anomaly)?
     why: Registration straight after a phishing click or an AiTM sign-in is the classic persistence step.
+    also_check:
+      - "Were there multiple failed sign-ins or MFA prompts for {{user}} before the registration?"
+      - "Did the password for {{user}} change unexpectedly before the registration?"
     kql:
       - title: Risk detections for the user (14d)
         platform: sentinel

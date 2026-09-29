@@ -10,7 +10,7 @@ applies_to:
   - Suspicious process launched by web server (w3wp.exe spawning cmd)
   - Web shell detected (Backdoor:ASP/Webshell)
 mitre: [T1505.003, T1190]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -46,6 +46,9 @@ nodes:
   q-deployment:
     type: question
     text: Did the file arrive through a legitimate deployment (release pipeline, change window, developer confirms)?
+    also_check:
+      - "Did the web server receive requests to {{file}} from unusual or untrusted external IPs?"
+      - "Is there evidence of exploit attempts against the web application on {{device}} before {{file}} appeared?"
     yes: q-shell-behaviour
     no: q-shell-behaviour
     notes:
@@ -55,6 +58,14 @@ nodes:
   q-shell-behaviour:
     type: question
     text: Does the web server process spawn shells or recon commands, or does the file contain command execution code (eval, Process.Start, cmd /c)?
+    also_check:
+      - "Did the web server process access LSASS memory or dump credentials on {{device}}?"
+      - "Was a new local or domain account created, or added to a privileged group, from {{device}}?"
+      - "Has {{device}} connected to internal hosts it does not normally talk to (RDP, SMB, WinRM)?"
+      - "Has {{device}} downloaded tools or connected to previously unseen external domains or IPs?"
+      - "Were scheduled tasks, services or startup entries created on {{device}}?"
+      - "Were security tools disabled or event logs cleared on {{device}}?"
+      - "Has a large volume of data left {{device}}, or was data staged or compressed on it?"
     yes: o-tp
     no: o-fp
     notes:

@@ -22,6 +22,8 @@ python tools/build.py && python -m http.server -d dist
 
 Optional on `check`, `question` and `choice`: `why` (one short paragraph), `look_for` (checks only, a list), `kql` (a list of `{title, platform, query}` where platform is `sentinel`, `xdr` or `both`).
 
+`also_check` (optional on `check`, `question` and `choice`) is a list of wider yes/no questions to rule out at that step, where yes always means "suspicious". They don't change the route. The analyst answers each one, and the answers go into the closure note. A yes before a benign verdict gets a warning. Use them for related activity the tree doesn't branch on: persistence, privilege changes, lateral movement, collection and exfiltration for the same entities. Each question may appear only once per tree.
+
 Optional on `outcome`: `monitor`, `escalate: true`, `tuning`.
 
 Node ids use a prefix for their type: `c-` check, `q-` question, `ch-` choice, `o-` outcome, `l-` link.
@@ -48,6 +50,12 @@ Declare the values an analyst fills in once under `entities`, then use them anyw
 - `actions` are specific and ordered by priority.
 - Add `monitor` for true positives, inconclusive results, privileged accounts and anything with residual doubt.
 - Add `tuning` to false and benign outcomes when a scoped exclusion or logic fix would stop the noise.
+
+**Also check**
+- One question each, ending in "?", phrased so that yes means bad.
+- Put it on the step whose subject it matches, and prefer steps that most paths pass through.
+- Don't repeat what the tree already asks or lists in `look_for`.
+- Use the tree's entity placeholders ("Has {{user}} ...") and quote each item in double quotes in YAML.
 
 **KQL**
 - Put the query on the question it answers, not in a big block at the start.

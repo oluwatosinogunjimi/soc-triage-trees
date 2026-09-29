@@ -10,7 +10,7 @@ applies_to:
   - An Office application ran suspicious commands
   - "ASR rule: Block Office applications from creating child processes"
 mitre: [T1204.002, T1566.001, T1059]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-chain:
     type: check
     text: Read the process chain and the document that started it.
+    also_check:
+      - "Did {{document}} arrive from an external or first-time sender, or from an untrusted download site?"
+      - "Did the Office process make a network connection or download a file right after {{document}} opened?"
     kql:
       - title: Office child processes on the device (48h)
         platform: xdr
@@ -57,6 +60,10 @@ nodes:
   q-blocked:
     type: question
     text: Did ASR or the EDR block the child process?
+    also_check:
+      - "Did the Office process write executables, scripts or DLLs to disk after {{document}} opened?"
+      - "Were new scheduled tasks or Run keys created on {{device}} after {{document}} opened?"
+      - "Was {{document}} delivered to other users or opened on other devices?"
     yes: o-tp-blocked
     no: l-powershell
     notes:

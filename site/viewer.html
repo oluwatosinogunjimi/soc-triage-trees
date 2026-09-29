@@ -210,6 +210,21 @@ mark { background: var(--inc-soft); color: inherit; border-radius: 2px; padding:
 .lookfor label, .actions-list label { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: start; cursor: pointer; }
 .lookfor input, .actions-list input { margin-top: 4px; accent-color: var(--accent); }
 .lookfor input:checked + span, .actions-list input:checked + span { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+.also-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.also-head .muted { font-size: 12.5px; }
+.also { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; max-width: 80ch; }
+.also li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 8px 8px 12px;
+  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.also li.a-yes { border-color: var(--tp); background: var(--tp-soft); }
+.also li.a-no .aq { color: var(--muted); }
+.also .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+.also .seg button { font: inherit; font-size: 12.5px; font-weight: 600; padding: 4px 11px; border: 0; background: var(--surface); color: var(--ink-2); cursor: pointer; min-width: 44px; min-height: 30px; }
+.also .seg button + button { border-left: 1px solid var(--line-strong); }
+.also .seg button[aria-pressed="true"].sy { background: var(--tp); color: #fff; }
+.also .seg button[aria-pressed="true"].sn { background: var(--btp); color: #fff; }
+.also .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.also-flag { font-size: 13px; padding: 8px 12px; border-radius: var(--r); background: var(--tp-soft); color: var(--tp); max-width: 80ch; }
+@media (max-width: 560px) { .also li { grid-template-columns: 1fr; } .also .seg { justify-self: start; } }
 .sub { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 
 details.kql { border: 1px solid var(--line); border-radius: var(--r); background: var(--code-bg); min-width: 0; }
@@ -418,7 +433,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
 
   // ================= state =================
   const STORE = "triage-trees-case-v2";
-  const blank = () => ({ view: "home", tree: "universal-triage", node: null, started: false, path: [], evidence: {}, entities: {}, ticks: {},
+  const blank = () => ({ view: "home", tree: "universal-triage", node: null, started: false, path: [], evidence: {}, entities: {}, ticks: {}, also: {},
                          ticket: "", signoff: "", incSteps: true, incActions: true });
   let S = blank();
   let previous = null;
@@ -506,6 +521,24 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     if (n.type === "check") return [{ label: "", ans: "next", to: n.next }];
     if (n.type === "choice") return n.options.map(o => ({ label: o.label, ans: "option:" + o.label, to: o.next }));
     return [];
+  }
+
+  // Wider "also check" answers. Keyed by tree, node and question text so edits to other items don't shift answers.
+  const alsoKey = (tid, nid, q) => tid + ":" + nid + "|" + q;
+  function alsoAnswers(tid, nid) {
+    const n = node(tid, nid);
+    return (n.also_check || []).map(q => ({ q, a: S.also[alsoKey(tid, nid, q)] || null }));
+  }
+  function visitedSteps() {
+    const out = S.path.filter(st => node(st.tree, st.node).type !== "link").map(st => [st.tree, st.node]);
+    const cur = node(S.tree, S.node);
+    if (cur.type !== "outcome" && cur.type !== "link") out.push([S.tree, S.node]);
+    return out;
+  }
+  function alsoTotals() {
+    let yes = 0, no = 0; const flagged = [];
+    visitedSteps().forEach(([t, n]) => alsoAnswers(t, n).forEach(x => { if (x.a === "yes") { yes++; flagged.push(x.q); } else if (x.a === "no") no++; }));
+    return { yes, no, flagged };
   }
 
   // Outcomes reachable from a node, following hand-overs into other playbooks.
@@ -792,6 +825,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         h("div", { style: "display:grid;gap:16px;align-content:start" },
           h("div", { style: "display:grid;gap:8px" }, h("div", { class: "sub" }, outs.length + " possible endings"), vbar(counts, true), vlegend(counts),
             h("div", { class: "endings-list" }, VERDICTS.flatMap(v => outs.filter(o => o.verdict === v).map(o => h("span", { class: "end-pill ep-" + v }, o.title))))),
+          (() => { const c = Object.values(t.nodes).reduce((a, x) => a + (x.also_check || []).length, 0);
+            return c ? h("p", { class: "muted" }, c + " wider checks sit on the steps under \u201cAlso check\u201d. Answer them as you go; a yes points beyond this alert.") : null; })(),
           links.length ? h("p", { class: "muted" }, links.length > 6 ? "Routes to " + links.length + " other playbooks." : "Can hand over to " + [...new Set(links.map(l => TREES[l.tree].title))].join(", ") + ".") : null,
           (t.entities && t.entities.length) ? h("p", { class: "muted" }, "Fill the case entities first (" + t.entities.map(e => e.label.toLowerCase()).join(", ") + "). They go into every query and the note.") : null)),
       h("div", { class: "start-row" }, h("button", { class: "ans-btn go", type: "button", onclick: start }, "Start investigation", h("kbd", {}, "Enter")),
@@ -837,6 +872,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         return h("li", {}, h("label", { for: "lf-" + i }, cb, h("span", {}, fill(x))));
       })));
     }
+    if (n.also_check && n.also_check.length) box.append(renderAlso(n));
     if (n.kql && n.kql.length) { box.append(h("div", { class: "sub" }, n.kql.length > 1 ? "Queries" : "Query")); renderKql(n.kql).forEach(el => box.append(el)); }
     const k = key(S.tree, S.node);
     const ta = h("textarea", { id: "ev-" + S.tree + "-" + S.node, rows: 2, placeholder: "Real values, for example: 42 sign-ins from 81.2.69.160 (AS2856) over 30 days, all from a compliant device" });
@@ -856,6 +892,29 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     }
     box.append(backRow());
     return box;
+  }
+  function renderAlso(n) {
+    const tid = S.tree, nid = S.node;
+    const wrap = h("div", { class: "also-wrap", style: "display:grid;gap:8px" });
+    const draw = () => {
+      const ans = alsoAnswers(tid, nid);
+      const done = ans.filter(x => x.a).length, yes = ans.filter(x => x.a === "yes").length;
+      wrap.replaceChildren(
+        h("div", { class: "also-head" }, h("div", { class: "sub" }, "Also check"),
+          h("span", { class: "muted" }, done + " of " + ans.length + " answered · a yes points beyond this alert")),
+        h("ul", { class: "also" }, ans.map((x, i) => {
+          const set = v => { const k = alsoKey(tid, nid, x.q); if (S.also[k] === v) delete S.also[k]; else S.also[k] = v; save(); draw(); refreshDraft(); };
+          return h("li", { class: x.a ? "a-" + x.a : "" },
+            h("span", { class: "aq", id: "aq-" + i }, fill(x.q)),
+            h("span", { class: "seg", role: "group", "aria-labelledby": "aq-" + i },
+              h("button", { type: "button", class: "sy", "aria-pressed": x.a === "yes" ? "true" : "false", onclick: () => set("yes") }, "Yes"),
+              h("button", { type: "button", class: "sn", "aria-pressed": x.a === "no" ? "true" : "false", onclick: () => set("no") }, "No")));
+        })),
+        yes ? h("div", { class: "also-flag", role: "status" }, (yes === 1 ? "One wider check came back yes." : yes + " wider checks came back yes.") +
+          " Record what you found below and weigh it before the verdict. It can justify escalating even if this route ends benign.") : null);
+    };
+    draw();
+    return wrap;
   }
   function backRow() {
     return h("div", { class: "back-row" },
@@ -883,6 +942,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     wrap.append(h("section", { class: "verdict-banner vb-" + n.verdict, "aria-live": "polite" },
       h("div", { class: "verdict-label" }, h("span", {}, "Verdict · " + VLABEL[n.verdict]), n.escalate ? h("span", { class: "esc" }, "Escalate") : null),
       h("h2", {}, n.title), h("p", {}, fill(n.anchor))));
+    const tot = alsoTotals();
+    if (tot.yes && (n.verdict === "false_positive" || n.verdict === "benign_positive")) {
+      wrap.append(h("div", { class: "also-flag", role: "status" }, "You answered yes to " + (tot.yes === 1 ? "a wider check" : tot.yes + " wider checks") +
+        " on the way here: " + tot.flagged.map(q => fill(q)).join(" ") + " Make sure the note explains " + (tot.yes === 1 ? "it" : "them") + " before closing this as " + VLABEL[n.verdict].toLowerCase() + ", or escalate."));
+    }
     const body = h("section", { class: "panel out-body" });
     body.append(h("div", { class: "out-block" }, h("div", { class: "sub" }, "Risk"), h("p", {}, fill(n.risk))));
     const side = h("div", { style: "display:grid;gap:16px;align-content:start" });
@@ -929,6 +993,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       lines.push("- " + s.trim());
     });
     if (!done) { const ev = (S.evidence[key(S.tree, S.node)] || "").trim(); if (ev) lines.push("- " + ev.replace(/\s+/g, " ")); }
+    const tot = alsoTotals();
+    tot.flagged.forEach(q => { missingIn(q, missing); lines.push("- Wider check answered yes: " + fill(q)); });
+    if (tot.no) lines.push("- I ran " + (tot.yes + tot.no) + " wider check" + (tot.yes + tot.no === 1 ? "" : "s") + " alongside this playbook" +
+      (tot.yes ? "; " + tot.no + " came back clear." : " and all came back clear."));
     if (done) {
       lines.push(""); lines.push(fill(out.risk));
       const act = [];
@@ -940,7 +1008,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     }
     if (S.incSteps && S.path.length) {
       lines.push(""); lines.push("Investigative steps:");
-      S.path.forEach(st => { const n = node(st.tree, st.node); if (n.type === "link") return; lines.push("- " + fill(n.text) + " " + answerLabel(st) + "."); });
+      S.path.forEach(st => {
+        const n = node(st.tree, st.node); if (n.type === "link") return;
+        lines.push("- " + fill(n.text) + " " + answerLabel(st) + ".");
+        alsoAnswers(st.tree, st.node).forEach(x => { if (x.a) lines.push("- " + fill(x.q) + " " + (x.a === "yes" ? "Yes" : "No") + "."); });
+      });
     }
     if (S.signoff.trim()) { lines.push(""); lines.push(S.signoff.trim()); }
     return { text: lines.join("\n").replace(/\n{3,}/g, "\n\n"), missing: [...missing] };
@@ -1097,6 +1169,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       box.append(h("div", { class: "kind" }, h("span", { class: "tag" }, KIND[n.type]), h("span", {}, nid)),
         h("div", { class: "q-text" }, fill(n.text)), n.why ? h("p", { class: "why" }, h("span", {}, fill(n.why))) : null,
         n.look_for ? h("ul", { style: "margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px" }, n.look_for.map(x => h("li", {}, fill(x)))) : null,
+        n.also_check ? h("div", { class: "sub" }, "Also check (" + n.also_check.length + ")") : null,
+        n.also_check ? h("ul", { style: "margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px" }, n.also_check.map(x => h("li", {}, fill(x)))) : null,
         (n.kql && n.kql.length) ? h("p", { class: "muted" }, n.kql.length + " KQL " + (n.kql.length > 1 ? "queries" : "query") + " at this step.") : null,
         h("div", { class: "sub" }, outs.length + " endings reachable from here"), vbar(counts, true), vlegend(counts));
     }

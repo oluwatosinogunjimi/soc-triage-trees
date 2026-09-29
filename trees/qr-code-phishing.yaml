@@ -10,7 +10,7 @@ applies_to:
   - Phish detected, URL in QR code
   - User reported QR code phishing
 mitre: [T1566.002, T1204.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-message:
     type: check
     text: Pull the message, the decoded QR URL and every recipient.
+    also_check:
+      - "Is the domain behind the decoded QR URL newly registered or recently changed?"
+      - "Has {{recipient}} received other messages with malicious links or QR codes in the last 30 days?"
     kql:
       - title: QR code URLs and recipients
         platform: xdr
@@ -52,6 +55,11 @@ nodes:
     type: question
     text: Is there evidence a recipient scanned it (sign-in soon after from a mobile IP or new device, user admits scanning)?
     why: Phone scans bypass Safe Links, so look at sign-ins. An AiTM sign-in from a mobile carrier IP or unusual user agent a few minutes after delivery is the tell.
+    also_check:
+      - "Has {{recipient}} registered or changed an MFA method since the message arrived?"
+      - "Has a new device been registered for {{recipient}} since the message arrived?"
+      - "Were multiple failed sign-ins for {{recipient}} seen after the message arrived?"
+      - "Did {{recipient}} report an unexpected MFA prompt or sign-in request after the message arrived?"
     kql:
       - title: Sign-ins for the recipient after delivery (48h)
         platform: sentinel

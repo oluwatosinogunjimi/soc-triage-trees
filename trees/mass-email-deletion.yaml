@@ -10,7 +10,7 @@ applies_to:
   - Unusual file deletion activities (mail)
   - Mass HardDelete in mailbox
 mitre: [T1070.008]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,8 @@ nodes:
   c-deletes:
     type: check
     text: Measure the deletions, their source session and what they targeted.
+    also_check:
+      - "Were files in shared document libraries also deleted or changed by {{user}} in the same period?"
     kql:
       - title: Deletions by operation and client IP (7d)
         platform: sentinel
@@ -40,6 +42,10 @@ nodes:
   q-session:
     type: question
     text: Did the deletions come from the user's usual client and network?
+    also_check:
+      - "Were multiple failed sign-ins for {{user}} seen before the session that made the deletions?"
+      - "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
+      - "Has {{user}} consented to a new OAuth app or granted an app access to mail?"
     yes: q-content
     no: o-tp
     notes:
@@ -49,6 +55,11 @@ nodes:
   q-content:
     type: question
     text: Did the deletions target security alerts, bounce messages, replies to recent sends, or a specific thread (rather than general clean-up)?
+    also_check:
+      - "Did {{user}} send unusual messages to many colleagues or external contacts before the deletions?"
+      - "Has the mailbox of {{user}} got inbox rules that delete, hide or forward mail?"
+      - "Has the mailbox of {{user}} sent attachments or sensitive data outside the organisation in the same period?"
+      - "Did {{user}} export mail, contacts or files in bulk in the same period?"
     yes: o-inconclusive
     no: o-benign
     notes:

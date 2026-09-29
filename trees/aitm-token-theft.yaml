@@ -13,7 +13,7 @@ applies_to:
   - Stolen session cookie was used
   - Suspicious sign-in after a phishing click
 mitre: [T1557, T1539, T1550.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -35,6 +35,8 @@ nodes:
       The theft happens in an interactive sign-in through the proxy. The replay usually shows
       up in non-interactive sign-ins from the attacker's infrastructure, which many analysts
       never look at.
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
     kql:
       - title: Interactive and non-interactive sign-ins (7d)
         platform: sentinel
@@ -121,6 +123,8 @@ nodes:
     type: check
     text: Tie it to the lure. Look for a URL click in the minutes before the suspicious sign-in.
     why: Finding the phishing email lets you purge it and check every other recipient who clicked.
+    also_check:
+      - "Has {{ip}} made failed sign-ins against other or privileged accounts?"
     kql:
       - title: URL clicks by the user (7d)
         platform: xdr
@@ -143,6 +147,12 @@ nodes:
   q-persistence:
     type: question
     text: Did the attacker establish persistence (new MFA method, inbox rule, OAuth consent, device registration, mail sent from the account)?
+    also_check:
+      - "Has {{user}} been assigned a privileged role or changed directory permissions since the suspect sign-in?"
+      - "Did {{user}} access other mailboxes or gain delegate permissions from {{ip}}?"
+      - "Did {{user}} search mail or files for payment, invoice or password terms during the suspect session?"
+      - "Has {{user}} downloaded or synced an unusual volume of files in M365 since the suspect sign-in?"
+      - "Has {{user}} created external sharing links or sent files to personal addresses?"
     kql:
       - title: Security info, device and consent changes (7d)
         platform: sentinel

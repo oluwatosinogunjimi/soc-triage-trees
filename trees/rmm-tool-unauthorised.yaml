@@ -10,7 +10,7 @@ applies_to:
   - AnyDesk / ScreenConnect installed
   - Quick Assist session started after unsolicited contact
 mitre: [T1219]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -62,6 +62,8 @@ nodes:
   q-trigger:
     type: question
     text: Did it follow unsolicited contact (callback lure, Teams "helpdesk", email bomb) or appear from a script or another RMM tool?
+    also_check:
+      - "Did {{file}} install itself as a service or startup entry for unattended access?"
     yes: q-session
     no: q-user-reason
     notes:
@@ -80,6 +82,11 @@ nodes:
   q-session:
     type: question
     text: Was a remote session established, followed by other activity (new tools, credential access, discovery, data transfer)?
+    also_check:
+      - "Were security tools on {{device}} disabled or changed, or event logs cleared, after {{file}} appeared?"
+      - "Was a new local account created or added to the administrators group on {{device}}?"
+      - "Were other scheduled tasks, services or startup entries created on {{device}} after {{file}} appeared?"
+      - "Has {{device}} connected to previously unseen external domains or IPs other than the tool's relay?"
     yes: o-tp-active
     no: o-tp-contained
     notes:

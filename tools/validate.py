@@ -10,7 +10,8 @@ Checks, in order:
   6. Every node is reachable from start (no orphans).
   7. No cycles, inside a tree or across trees through links.
   8. Every {{placeholder}} is declared in that tree's entities.
-  9. Warnings: unused entities, questions with an unknown edge but no unknown note.
+  9. No also_check question repeats within a tree.
+ 10. Warnings: unused entities, questions with an unknown edge but no unknown note.
 
 Usage: python tools/validate.py [trees_dir]
 Exit code 1 if any error.
@@ -141,6 +142,14 @@ def check_graphs(trees: dict[str, dict]) -> tuple[list[str], list[str]]:
                     errors.append(f"{where}: {nid} links to unknown node '{node['tree']}:{node['node']}'")
             if node["type"] == "question" and "unknown" in node and "unknown" not in node["notes"]:
                 warnings.append(f"{where}: {nid} has an unknown edge but no notes.unknown")
+
+        # also_check questions: each asked once per tree
+        asked: dict[str, str] = {}
+        for nid, node in nodes.items():
+            for q in node.get("also_check", []):
+                if q in asked:
+                    errors.append(f"{where}: also_check repeated in {asked[q]} and {nid}: {q}")
+                asked[q] = nid
 
         # Reachability
         seen, stack = set(), [tree["start"]]

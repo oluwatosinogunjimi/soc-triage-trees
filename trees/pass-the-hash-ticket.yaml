@@ -11,7 +11,7 @@ applies_to:
   - Suspicious NTLM authentication
   - Logon with LogonType 9 (NewCredentials) by admin tools
 mitre: [T1550.002, T1550.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -51,6 +51,10 @@ nodes:
   q-usual-host:
     type: question
     text: Does the account normally log on from {{src_host}} (it is the user's workstation, an admin jump host or a PAW)?
+    also_check:
+      - "Has {{account}} recently been given a privileged role or been added to a privileged group without an approved request?"
+      - "Has {{account}} accessed or changed another user's credentials or account?"
+      - "Has {{account}} run reconnaissance such as net group, whoami or BloodHound?"
     yes: q-protocol
     no: q-user-present
     notes:
@@ -69,6 +73,12 @@ nodes:
   q-user-present:
     type: question
     text: Is the real owner of the account logged on at {{src_host}}, or does the host show credential theft tooling?
+    also_check:
+      - "Has {{src_host}} attempted to access credential stores such as the SAM database or NTDS.dit?"
+      - "Has anyone tried to disable security monitoring or clear security logs on {{src_host}}?"
+      - "Have new scheduled tasks, services or startup registry keys been created on {{src_host}}?"
+      - "Has {{src_host}} connected to many other internal hosts?"
+      - "Has {{src_host}} talked to suspicious or previously unseen external domains or IPs?"
     kql:
       - title: Interactive sessions and credential tooling on the host (7d)
         platform: xdr

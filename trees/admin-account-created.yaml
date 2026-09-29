@@ -11,7 +11,7 @@ applies_to:
   - Add user followed by Add member to role
   - OAuth app created a user
 mitre: [T1136.003, T1098.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,11 @@ nodes:
   c-created:
     type: check
     text: Pull the creation and every change to the new account.
+    also_check:
+      - "Has {{user}} registered an MFA method from an unrecognised IP?"
+      - "Has {{user}} added credentials to app registrations or service principals, or granted OAuth consent?"
+      - "Has {{user}} assigned roles or changed permissions for other accounts?"
+      - "Has {{user}} changed Conditional Access policies, audit logs or diagnostic settings?"
     kql:
       - title: Lifecycle of the new account (30d)
         platform: sentinel
@@ -45,6 +50,8 @@ nodes:
     type: question
     text: Was the account created by an application or service principal rather than a person?
     why: Provisioning connectors (HR sync, SCIM) create users routinely. An unknown app creating users is a strong compromise signal.
+    also_check:
+      - "Has {{actor}} created other accounts or assigned privileged roles in the same period?"
     yes: q-known-provisioner
     no: q-standards
     notes:
@@ -72,6 +79,8 @@ nodes:
   q-actor-clean:
     type: question
     text: Was the creator's session clean (usual IP and device, no risk)?
+    also_check:
+      - "Did {{actor}} register or change an MFA method from an unrecognised IP before the creation?"
     yes: o-inconclusive
     no: o-tp-backdoor
     notes:
@@ -81,6 +90,10 @@ nodes:
   q-signins:
     type: question
     text: Have sign-ins to the new account come only from expected locations?
+    also_check:
+      - "Has {{user}} enumerated directory users, roles or Azure subscriptions?"
+      - "Has {{user}} read secrets from Azure Key Vault or other secret stores?"
+      - "Has {{user}} exported or downloaded large amounts of mail or files?"
     kql:
       - title: Sign-ins by the new account
         platform: sentinel

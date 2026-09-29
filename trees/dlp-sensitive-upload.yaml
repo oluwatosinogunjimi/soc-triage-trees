@@ -10,7 +10,7 @@ applies_to:
   - Sensitive data uploaded to personal cloud storage
   - Sensitive data pasted into generative AI site
 mitre: [T1567.002, T1048]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,8 @@ nodes:
   c-match:
     type: check
     text: Read the match, including data types, count, destination and channel.
+    also_check:
+      - "Did {{user}} compress, encrypt or rename the files before sending them?"
     kql:
       - title: DLP matches for the user (14d)
         platform: sentinel
@@ -56,6 +58,10 @@ nodes:
   q-volume:
     type: question
     text: Is it bulk or repeated (many records, many files, several days), rather than a one-off?
+    also_check:
+      - "Has {{user}} downloaded or synced an unusual number of files from SharePoint or OneDrive?"
+      - "Has {{user}} created anonymous or external sharing links?"
+      - "Has {{user}} copied files to removable media?"
     yes: q-context
     no: o-mistake
     notes:
@@ -65,6 +71,9 @@ nodes:
   q-context:
     type: question
     text: Is there compromise or insider context (risky session, leaver, HR concern)?
+    also_check:
+      - "Has {{user}} created inbox rules or forwarding to an external address?"
+      - "Has {{user}} registered or changed an MFA method recently?"
     yes: o-tp
     no: o-inconclusive
     notes:

@@ -9,7 +9,7 @@ applies_to:
   - Suspicious Run key modification
   - File dropped in Startup folder
 mitre: [T1547.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -23,6 +23,10 @@ nodes:
   c-entry:
     type: check
     text: Read the entry and the process that wrote it.
+    also_check:
+      - "Did the process that wrote \"{{value}}\" run from a temporary or user-writable directory, or from an unexpected parent?"
+      - "Were other autostart locations changed on {{device}} around the same time (scheduled tasks, services, WMI subscriptions)?"
+      - "Has {{device}} been accessed from an unusual or untrusted source?"
     kql:
       - title: Autostart registry and startup folder writes (7d)
         platform: xdr
@@ -51,6 +55,11 @@ nodes:
   q-suspicious-target:
     type: question
     text: Does it launch a script host, LOLBin, encoded command, or a binary in AppData, Temp, ProgramData or Public?
+    also_check:
+      - "Has the binary launched by \"{{value}}\" connected to previously unseen external domains or IPs?"
+      - "Has anyone tried to disable security monitoring (antivirus, EDR, logging) on {{device}}?"
+      - "Was a new local account created or added to a privileged group on {{device}}?"
+      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
     yes: l-edr
     no: o-inconclusive
     notes:

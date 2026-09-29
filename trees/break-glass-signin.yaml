@@ -10,7 +10,7 @@ applies_to:
   - Break-glass account used
   - Sign-in by excluded privileged account
 mitre: [T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,13 @@ nodes:
   c-signin:
     type: check
     text: Pull every sign-in and action by the account.
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
+      - "Did {{user}} register an MFA method or change its own password or sign-in settings?"
+      - "Did {{user}} add credentials to app registrations or grant OAuth consent?"
+      - "Did {{user}} create accounts or assign roles to other identities?"
+      - "Did {{user}} change Conditional Access policies, audit logs or diagnostic settings?"
+      - "Did {{user}} elevate access to Azure subscriptions or read Key Vault secrets?"
     kql:
       - title: Sign-ins and directory actions by the account (7d)
         platform: sentinel
@@ -51,6 +58,9 @@ nodes:
   q-actions-match:
     type: question
     text: Did the account only do what the emergency or test required, from the expected location?
+    also_check:
+      - "Did {{user}} reset passwords or MFA methods for other accounts?"
+      - "Did {{user}} delete accounts, policies or other critical tenant resources?"
     yes: o-benign
     no: o-inconclusive
     notes:
@@ -60,6 +70,8 @@ nodes:
   q-success:
     type: question
     text: Did the sign-in succeed?
+    also_check:
+      - "Were there multiple failed sign-ins against {{user}} or other privileged accounts before this one?"
     yes: o-tp
     no: o-tp-attempt
     notes:

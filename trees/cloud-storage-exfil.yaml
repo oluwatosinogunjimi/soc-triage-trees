@@ -11,7 +11,7 @@ applies_to:
   - Impact:S3/AnomalousBehavior.Delete
   - Unusual volume of blob reads or deletes
 mitre: [T1530, T1485, T1537]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,9 @@ nodes:
   c-volume:
     type: check
     text: Measure reads and deletes by principal and source.
+    also_check:
+      - "Did {{principal}} also read or delete from other buckets or storage accounts beyond {{bucket}}?"
+      - "Did {{principal}} gain access to {{bucket}} through a recent bucket policy or role change?"
     kql:
       - title: S3 object reads and deletes (48h)
         platform: sentinel
@@ -49,6 +52,9 @@ nodes:
   q-job:
     type: question
     text: Is it a known job (backup, ETL, migration, lifecycle policy) from its usual source?
+    also_check:
+      - "Is the source IP flagged in threat intelligence or hosted on a VPS or anonymising provider?"
+      - "Did {{principal}} list or enumerate buckets or containers before the reads?"
     yes: o-fp
     no: q-destination
     notes:
@@ -58,6 +64,11 @@ nodes:
   q-destination:
     type: question
     text: Did data go to an external account or IP (CopyObject to a foreign bucket, replication change, reads from unknown IPs), or were objects deleted after being read?
+    also_check:
+      - "Was {{bucket}} or its objects made public, or were presigned URLs or SAS tokens generated?"
+      - "Were versioning, object lock, soft delete or lifecycle rules on {{bucket}} changed or disabled?"
+      - "Was access logging or data event logging for {{bucket}} turned off?"
+      - "Was a ransom note or unexpected object uploaded to {{bucket}}?"
     yes: o-tp
     no: l-cloud
     notes:

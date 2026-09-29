@@ -10,7 +10,7 @@ applies_to:
   - Email sending limit exceeded
   - Suspicious email sending patterns detected
 mitre: [T1534, T1114]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,8 @@ nodes:
   c-sends:
     type: check
     text: Look at what was sent before the restriction.
+    also_check:
+      - "Did {{user}} send attachments or sensitive data to external or personal addresses before the restriction?"
     kql:
       - title: Outbound volume and subjects (48h)
         platform: xdr
@@ -48,6 +50,13 @@ nodes:
   q-compromise:
     type: question
     text: Are there signs of account takeover (unfamiliar sign-ins, new inbox rules, new MFA method)?
+    also_check:
+      - "Did {{user}} receive a phishing message with a malicious link or attachment shortly before the sends started?"
+      - "Were multiple failed sign-ins for {{user}} seen before a successful one?"
+      - "Has {{user}} consented to a new OAuth app or granted an app permission to send mail?"
+      - "Has external forwarding been enabled on the mailbox of {{user}}?"
+      - "Did {{user}} export mail, contacts or files in bulk before the restriction?"
+      - "Did {{user}} try to access other mailboxes, accounts or systems in the tenant?"
     yes: o-tp
     no: o-tp
     notes:

@@ -11,7 +11,7 @@ applies_to:
   - Add or update named location
   - MFA disabled for user or tenant
 mitre: [T1556.009, T1562.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,8 @@ nodes:
   c-change:
     type: check
     text: Pull the change with old and new values.
+    also_check:
+      - "Has {{actor}} also changed authentication method policies, security defaults or per-user MFA in the same period?"
     kql:
       - title: Conditional Access and named location changes (30d)
         platform: sentinel
@@ -47,6 +49,10 @@ nodes:
   q-weakens:
     type: question
     text: Does the change weaken protection (policy disabled or deleted, report-only, new user or group exclusion, new trusted IP, grant control removed)?
+    also_check:
+      - "Have accounts signed in without MFA since the change where {{policy}} previously required it?"
+      - "Is any newly trusted IP or location flagged in threat intelligence?"
+      - "Was a newly excluded account recently created or given a privileged role?"
     yes: q-approved
     no: o-benign-tightening
     notes:
@@ -56,6 +62,11 @@ nodes:
   q-approved:
     type: question
     text: Is it approved (change ticket) and was the actor's session clean?
+    also_check:
+      - "Did {{actor}} register or change an MFA method from an unrecognised IP before the change?"
+      - "Has {{actor}} assigned privileged roles or created accounts around the time of the change?"
+      - "Has {{actor}} added credentials to app registrations or granted OAuth consent?"
+      - "Has {{actor}} changed audit, diagnostic or log export settings?"
     yes: q-scope
     no: o-tp
     unknown: o-inconclusive

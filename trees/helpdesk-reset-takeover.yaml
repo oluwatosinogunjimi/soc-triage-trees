@@ -11,7 +11,7 @@ applies_to:
   - Suspicious MFA tampering activity by admin account
   - Suspicious sign-in to a web app following MFA phone number tampering activity
 mitre: [T1656, T1098.005, T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,6 +28,12 @@ nodes:
   c-sequence:
     type: check
     text: Put the reset, the method changes and the next sign-ins on one timeline.
+    also_check:
+      - "Has {{user}} created inbox rules or external forwarding since the reset?"
+      - "Has {{user}} granted OAuth consent or added app credentials since the reset?"
+      - "Has {{user}} downloaded or shared an unusual volume of files or mail since the reset?"
+      - "Has {{user}} been assigned a privileged role since the reset?"
+      - "Did {{user}} send unusual messages to many colleagues or external contacts since the reset?"
     kql:
       - title: Resets, method changes and sign-ins (7d)
         platform: sentinel
@@ -46,6 +52,9 @@ nodes:
   q-verified:
     type: question
     text: Did the helpdesk verify the caller through an out-of-band method (call-back to a number on file, manager approval, video or in person)?
+    also_check:
+      - "Did {{actor}} make the reset from an unrecognised IP or device?"
+      - "Has {{actor}} reset passwords or MFA for other users in the same period?"
     yes: q-signin-normal
     no: q-user-confirm
     notes:
@@ -66,6 +75,9 @@ nodes:
   q-signin-normal:
     type: question
     text: Was the sign-in after the reset from the user's usual location and device?
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
+      - "Has {{ip}} signed in to other accounts in the tenant?"
     yes: o-benign
     no: o-inconclusive
     notes:

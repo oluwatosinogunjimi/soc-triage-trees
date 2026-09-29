@@ -10,7 +10,7 @@ applies_to:
   - Anomalous activity following Global Administrator elevation
   - Owner role assigned at subscription or management group
 mitre: [T1098.003, T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,12 @@ nodes:
   c-change:
     type: check
     text: Pull the elevation or assignment and what followed.
+    also_check:
+      - "Did {{actor}} or {{assignee}} assign further roles, or add credentials to service principals, after the change?"
+      - "Did {{actor}} or {{assignee}} change or delete diagnostic settings, activity log exports or Defender plans?"
+      - "Did {{assignee}} read Key Vault secrets or list storage account keys after the change?"
+      - "Did {{assignee}} run commands or extensions on virtual machines after the change?"
+      - "Did {{assignee}} delete resources, backups or resource locks after the change?"
     kql:
       - title: Elevations and high-privilege role assignments (7d)
         platform: sentinel
@@ -48,6 +54,10 @@ nodes:
   q-ticket:
     type: question
     text: Is there a ticket (break-fix on a lost subscription, onboarding a cloud admin) and was the actor's session clean?
+    also_check:
+      - "Did {{actor}} register or change an MFA method shortly before the change?"
+      - "Was {{actor}} given Global Administrator or another privileged Entra role recently and unexpectedly?"
+      - "Is {{assignee}} a guest, a newly created account or a service principal?"
     yes: q-reverted
     no: o-tp
     notes:

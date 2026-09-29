@@ -9,7 +9,7 @@ applies_to:
   - Anonymous link created for sensitive file
   - Unusual external user file activity
 mitre: [T1567, T1537]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,8 @@ nodes:
   c-shares:
     type: check
     text: List the links and recipients.
+    also_check:
+      - "Did {{user}} change site or library sharing settings to allow broader external access?"
     kql:
       - title: Sharing activity by the user (7d)
         platform: sentinel
@@ -48,6 +50,10 @@ nodes:
   q-personal:
     type: question
     text: Did files go to personal addresses of the user (their own Gmail or Outlook.com), or anonymous links?
+    also_check:
+      - "Did {{user}} also email files or attachments to personal addresses?"
+      - "Did {{user}} download or sync an unusual number of files before sharing?"
+      - "Did {{user}} copy files to removable media or upload them to other personal cloud storage?"
     yes: q-session
     no: q-session
     notes:
@@ -57,6 +63,10 @@ nodes:
   q-session:
     type: question
     text: Was the sharing done from a suspicious session (unfamiliar IP, risky sign-in)?
+    also_check:
+      - "Has {{user}} registered or changed an MFA method recently?"
+      - "Has {{user}} created inbox rules that forward or delete mail?"
+      - "Has {{user}} consented to a new OAuth app with file access?"
     yes: o-tp
     no: o-inconclusive
     notes:

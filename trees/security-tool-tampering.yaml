@@ -11,7 +11,7 @@ applies_to:
   - Tamper protection blocked a change
   - EDR agent uninstalled or sensor offline unexpectedly
 mitre: [T1562.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,10 @@ nodes:
   c-change:
     type: check
     text: See exactly what was changed and by what.
+    also_check:
+      - "Did the process that made the change run from a temporary or user-writable directory, or from an unexpected parent?"
+      - "Were security or event logs cleared, or audit policy changed, on {{device}}?"
+      - "Has {{device}} been accessed from an unusual or untrusted source?"
     kql:
       - title: Defender changes, exclusions and tamper events (7d)
         platform: xdr
@@ -54,6 +58,12 @@ nodes:
   q-blocked:
     type: question
     text: Did tamper protection block the change, leaving protection intact?
+    also_check:
+      - "Did an unsigned binary or LOLBin run on {{device}} shortly after the change?"
+      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
+      - "Were shadow copies or backup data deleted or changed on {{device}}?"
+      - "Were new scheduled tasks, services or startup entries created on {{device}}?"
+      - "Has {{device}} connected to many other internal hosts or used remote execution (WMI, RDP, SMB)?"
     yes: o-tp-blocked
     no: o-tp
     notes:

@@ -10,7 +10,7 @@ applies_to:
   - UnauthorizedAccess:EC2/TorRelay
   - Connection to TOR network detected
 mitre: [T1090.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,10 @@ nodes:
   c-traffic:
     type: check
     text: Find the process making TOR connections.
+    also_check:
+      - "Has a large volume of data left {{host}} over TOR or to other rare destinations?"
+      - "Is there evidence of data being compressed or staged on {{host}} before transfer?"
+      - "Has {{host}} talked to other suspicious or previously unseen domains or IPs?"
     kql:
       - title: TOR-style connections and binaries (7d)
         platform: xdr
@@ -42,6 +46,11 @@ nodes:
   q-browser:
     type: question
     text: Is it the TOR Browser started by the user from their profile?
+    also_check:
+      - "Have new scheduled tasks or services been created on {{host}} to keep a TOR client running?"
+      - "Has anyone tried to disable security monitoring on {{host}} (AV, EDR, logging)?"
+      - "Has {{host}} connected to many other internal hosts?"
+      - "Is there evidence of ransomware activity on {{host}}, such as mass file changes or shadow copy deletion?"
     yes: o-policy
     no: o-tp
     notes:

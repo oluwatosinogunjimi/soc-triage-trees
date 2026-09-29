@@ -11,7 +11,7 @@ applies_to:
   - Unusual multiple VM creation activities
   - Impact:IAMUser/CostHarvesting
 mitre: [T1496, T1578.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,11 @@ nodes:
   c-launches:
     type: check
     text: List the launches by principal, region and size.
+    also_check:
+      - "Did {{principal}} create new users, access keys or role assignments alongside the launches?"
+      - "Did {{principal}} open security groups to the internet or import new SSH key pairs?"
+      - "Did {{principal}} stop or change CloudTrail or Azure diagnostic settings?"
+      - "Do the new instances connect to mining pools or other suspicious domains or IPs?"
     kql:
       - title: EC2 launches by region and type (48h)
         platform: sentinel
@@ -49,6 +54,10 @@ nodes:
   q-expected:
     type: question
     text: Is it expected (a known ML training job, autoscaling, a planned regional expansion)?
+    also_check:
+      - "Was {{principal}} used from an IP it has not used before, or one flagged in threat intelligence?"
+      - "Have credentials for {{principal}} been exposed in a repository, pipeline log or public paste?"
+      - "Did {{principal}} assume roles in, or launch resources across, other accounts or subscriptions?"
     yes: o-fp
     no: o-tp
     notes:

@@ -11,7 +11,7 @@ applies_to:
   - Web server process spawned shell on Linux
   - Unexpected SSH authorized_keys modification
 mitre: [T1059.004, T1098.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,9 @@ nodes:
   c-shell:
     type: check
     text: Read the command, its parent and any connection it opened.
+    also_check:
+      - "Has {{device}} talked to previously unseen external IPs or domains, or shown beaconing?"
+      - "Did the shell run discovery commands (id, uname, ps, netstat, cat /etc/passwd)?"
     kql:
       - title: Suspicious shell commands and parents (48h)
         platform: xdr
@@ -52,6 +55,13 @@ nodes:
   q-service-parent:
     type: question
     text: Was the shell spawned by a network service (web server, app runtime, database), running as its service account?
+    also_check:
+      - "Did {{account}} gain root after the shell started (sudo, su, a setuid binary or a kernel exploit)?"
+      - "Were systemd units, shell profile files or /etc/ld.so.preload changed on {{device}}?"
+      - "Did anyone read /etc/shadow, SSH private keys, cloud credential files or application secrets on {{device}}?"
+      - "Has {{device}} opened SSH or other connections to many internal hosts since the shell started?"
+      - "Were logs or shell history cleared, or auditd or the EDR sensor stopped, on {{device}}?"
+      - "Has a large volume of data left {{device}} since the shell started?"
     yes: o-tp-exploit
     no: q-ssh
     notes:
@@ -61,6 +71,8 @@ nodes:
   q-ssh:
     type: question
     text: Did the session come from an unusual SSH source, or did it add keys, users or cron jobs?
+    also_check:
+      - "Were there failed SSH logons or brute force against {{device}} before the session?"
     yes: o-tp-access
     no: o-inconclusive
     notes:

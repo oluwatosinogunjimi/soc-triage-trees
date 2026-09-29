@@ -10,7 +10,7 @@ applies_to:
   - IMAP/POP sign-in from unusual location
   - SMTP AUTH client submission from unknown IP
 mitre: [T1078.004, T1110]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,6 +52,8 @@ nodes:
   q-new-source:
     type: question
     text: Is the source new for this user, or a hosting, VPN or foreign IP?
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
     yes: q-spray-context
     no: o-benign-client
     notes:
@@ -61,6 +63,8 @@ nodes:
   q-spray-context:
     type: question
     text: Is the success part of a spray or preceded by failures from the same source?
+    also_check:
+      - "Has {{ip}} signed in successfully to any other account in the tenant?"
     yes: l-spray
     no: q-mail-access
     notes:
@@ -76,6 +80,10 @@ nodes:
   q-mail-access:
     type: question
     text: Was mail read, synced or sent over the legacy session?
+    also_check:
+      - "Has {{user}} enabled forwarding to an external address or created inbox rules that move or delete mail?"
+      - "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
+      - "Has {{user}} signed in to other M365 apps from {{ip}} beyond the legacy protocol?"
     kql:
       - title: Mailbox activity from the IP (7d)
         platform: sentinel

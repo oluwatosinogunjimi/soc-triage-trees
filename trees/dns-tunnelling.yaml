@@ -10,7 +10,7 @@ applies_to:
   - DNS tunnelling detected
   - Trojan:EC2/DNSDataExfiltration
 mitre: [T1071.004, T1048.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,8 @@ nodes:
   c-queries:
     type: check
     text: Profile the queries to the domain.
+    also_check:
+      - "Are other internal hosts querying {{domain}} or similar long encoded subdomains?"
     kql:
       - title: Query volume, length and types to the domain (24h)
         platform: sentinel
@@ -52,6 +54,9 @@ nodes:
   q-known-service:
     type: question
     text: Is the domain a known service that uses encoded subdomains (security vendor lookups, CDN, telemetry, anti-spam DNSBL)?
+    also_check:
+      - "Is {{domain}} newly registered or on dynamic DNS?"
+      - "Does threat intelligence link {{domain}} to known C2 infrastructure or malware families?"
     yes: o-fp
     no: q-pattern
     notes:
@@ -61,6 +66,8 @@ nodes:
   q-pattern:
     type: question
     text: Is the pattern tunnel-like (many unique subdomains, long high-entropy labels, TXT or NULL records, steady volume from one process)?
+    also_check:
+      - "Has {{host}} talked to other suspicious or previously unseen domains or IPs?"
     yes: q-process
     no: o-inconclusive
     notes:
@@ -70,6 +77,11 @@ nodes:
   q-process:
     type: question
     text: Is the sending process a normal resolver path (DNS client service) for a browser, or a suspicious binary or script?
+    also_check:
+      - "Is there evidence of data being compressed or staged on {{host}} before the queries started?"
+      - "Have new scheduled tasks, services or startup entries been created on {{host}}?"
+      - "Has anyone tried to disable security monitoring on {{host}} (AV, EDR, logging)?"
+      - "Has {{host}} run system, network or domain enumeration commands?"
     yes: o-tp
     no: o-tp
     notes:

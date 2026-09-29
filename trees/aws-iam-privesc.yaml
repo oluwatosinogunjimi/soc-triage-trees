@@ -11,7 +11,7 @@ applies_to:
   - AttachUserPolicy AdministratorAccess
   - UpdateAssumeRolePolicy to external account
 mitre: [T1098.003, T1098.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,8 @@ nodes:
   c-changes:
     type: check
     text: List every IAM change by the principal.
+    also_check:
+      - "Did {{principal}} enumerate IAM roles and policies, or probe permissions with repeated AccessDenied errors, before the changes?"
     kql:
       - title: IAM changes by the principal (7d)
         platform: sentinel
@@ -44,6 +46,9 @@ nodes:
   q-pipeline:
     type: question
     text: Is it infrastructure-as-code or an identity admin working a ticket, from the usual pipeline or network?
+    also_check:
+      - "Is the source IP of the changes flagged in threat intelligence or hosted on a VPS or anonymising provider?"
+      - "Did {{principal}} use a console session without MFA where MFA is required?"
     yes: o-benign
     no: q-escalates
     notes:
@@ -53,6 +58,11 @@ nodes:
   q-escalates:
     type: question
     text: Did the principal grant itself or a new identity more privilege, or trust an external account?
+    also_check:
+      - "Did {{principal}} or a new identity assume roles in other AWS accounts after the changes?"
+      - "Did {{principal}} or a new identity stop or change CloudTrail, GuardDuty or Config after the changes?"
+      - "Did {{principal}} or a new identity read secrets or passwords (GetSecretValue, GetPasswordData)?"
+      - "Did {{principal}} or a new identity access S3 data or make storage public after the changes?"
     yes: o-tp
     no: o-inconclusive
     notes:

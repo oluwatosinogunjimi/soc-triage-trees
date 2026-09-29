@@ -10,7 +10,7 @@ applies_to:
   - Fake subscription renewal or invoice with phone number
   - User reported callback scam
 mitre: [T1566.004, T1219]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -45,6 +45,13 @@ nodes:
   q-called:
     type: question
     text: Did the recipient call the number (they say so, or remote access software appeared soon after)?
+    also_check:
+      - "Did {{recipient}} report being asked for sign-in details, MFA codes or payment details during the call?"
+      - "Has {{device}} been accessed from an unusual or untrusted source since the message arrived?"
+      - "Did a script host (PowerShell, cmd, MSHTA) or an unsigned binary run on {{device}} since the message arrived?"
+      - "Did {{device}} connect to suspicious or previously unseen domains or IPs since the message arrived?"
+      - "Has {{recipient}} signed in from an unrecognised IP or device since the message arrived?"
+      - "Has a large volume of data left {{device}} since the message arrived?"
     kql:
       - title: Remote access tools and installers on the device (7d)
         platform: xdr

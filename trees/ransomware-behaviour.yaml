@@ -10,7 +10,7 @@ applies_to:
   - File backups were deleted (vssadmin, wbadmin)
   - Ransom note detected
 mitre: [T1486, T1490]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -53,6 +53,11 @@ nodes:
       - New extensions and ransom notes (README, HOW_TO_DECRYPT, .txt or .hta in many folders)
       - vssadmin, wbadmin, bcdedit or wmic shadowcopy commands
       - The process and account responsible, and remote writes over SMB from another host
+    also_check:
+      - "Was security monitoring (antivirus, EDR, logging) disabled or tampered with on {{device}} before the activity?"
+      - "Were security or event logs cleared on {{device}}?"
+      - "Were new scheduled tasks, services or startup entries created on {{device}} before the activity?"
+      - "Were backup or database services stopped on {{device}} before the activity?"
     kql:
       - title: Recovery inhibition commands (24h)
         platform: xdr
@@ -78,6 +83,13 @@ nodes:
   q-spread:
     type: question
     text: Are other devices affected, or was {{device}} encrypted remotely by another host over SMB?
+    also_check:
+      - "Has {{account}} signed in to other devices it does not normally use?"
+      - "Was {{account}} recently added to a privileged group or given admin rights without an approved request?"
+      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
+      - "Was data staged, compressed or sent out from {{device}} in large volume before the encryption started?"
+      - "Has {{device}} run network or domain enumeration commands?"
+      - "Has {{device}} talked to previously unseen external domains or IPs, or shown beaconing?"
     kql:
       - title: Devices with ransomware alerts or recovery inhibition (24h)
         platform: xdr

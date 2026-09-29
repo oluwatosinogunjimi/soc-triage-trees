@@ -10,7 +10,7 @@ applies_to:
   - Suspicious service creation (Event 7045 / 4697)
   - PsExec service installed
 mitre: [T1543.003, T1569.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,10 @@ nodes:
   c-service:
     type: check
     text: Read the service binary path and the install context.
+    also_check:
+      - "Were other persistence entries created on {{device}} around the same time (scheduled tasks, Run keys, WMI subscriptions)?"
+      - "Were security tools disabled or event logs cleared on {{device}} around the install?"
+      - "Has anyone tried to dump credentials from LSASS, SAM or NTDS.dit on {{device}}?"
     kql:
       - title: Service installs on the device (7d)
         platform: xdr
@@ -68,6 +72,8 @@ nodes:
   q-admin-tooling:
     type: question
     text: Is the remote install explained by an admin's normal remote tooling from their usual host, with a ticket?
+    also_check:
+      - "Was the account behind the install recently added to a privileged group without an approved request?"
     yes: o-benign-admin
     no: l-lateral
     notes:
@@ -77,6 +83,9 @@ nodes:
   q-binary:
     type: question
     text: Is the service binary malicious or unknown and unsigned from a user-writable path?
+    also_check:
+      - "Did a process request administrative privileges unexpectedly or use a UAC bypass on {{device}} before the install?"
+      - "Has the service binary connected to previously unseen external domains or IPs, or shown beaconing?"
     yes: l-edr
     no: o-inconclusive
     notes:

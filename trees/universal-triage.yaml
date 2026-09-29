@@ -6,7 +6,7 @@ summary: >-
   exists, and otherwise bucket the alert as benign, false positive, true positive or
   needs more work.
 applies_to: [Any alert, Unfamiliar detection, Custom analytics rule]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -43,6 +43,9 @@ nodes:
       - Other alerts for the same entity in the last 48 to 72 hours
       - The same alert firing on other users or hosts right now
       - How often this rule has fired and been closed as benign recently
+    also_check:
+      - "Has {{entity}} had multiple failed authentications across different platforms?"
+      - "Has the same activity recurred on {{entity}} after earlier remediation?"
     kql:
       - title: Other alerts for the same entity (72h)
         platform: sentinel
@@ -312,6 +315,8 @@ nodes:
     why: >-
       Benign true positives are real detections of real activity that is allowed. They are
       not errors in the rule, and they are the best candidates for a scoped exclusion.
+    also_check:
+      - "Did the activity come from an unusual location, device or source for {{entity}}?"
     yes: o-benign
     no: q-malicious-signs
     unknown: q-malicious-signs
@@ -323,6 +328,14 @@ nodes:
   q-malicious-signs:
     type: question
     text: Are there signs of malicious activity (IoC match, known-bad behaviour, corroborating alerts)?
+    also_check:
+      - "Has {{entity}} been linked to privilege escalation, new roles or permission changes?"
+      - "Has {{entity}} created persistence such as new accounts, scheduled tasks, services, keys or tokens?"
+      - "Has {{entity}} tried to disable security monitoring or clear logs?"
+      - "Has {{entity}} been involved in reconnaissance or lateral movement to other hosts or accounts?"
+      - "Has {{entity}} communicated with known command-and-control infrastructure or beaconed at regular intervals?"
+      - "Has {{entity}} been involved in large or unusual data transfers out of the organisation?"
+      - "Is {{entity}} linked to ransomware, destructive activity or service disruption?"
     yes: o-true-positive
     no: q-detection-error
     unknown: q-detection-error

@@ -12,7 +12,7 @@ applies_to:
   - Suspicious Kerberos SPN request
   - Multiple RC4 service ticket requests (4769)
 mitre: [T1558.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,6 +54,9 @@ nodes:
     type: question
     text: Did the account request tickets for many distinct service accounts in a short window, or mainly with RC4 (0x17)?
     why: A normal user requests tickets for the handful of services they use, with AES. Dozens of SPNs, or RC4 in an AES environment, is roasting.
+    also_check:
+      - "Has {{account}} signed in to other endpoints or opened remote sessions on hosts it does not normally use?"
+      - "Has {{account}} recently been given a privileged role or changed group memberships without an approved request?"
     yes: q-tooling
     no: o-fp
     notes:
@@ -72,6 +75,12 @@ nodes:
   q-endpoint:
     type: question
     text: Does the requesting host show offensive tooling or other compromise (Rubeus, Impacket, PowerView, suspicious PowerShell)?
+    also_check:
+      - "Has anyone tried to dump credentials from LSASS, the SAM database or NTDS.dit on {{src_host}}?"
+      - "Has {{src_host}} run domain enumeration such as BloodHound, net group or other AD queries?"
+      - "Has anyone tried to disable security monitoring on {{src_host}} (AV, EDR, logging)?"
+      - "Has {{src_host}} talked to suspicious or previously unseen external domains or IPs?"
+      - "Has any service account whose ticket was requested since logged on from a host it does not normally use?"
     kql:
       - title: Offensive tooling on the host (24h)
         platform: xdr

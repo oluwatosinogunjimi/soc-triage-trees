@@ -11,7 +11,7 @@ applies_to:
   - CredentialAccess:Kubernetes/AnomalousBehavior.SecretsAccessed
   - Policy:Kubernetes/AnonymousAccessGranted
 mitre: [T1609, T1610, T1611, T1552.007]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,6 +27,9 @@ nodes:
   c-audit:
     type: check
     text: Pull the API calls made by the principal.
+    also_check:
+      - "Did {{principal}} enumerate namespaces, pods, roles or its own permissions (SelfSubjectRulesReview)?"
+      - "Were audit logging or admission controls in {{cluster}} changed or disabled?"
     kql:
       - title: AKS audit events by the principal (48h)
         platform: sentinel
@@ -44,6 +47,8 @@ nodes:
   q-platform:
     type: question
     text: Is the principal a platform component or CI/CD identity doing its normal job (GitOps controller, monitoring agent, a known SRE)?
+    also_check:
+      - "Did the API calls come from an IP outside the cluster, CI/CD or admin networks, or one flagged in threat intelligence?"
     yes: o-fp
     no: q-escalation
     notes:
@@ -53,6 +58,12 @@ nodes:
   q-escalation:
     type: question
     text: Did it create privileged pods, host mounts, cluster-admin bindings, or read secrets across namespaces?
+    also_check:
+      - "Did {{principal}} create new service accounts, tokens, Roles or RoleBindings?"
+      - "Did {{principal}} create CronJobs or DaemonSets?"
+      - "Was anonymous or unauthenticated access to the API server granted or used?"
+      - "Did a pod query the cloud instance metadata service for node or cloud credentials?"
+      - "Did pods started by {{principal}} connect to mining pools or unusual external domains or IPs?"
     yes: o-tp
     no: o-inconclusive
     notes:

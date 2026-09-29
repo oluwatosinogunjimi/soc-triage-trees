@@ -12,7 +12,7 @@ applies_to:
   - Port scan or internal reconnaissance
   - Beaconing detected
 mitre: [T1190, T1071, T1021, T1046]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -62,6 +62,9 @@ nodes:
   q-blocked-in:
     type: question
     text: Was the inbound traffic blocked or dropped by the firewall or IPS?
+    also_check:
+      - "Is {{src_ip}} flagged in threat intelligence for exploitation or brute force?"
+      - "Is {{src_ip}} scanning or probing other assets in the estate?"
     yes: q-target-vulnerable
     no: q-exploit-success
     notes:
@@ -75,6 +78,10 @@ nodes:
       Look for the service process (w3wp, java, httpd, sqlservr) spawning shells or recon
       tools, new script files in web directories, application errors or unusual responses
       at the alert time, and new outbound connections from the target.
+    also_check:
+      - "Were new accounts, scheduled tasks or services created on {{host}} after the traffic?"
+      - "Has anyone tried to dump credentials on {{host}} (LSASS, SAM)?"
+      - "Were security logs cleared or security monitoring disabled on {{host}}?"
     kql:
       - title: Shells or recon tools spawned by server processes (24h)
         platform: xdr
@@ -154,6 +161,8 @@ nodes:
     type: question
     text: Is the connection made by a suspicious process (unsigned, running from Temp or AppData, a script host or LOLBin) or with a beacon-like pattern?
     why: A browser visiting a flagged site is a user event. A process from AppData connecting every 60 seconds is a foothold.
+    also_check:
+      - "Has a large volume of data left {{host}} for {{dst_ip}} or other rare destinations?"
     kql:
       - title: Process behind the connection (7d)
         platform: xdr
@@ -190,6 +199,9 @@ nodes:
   q-lateral:
     type: question
     text: Does the source show lateral movement or recon (SMB, RDP, WinRM or WMI to many hosts, remote service creation, port sweeps)?
+    also_check:
+      - "Has the account used from {{src_ip}} signed in to endpoints it does not normally use?"
+      - "Has {{src_ip}} run domain enumeration commands (net group, nltest)?"
     kql:
       - title: Remote-admin ports from the source (24h)
         platform: xdr

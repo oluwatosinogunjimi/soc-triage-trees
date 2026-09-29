@@ -12,7 +12,7 @@ applies_to:
   - Verified threat actor IP (nationStateIP)
   - Activity from a TOR IP address
 mitre: [T1078.004, T1090.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,6 +47,9 @@ nodes:
   q-threat-actor:
     type: question
     text: Is the IP flagged as malicious or threat-actor infrastructure (not merely anonymising)?
+    also_check:
+      - "Does {{ip}} appear in historical logs of unauthorised access or earlier incidents in the tenant?"
+      - "Has {{ip}} appeared in Azure activity or M365 audit logs beyond sign-ins, suggesting token use?"
     yes: q-success-malicious
     no: q-success
     notes:
@@ -56,6 +59,8 @@ nodes:
   q-success-malicious:
     type: question
     text: Did any sign-in from the IP succeed or get past the password?
+    also_check:
+      - "Did {{ip}} target privileged or admin accounts?"
     yes: l-postauth
     no: o-tp-blocked
     notes:
@@ -65,6 +70,8 @@ nodes:
   q-success:
     type: question
     text: Did the sign-in succeed?
+    also_check:
+      - "Did {{user}} authenticate without MFA where MFA is required?"
     yes: q-user-vpn
     no: o-fp-failed
     notes:
@@ -74,6 +81,8 @@ nodes:
   q-user-vpn:
     type: question
     text: Does the user regularly use this VPN or proxy provider, or confirm they used it this time?
+    also_check:
+      - "Has {{user}} signed in from other TOR, VPN or hosting IPs in the same period?"
     kql:
       - title: The user's history with this ASN (90d)
         platform: sentinel

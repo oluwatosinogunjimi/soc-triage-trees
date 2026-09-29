@@ -10,7 +10,7 @@ applies_to:
   - Invoice fraud from known vendor
   - Suspicious email from trusted partner domain
 mitre: [T1566, T1656]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -30,6 +30,9 @@ nodes:
       - Exact sender domain versus the vendor's real domain (lookalikes, new TLD)
       - Reply-To, and whether SPF/DKIM/DMARC pass
       - Thread hijacking (a real previous thread continued from a new address)
+    also_check:
+      - "Has {{recipient}} signed in from an unrecognised IP or device recently?"
+      - "Has {{recipient}} got inbox rules that move, delete or forward mail from the vendor?"
     kql:
       - title: Mail history with the vendor domain (180d)
         platform: xdr
@@ -45,6 +48,10 @@ nodes:
   q-lookalike:
     type: question
     text: Is the sender domain a lookalike of the real vendor domain?
+    also_check:
+      - "Is the sender domain newly registered or recently changed?"
+      - "Did {{sender}} or its domain send similar payment or bank change requests to other recipients in the organisation?"
+      - "Did {{sender}} or its domain also send messages with malicious links or attachments to the organisation?"
     yes: q-acted
     no: q-verified
     notes:
@@ -63,6 +70,8 @@ nodes:
   q-acted:
     type: question
     text: Did the recipient update bank details or pay anything?
+    also_check:
+      - "Did {{recipient}} send invoices, remittance details or other sensitive files to {{sender}} or another external address?"
     yes: o-tp-loss
     no: o-tp
     notes:

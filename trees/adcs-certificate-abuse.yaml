@@ -12,7 +12,7 @@ applies_to:
   - Suspicious login attempt using possibly compromised account certificate
   - Certificate issued with SAN different from requester (Event 4887)
 mitre: [T1649]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -33,6 +33,10 @@ nodes:
       - Template name and whether it allows enrollee-supplied subject
       - Requester versus the identity in the certificate
       - Tools on the host (Certify, Certipy, ForgeCert)
+    also_check:
+      - "Has {{src_host}} been accessed from an unusual or untrusted source?"
+      - "Did {{account}} run domain reconnaissance (net group, BloodHound) before the request?"
+      - "Has {{src_host}} shown credential dumping or access to credential stores (LSASS, SAM, NTDS.dit)?"
     kql:
       - title: Certificate requests and issuances on the CA (Events 4886/4887, 7d)
         platform: sentinel
@@ -56,6 +60,10 @@ nodes:
   q-mismatch:
     type: question
     text: Does the certificate name a different identity from the requester, or was a vulnerable template used by a low-privileged account?
+    also_check:
+      - "Was an account created or added to a privileged group after the certificate was issued?"
+      - "Did {{account}} open remote sessions on hosts it does not normally use?"
+      - "Were security logs cleared or auditing changed on the CA or {{src_host}}?"
     yes: q-approved
     no: q-auth-use
     notes:

@@ -12,7 +12,7 @@ applies_to:
   - Possible theft of sensitive browser data
   - ClickFix / fake CAPTCHA Run dialog execution
 mitre: [T1555.003, T1539, T1204.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,6 +28,9 @@ nodes:
   c-access:
     type: check
     text: See what touched the browser stores and how it got there.
+    also_check:
+      - "Did the stealer also read crypto wallets, password manager vaults, SSH keys or VPN profiles on {{device}}?"
+      - "Did the delivery chain run encoded PowerShell, MSHTA or CertUtil commands on {{device}}?"
     kql:
       - title: Non-browser processes reading browser credential files (7d)
         platform: xdr
@@ -51,6 +54,10 @@ nodes:
   q-executed:
     type: question
     text: Did the stealer run (not just quarantined on download)?
+    also_check:
+      - "Did the stealer create persistence (scheduled task, Run key, startup folder) on {{device}}?"
+      - "Did the stealer download or drop a second-stage payload on {{device}}?"
+      - "Did the stealer take screenshots or read clipboard data?"
     yes: q-exfil
     no: o-blocked
     notes:
@@ -60,6 +67,10 @@ nodes:
   q-exfil:
     type: question
     text: Did it connect out to exfiltrate (outbound POST to a new domain, Telegram, Discord, paste sites) after reading the stores?
+    also_check:
+      - "Has {{user}} signed in, or had a session token replayed, from an unfamiliar IP or device since the stealer ran?"
+      - "Has {{user}} registered or changed an MFA method since the stealer ran?"
+      - "Has {{user}} created inbox rules or mailbox forwarding since the stealer ran?"
     kql:
       - title: Outbound connections from the stealer process (7d)
         platform: xdr

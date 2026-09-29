@@ -23,6 +23,7 @@ Every tree has:
 
 - **Questions with a reason.** Each question can explain why it matters, so the tool also teaches new analysts.
 - **KQL at the point of use.** Queries for Microsoft Sentinel and Defender XDR sit on the question they answer. Case entities (user, IP, hash) fill into the queries.
+- **Wider checks at each step.** Beyond the questions that route you, most steps carry an "Also check" list of yes/no questions: persistence, privilege changes, lateral movement and data leaving, for the same user, host or IP. A yes is flagged, carried into the note and warned about before a benign verdict.
 - **An "unknown" path.** Real triage often stalls on "can't tell yet". Where that matters, the tree says what to do about it.
 - **Interactive map.** Every playbook opens as a decision tree you expand one branch at a time, with your path highlighted and the full detail of any step on click.
 - **At a glance.** Each playbook shows its stages in order, the alternatives at each, and every way it can end, before you start.

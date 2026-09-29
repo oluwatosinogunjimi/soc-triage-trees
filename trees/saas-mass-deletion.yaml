@@ -10,7 +10,7 @@ applies_to:
   - Ransomware payment instruction file uploaded
   - Mass file rename in OneDrive
 mitre: [T1485, T1486]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,6 +25,11 @@ nodes:
   c-activity:
     type: check
     text: Measure deletions, renames and uploads, and their client.
+    also_check:
+      - "Did the activity touch sites or libraries {{user}} does not normally use?"
+      - "Were the files downloaded or shared externally before being deleted or encrypted?"
+      - "Were recycle bins emptied, or versioning or retention settings changed, to block recovery?"
+      - "Have other accounts shown mass deletion or modification in the same period?"
     kql:
       - title: Deletions, renames and uploads by the user (48h)
         platform: sentinel
@@ -49,6 +54,9 @@ nodes:
   q-source:
     type: question
     text: Did it come through a sync client on a device (then the device is infected) or through the web or API?
+    also_check:
+      - "Did a newly consented OAuth app or unfamiliar client make the changes?"
+      - "Has {{user}} registered or changed an MFA method recently?"
     yes: l-ransomware
     no: o-tp-api
     notes:
@@ -63,6 +71,8 @@ nodes:
   q-cleanup:
     type: question
     text: Is it a user clean-up or retention policy from the usual session?
+    also_check:
+      - "Was {{user}} given site owner or admin rights shortly before the deletions?"
     yes: o-benign
     no: o-tp-destruction
     notes:

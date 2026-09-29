@@ -12,7 +12,7 @@ applies_to:
   - Sign-in from an unusual location or anonymous IP
   - Risky sign-in (Entra ID Protection)
 mitre: [T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -36,6 +36,8 @@ nodes:
       - Device ID, join type and compliance, operating system, browser and user agent
       - Authentication requirement, MFA detail and Conditional Access result
       - Risk level and risk event types during sign-in
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
     kql:
       - title: Sign-ins from the flagged IP for this user (7d)
         platform: sentinel
@@ -72,6 +74,8 @@ nodes:
       Codes 50074 and 50076 (MFA required), 500121 (MFA failed or denied) and 53003 (blocked
       by Conditional Access) all mean the first factor was correct. 50126 (bad password) and
       50053 (smart lockout) mean it was not.
+    also_check:
+      - "Did {{user}} receive a phishing message or visit a credential harvesting page before the sign-in?"
     kql:
       - title: Result codes from the flagged IP
         platform: sentinel
@@ -215,6 +219,11 @@ nodes:
     type: question
     text: Is there suspicious activity after the sign-in (inbox rules or forwarding, MFA registration, OAuth consent, mass download, unusual mail sent, role changes)?
     why: Post-authentication activity is what turns a suspicious sign-in into a confirmed compromise.
+    also_check:
+      - "Has {{user}} created external sharing links or sent files to personal addresses?"
+      - "Did {{user}} search mail or files for payment, invoice or password terms after the sign-in?"
+      - "Has {{user}} enumerated directory users, groups or roles after the sign-in?"
+      - "Has {{user}} changed Conditional Access, audit or other security settings?"
     kql:
       - title: Directory changes by or to the user (7d)
         platform: sentinel

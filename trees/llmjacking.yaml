@@ -11,7 +11,7 @@ applies_to:
   - Unusual Azure OpenAI usage spike
   - PutFoundationModelEntitlement from unfamiliar principal
 mitre: [T1496, T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,8 @@ nodes:
   c-calls:
     type: check
     text: Measure model calls and configuration changes by the principal.
+    also_check:
+      - "Did {{principal}} enumerate models, model availability or its own identity first (ListFoundationModels, GetCallerIdentity)?"
     kql:
       - title: Bedrock activity by the principal (7d)
         platform: sentinel
@@ -43,6 +45,9 @@ nodes:
   q-known-app:
     type: question
     text: Is the principal a known application or team that uses these models from its usual source and region?
+    also_check:
+      - "Is the source IP flagged in threat intelligence or hosted on a VPS, VPN or anonymising provider?"
+      - "Have credentials for {{principal}} been exposed in a repository, pipeline log or public paste?"
     yes: o-fp
     no: q-config
     notes:
@@ -52,6 +57,11 @@ nodes:
   q-config:
     type: question
     text: Did the principal enable model access, create provisioned throughput, or disable invocation logging?
+    also_check:
+      - "Did {{principal}} create new users, access keys or roles?"
+      - "Did {{principal}} stop or change CloudTrail or GuardDuty?"
+      - "Did {{principal}} launch compute or use other paid services beyond model calls?"
+      - "Did {{principal}} assume roles or act in other AWS accounts?"
     yes: o-tp
     no: o-tp
     notes:

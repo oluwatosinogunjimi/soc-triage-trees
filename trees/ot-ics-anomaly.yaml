@@ -11,7 +11,7 @@ applies_to:
   - New IT-to-OT connection
   - Engineering workstation activity outside maintenance window
 mitre: [T0843, T0855, T0886]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -33,6 +33,9 @@ nodes:
       - Protocol and function (read, write, program download, stop or start CPU, firmware)
       - Whether the source is an engineering workstation, HMI or historian, or an IT host
       - Maintenance windows and site contacts from the customer runbook
+    also_check:
+      - "Is {{src_ip}} scanning or connecting to other OT assets it has not contacted before?"
+      - "Has {{src_ip}} communicated with external or internet destinations?"
     kql:
       - title: Flows from the source to OT ports (48h)
         platform: sentinel
@@ -48,6 +51,10 @@ nodes:
   q-engineering:
     type: question
     text: Is the source an authorised engineering workstation during a planned maintenance window, confirmed with site operations?
+    also_check:
+      - "Were there remote sessions or sign-ins to {{src_ip}} from an unfamiliar user or IT host?"
+      - "Was a new or unsigned binary, or a remote access tool, run on {{src_ip}}?"
+      - "Has anyone tried to disable security monitoring or clear logs on {{src_ip}}?"
     yes: o-benign
     no: q-state-changing
     notes:
@@ -57,6 +64,8 @@ nodes:
   q-state-changing:
     type: question
     text: Did the command change process state or logic (writes, program download, CPU stop, firmware), rather than only read?
+    also_check:
+      - "Is there evidence of service disruption or process alarms on {{target}} around the time of the command?"
     yes: o-tp
     no: o-tp-recon
     notes:

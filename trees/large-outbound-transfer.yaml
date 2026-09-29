@@ -10,7 +10,7 @@ applies_to:
   - Behavior:EC2/TrafficVolumeUnusual
   - Possible data exfiltration
 mitre: [T1048, T1567.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,10 @@ nodes:
   c-volume:
     type: check
     text: Measure the transfer and compare with the host's baseline.
+    also_check:
+      - "Are other internal hosts sending data to {{dst_ip}}?"
+      - "Did the transfer use a non-standard port or protocol?"
+      - "Is traffic from {{host}} to {{dst_ip}} beaconing at regular intervals outside the transfer?"
     kql:
       - title: Outbound bytes by destination versus baseline (firewall, 14d)
         platform: sentinel
@@ -48,6 +52,8 @@ nodes:
   q-known-dest:
     type: question
     text: Is the destination a sanctioned service (backup provider, the customer's cloud tenant, a partner SFTP) used by the expected process?
+    also_check:
+      - "Is {{dst_ip}} flagged in threat intelligence or linked to known C2 infrastructure?"
     yes: o-fp
     no: q-tool
     notes:
@@ -57,6 +63,9 @@ nodes:
   q-tool:
     type: question
     text: Is the process an exfiltration-style tool (rclone, MEGAsync, WinSCP, curl, restic) or a browser uploading to personal storage?
+    also_check:
+      - "Did {{host}} access an unusual number of files or sensitive repositories before the transfer?"
+      - "Has anyone tried to disable security monitoring or clear logs on {{host}}?"
     yes: q-context
     no: o-inconclusive
     notes:
@@ -66,6 +75,8 @@ nodes:
   q-context:
     type: question
     text: Is there intrusion context (staging archives, recent lateral movement, other alerts) or insider context (leaver)?
+    also_check:
+      - "Is there evidence of ransomware preparation on {{host}}, such as shadow copy or backup deletion?"
     yes: o-tp
     no: o-tp
     notes:

@@ -10,7 +10,7 @@ applies_to:
   - Suspicious Custom Script Extension deployed
   - SSM SendCommand from unusual principal
 mitre: [T1651]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-command:
     type: check
     text: Pull the command, the caller and the script content.
+    also_check:
+      - "Was the same command or extension pushed to other VMs?"
+      - "Did {{principal}} reset local passwords or SSH keys on {{vm}} (VMAccess extension)?"
     kql:
       - title: Azure run command and extension writes (7d)
         platform: sentinel
@@ -48,6 +51,10 @@ nodes:
   q-routine:
     type: question
     text: Is it a routine operation (patching, monitoring agent install, configuration management) by the usual automation or ops account?
+    also_check:
+      - "Did {{principal}} act from an unfamiliar IP or one flagged in threat intelligence?"
+      - "Was {{principal}} given VM contributor or other new rights shortly before the command?"
+      - "Were new credentials (MFA method, client secret or access key) added to {{principal}} recently?"
     yes: o-fp
     no: q-content
     notes:
@@ -57,6 +64,10 @@ nodes:
   q-content:
     type: question
     text: Does the script do something offensive (add users, download tools, dump credentials, disable security, reverse shell)?
+    also_check:
+      - "Did the command create scheduled tasks, services or startup entries on {{vm}}?"
+      - "Did {{vm}} connect to unfamiliar external domains or IPs after the command?"
+      - "Did {{vm}} connect to other internal hosts after the command?"
     yes: o-tp
     no: o-inconclusive
     notes:

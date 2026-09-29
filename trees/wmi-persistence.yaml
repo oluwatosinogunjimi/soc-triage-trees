@@ -9,7 +9,7 @@ applies_to:
   - WMI event subscription created
   - Suspicious WMI persistence (CommandLineEventConsumer / ActiveScriptEventConsumer)
 mitre: [T1546.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -22,6 +22,9 @@ nodes:
   c-subscription:
     type: check
     text: Read the consumer's command or script and who created it.
+    also_check:
+      - "Was the subscription created remotely from another host over WMI or WinRM?"
+      - "Did the creating process run from a temporary or user-writable directory, or from an unexpected parent?"
     kql:
       - title: WMI subscription events (7d)
         platform: xdr
@@ -53,6 +56,11 @@ nodes:
   q-fired:
     type: question
     text: Has the consumer already executed a payload (scrcons.exe or WmiPrvSE spawning processes, outbound connections)?
+    also_check:
+      - "Were other autostart entries changed on {{device}} around the same time (scheduled tasks, Run keys, services)?"
+      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
+      - "Has anyone tried to disable security monitoring or clear logs on {{device}}?"
+      - "Was a new local account created or added to a privileged group on {{device}}?"
     yes: o-tp-active
     no: o-tp
     notes:

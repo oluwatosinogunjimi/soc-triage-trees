@@ -10,7 +10,7 @@ applies_to:
   - Root console login
   - Root access key used
 mitre: [T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-activity:
     type: check
     text: Pull every root action in the window.
+    also_check:
+      - "Were there failed root sign-ins or password recovery requests for {{account_id}} before the activity?"
+      - "Has {{ip}} been used by any other identity in {{account_id}}?"
     kql:
       - title: Root activity (7d)
         platform: sentinel
@@ -60,6 +63,12 @@ nodes:
   q-source:
     type: question
     text: Did it come from the owner's known network, with MFA, and without creating keys, users or policy changes?
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence or hosted on a VPS, VPN or anonymising provider?"
+      - "Were the root email, password, MFA device or account contact details changed?"
+      - "Were CloudTrail, GuardDuty or other security services stopped or changed?"
+      - "Did root make buckets, snapshots or AMIs public or share them with another account?"
+      - "Did root delete resources, backups or snapshots, or try to leave the AWS Organization?"
     yes: o-policy
     no: o-tp
     notes:

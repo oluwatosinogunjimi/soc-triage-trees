@@ -10,7 +10,7 @@ applies_to:
   - Connection to cryptocurrency mining pool
   - XMRig execution
 mitre: [T1496]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -23,6 +23,9 @@ nodes:
   c-miner:
     type: check
     text: Identify the miner, its parent and its pool connections.
+    also_check:
+      - "Has {{device}} talked to previously unseen domains or IPs other than the mining pools?"
+      - "Has anyone tried to disable AV or EDR on {{device}}, or add Defender exclusions?"
     kql:
       - title: Miner processes and pool connections (7d)
         platform: xdr
@@ -41,6 +44,13 @@ nodes:
   q-server:
     type: question
     text: Is {{device}} a server (especially internet-facing) or was the miner started by a service, web server or scheduled task?
+    also_check:
+      - "Has {{device}} been accessed from an unfamiliar IP over RDP or SSH?"
+      - "Is there evidence a known vulnerability on {{device}} was exploited?"
+      - "Were new services, startup registry keys or cron jobs created on {{device}}?"
+      - "Was a new local account created or added to a privileged group on {{device}}?"
+      - "Has anyone tried to dump credentials on {{device}} (LSASS, SAM or /etc/shadow)?"
+      - "Has {{device}} connected to many other internal hosts over SMB, RDP, WMI or SSH?"
     yes: o-tp-server
     no: q-user-installed
     notes:
@@ -50,6 +60,8 @@ nodes:
   q-user-installed:
     type: question
     text: Did the user install it (cracked software, game mod, "earn crypto" app)?
+    also_check:
+      - "Were other unsigned binaries run from Downloads or Temp on {{device}} around the same time?"
     yes: o-tp-pua
     no: o-tp-server
     notes:

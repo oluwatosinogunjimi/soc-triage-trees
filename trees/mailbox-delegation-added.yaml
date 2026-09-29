@@ -11,7 +11,7 @@ applies_to:
   - Set-Mailbox GrantSendOnBehalfTo
   - Add-MailboxFolderPermission
 mitre: [T1098.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,6 +28,9 @@ nodes:
   c-change:
     type: check
     text: Pull the permission change.
+    also_check:
+      - "Has {{actor}} granted permissions on other mailboxes in the same period?"
+      - "Has {{mailbox}} had new inbox rules or external forwarding added around the same time?"
     kql:
       - title: Mailbox permission changes (30d)
         platform: sentinel
@@ -43,6 +46,10 @@ nodes:
   q-business:
     type: question
     text: Is there a business reason (assistant, shared team inbox, leaver handover) with a request?
+    also_check:
+      - "Is {{delegate}} a newly created account or an external guest?"
+      - "Has {{delegate}} signed in from an unrecognised IP or device recently?"
+      - "Has {{delegate}} opened or sent mail as {{mailbox}} since the permission was added?"
     yes: o-benign
     no: o-policy
     notes:
@@ -52,6 +59,10 @@ nodes:
   q-actor-clean:
     type: question
     text: Was the change made by an Exchange admin from their normal session, or by the mailbox owner from a normal session?
+    also_check:
+      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
+      - "Were multiple failed sign-ins for {{actor}} seen before the session that made the change?"
+      - "Was {{actor}} given an Exchange Administrator or Global Administrator role recently or unexpectedly?"
     yes: q-business
     no: o-tp
     notes:

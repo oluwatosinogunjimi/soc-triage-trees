@@ -10,7 +10,7 @@ applies_to:
   - Suspicious driver load (known vulnerable driver blocklist)
   - Possible EDR killer activity
 mitre: [T1068, T1562.001, T1543.003]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,6 +28,9 @@ nodes:
   c-driver:
     type: check
     text: Identify the driver, where it was dropped and how it was loaded.
+    also_check:
+      - "Has {{device}} been accessed from an unusual or untrusted source before the driver was dropped?"
+      - "Did a process request administrative privileges unexpectedly or use a UAC bypass on {{device}} before the load?"
     kql:
       - title: Driver drops, service creation and loads (7d)
         platform: xdr
@@ -55,6 +58,11 @@ nodes:
   q-edr-impact:
     type: question
     text: After the load, did security processes stop or the sensor go quiet, or did other attack activity follow?
+    also_check:
+      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
+      - "Were shadow copies or backup data deleted or changed on {{device}}?"
+      - "Were security or event logs cleared on {{device}}?"
+      - "Has {{device}} connected to many other internal hosts or used remote execution (WMI, RDP, SMB)?"
     yes: o-tp-edr-killed
     no: o-tp
     notes:

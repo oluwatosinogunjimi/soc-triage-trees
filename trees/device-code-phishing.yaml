@@ -10,7 +10,7 @@ applies_to:
   - Suspicious sign-in using device code flow
   - Sign-in with authentication protocol deviceCode
 mitre: [T1528, T1566.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -30,6 +30,10 @@ nodes:
       - AuthenticationProtocol = deviceCode on the sign-in
       - Client app and resource (Microsoft Graph, Office, Azure CLI)
       - IP of the sign-in versus the user's usual IPs
+    also_check:
+      - "Is {{ip}} flagged in threat intelligence for malicious activity?"
+      - "Was a new device or MFA method registered for {{user}} after the device code sign-in?"
+      - "Has {{user}} been assigned a privileged role or changed directory permissions since the sign-in?"
     kql:
       - title: Device code sign-ins for the user (14d)
         platform: sentinel
@@ -64,6 +68,8 @@ nodes:
   q-lure:
     type: question
     text: Did the user receive a message with a device login code or microsoft.com/devicelogin link (email, Teams, SMS) just before?
+    also_check:
+      - "Have other users completed device code sign-ins or signed in from {{ip}}?"
     kql:
       - title: Emails and Teams messages mentioning device login (7d)
         platform: xdr
@@ -82,6 +88,11 @@ nodes:
   q-token-used:
     type: question
     text: Has the token been used to access data (mail, files, Graph calls from the attacker IP)?
+    also_check:
+      - "Has {{user}} created inbox rules or external forwarding since the sign-in?"
+      - "Has {{user}} granted OAuth consent to an unfamiliar application?"
+      - "Did {{user}} send unusual messages to many colleagues or external contacts?"
+      - "Has {{user}} created external sharing links or sent files to personal addresses?"
     kql:
       - title: Non-interactive activity from the redeeming IP (7d)
         platform: sentinel

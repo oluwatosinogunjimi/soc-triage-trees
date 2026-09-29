@@ -10,7 +10,7 @@ applies_to:
   - Guest user account promoted to member
   - Invite external user (unusual inviter or domain)
 mitre: [T1136.003, T1078.004]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,10 @@ nodes:
   c-invite:
     type: check
     text: Pull the invitation, redemption and group or app assignments.
+    also_check:
+      - "Has {{guest}} signed in from TOR, hosting or other unrecognised IPs?"
+      - "Has {{guest}} downloaded or synced a large number of files from SharePoint, OneDrive or Teams?"
+      - "Has {{guest}} created sharing links or shared files with other external accounts?"
     kql:
       - title: Guest lifecycle (30d)
         platform: sentinel
@@ -44,6 +48,8 @@ nodes:
     type: question
     text: Was the guest converted to a member or given a directory role?
     why: A guest promoted to member gets member-level directory visibility. It is rare and usually deliberate.
+    also_check:
+      - "Has {{guest}} enumerated users, groups or applications in the directory?"
     yes: q-actor-clean
     no: q-business
     notes:
@@ -53,6 +59,8 @@ nodes:
   q-business:
     type: question
     text: Is there a business relationship with the guest's domain (partner, supplier, known collaborator), and does the inviter work with them?
+    also_check:
+      - "Is the guest's email domain newly registered?"
     yes: q-access-scope
     no: q-actor-clean
     notes:
@@ -71,6 +79,10 @@ nodes:
   q-actor-clean:
     type: question
     text: Was the inviter's session clean and does the inviter confirm the action?
+    also_check:
+      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
+      - "Has {{actor}} created inbox rules or enabled forwarding to an external address?"
+      - "Has {{actor}} changed external collaboration or cross-tenant access settings?"
     yes: o-policy
     no: o-tp
     unknown: o-tp

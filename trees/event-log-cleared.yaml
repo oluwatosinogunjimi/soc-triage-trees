@@ -10,7 +10,7 @@ applies_to:
   - wevtutil cl executed
   - Audit policy changed
 mitre: [T1070.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,6 +24,8 @@ nodes:
   c-clear:
     type: check
     text: Confirm the clear and what ran around it.
+    also_check:
+      - "Has {{account}} cleared logs on, or signed in to, other devices it does not normally use?"
     kql:
       - title: Log clears and audit changes (7d)
         platform: sentinel
@@ -47,6 +49,8 @@ nodes:
   q-planned:
     type: question
     text: Is it a documented maintenance action (image build, lab machine, a ticket for log reset)?
+    also_check:
+      - "Has {{account}} recently been added to a privileged group or given admin rights it did not have before?"
     yes: o-benign
     no: q-before
     notes:
@@ -56,6 +60,13 @@ nodes:
   q-before:
     type: question
     text: Is there other suspicious activity on the device in the hours before (new tools, logons from unusual hosts, other alerts)?
+    also_check:
+      - "Was LSASS memory or a credential store (SAM, NTDS.dit) accessed on {{device}} before the clear?"
+      - "Were new scheduled tasks, services or local accounts created on {{device}} before the clear?"
+      - "Has anyone tried to disable AV, EDR or other logging on {{device}}?"
+      - "Was WMI, RDP or SMB used for remote execution to or from {{device}}?"
+      - "Were shadow copies or backups deleted on {{device}}?"
+      - "Has a large volume of data left {{device}} around the time of the clear?"
     yes: o-tp
     no: o-tp-isolated
     notes:

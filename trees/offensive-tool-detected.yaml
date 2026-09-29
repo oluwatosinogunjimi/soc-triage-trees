@@ -11,7 +11,7 @@ applies_to:
   - An active 'Sliver' / 'BruteRatel' beacon was detected
   - Impacket toolkit usage
 mitre: [T1588.002, T1071.001]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -37,6 +37,11 @@ nodes:
   c-execution:
     type: check
     text: Establish whether the tool ran, how it arrived and what it talked to.
+    also_check:
+      - "Was {{device}} accessed from an unfamiliar IP or account over RDP or a remote logon before the drop?"
+      - "Did a process on {{device}} request unexpected administrative privileges or use a UAC bypass?"
+      - "Were new scheduled tasks, services or startup registry keys created on {{device}}?"
+      - "Were security logs cleared, or AV, EDR or logging disabled, on {{device}}?"
     kql:
       - title: Alerts, process tree and network for the device (48h)
         platform: xdr
@@ -54,6 +59,12 @@ nodes:
   q-blocked:
     type: question
     text: Was it quarantined on write and never executed?
+    also_check:
+      - "Was LSASS memory or the SAM database accessed on {{device}}?"
+      - "Did {{device}} run domain enumeration (net group, nltest, LDAP or SharpHound queries)?"
+      - "Was WMI, WinRM, RDP or SMB used for remote execution from {{device}}?"
+      - "Were Kerberos service tickets requested in bulk from {{device}}?"
+      - "Has a large volume of data left {{device}}, or was data compressed for transfer?"
     yes: o-tp-blocked
     no: o-tp-active
     notes:

@@ -10,7 +10,7 @@ applies_to:
   - DLL search order hijacking
   - Unsigned DLL loaded from user-writable path
 mitre: [T1574.002]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-load:
     type: check
     text: Identify the host executable, the DLL and where both live.
+    also_check:
+      - "Were the executable and {{dll}} dropped by a browser, mail client, archive tool or script rather than an installer?"
+      - "Was the copied executable started from an unexpected parent (script host, Office application, archive tool)?"
     kql:
       - title: DLL loads by name, path and signer (7d)
         platform: xdr
@@ -60,6 +63,13 @@ nodes:
   q-behaviour:
     type: question
     text: Did the host process then behave maliciously (network beacons, injection, persistence)?
+    also_check:
+      - "Did the host process run at high or SYSTEM integrity, or spawn a high-privilege child process?"
+      - "Did the host process access LSASS memory or other credential stores?"
+      - "Did the host process run discovery commands (whoami, net, nltest, systeminfo)?"
+      - "Is there evidence of keylogging, screen capture or clipboard monitoring on {{device}}?"
+      - "Has {{device}} used WMI, RDP or SMB for remote execution to other internal hosts?"
+      - "Has anyone tried to disable AV, EDR or logging on {{device}}?"
     yes: o-tp
     no: l-edr
     notes:

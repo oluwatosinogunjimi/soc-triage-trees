@@ -10,7 +10,7 @@ applies_to:
   - Set-TransportRule
   - Mail flow rule redirecting mail externally
 mitre: [T1114.003, T1562]
-version: 1.0.0
+version: 1.1.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,6 +26,9 @@ nodes:
   c-rule:
     type: check
     text: Pull the rule's conditions and actions.
+    also_check:
+      - "Did {{actor}} change other email security settings (anti-spam, anti-phishing, connectors or outbound spam policy) around the same time?"
+      - "Did {{actor}} disable audit logging or alert policies around the same time?"
     kql:
       - title: Transport rule changes (90d)
         platform: sentinel
@@ -40,6 +43,8 @@ nodes:
   q-dangerous:
     type: question
     text: Does the rule redirect, BCC or forward mail externally, set SCL -1 (bypass spam) for an external domain, or remove security headers or warnings?
+    also_check:
+      - "Has mail matching {{rule_name}} already been delivered to an external address?"
     yes: q-approved
     no: o-benign
     notes:
@@ -49,6 +54,12 @@ nodes:
   q-approved:
     type: question
     text: Is it approved (journaling to an archive vendor, a third-party filter, a change ticket) and made from the admin's normal session?
+    also_check:
+      - "Was {{actor}} given an Exchange Administrator or Global Administrator role recently or unexpectedly?"
+      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
+      - "Were multiple failed sign-ins for {{actor}} seen before the session that made the change?"
+      - "Has {{actor}} consented to a new OAuth app or added app credentials?"
+      - "Has {{actor}} changed mailbox permissions or forwarding on other users' mailboxes?"
     yes: o-benign-approved
     no: o-tp
     notes:
