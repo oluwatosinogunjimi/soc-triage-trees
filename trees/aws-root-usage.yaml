@@ -1,0 +1,100 @@
+id: aws-root-usage
+title: AWS Root Account Usage
+category: cloud
+summary: >-
+  The AWS account root user signed in or made API calls. Root should be locked away with
+  hardware MFA and used only for the handful of tasks that need it. Any other use is a
+  policy breach, and use from an unknown source is an emergency.
+applies_to:
+  - Policy:IAMUser/RootCredentialUsage
+  - Root console login
+  - Root access key used
+mitre: [T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS, tasks that require root user credentials
+    url: https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-tasks.html
+  - title: AWS GuardDuty finding types
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+entities:
+  - { key: account_id, label: AWS account ID, example: "111122223333" }
+  - { key: ip, label: Source IP, example: "81.2.69.160" }
+start: c-activity
+nodes:
+  c-activity:
+    type: check
+    text: Pull every root action in the window.
+    kql:
+      - title: Root activity (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where UserIdentityType == "Root" and RecipientAccountId == "{{account_id}}"
+          | project TimeGenerated, EventName, EventSource, SourceIpAddress, UserAgent, ErrorCode, AWSRegion,
+                    MFAUsed = tostring(parse_json(AdditionalEventData).MFAUsed)
+          | order by TimeGenerated asc
+    note: I pulled every root action in account {{account_id}}, including from {{ip}}.
+    next: q-planned
+
+  q-planned:
+    type: question
+    text: Is it planned root-only work (billing change, account closure, support plan, MFA reset) confirmed by the cloud owner?
+    yes: q-mfa
+    no: q-source
+    notes:
+      yes: The root activity was planned root-only work confirmed by the cloud owner.
+      no: No planned root-only work covers the activity.
+
+  q-mfa:
+    type: question
+    text: Was MFA used and did the session stay within the planned task?
+    yes: o-benign
+    no: o-policy
+    notes:
+      yes: The root session used MFA and stayed within the planned task.
+      no: The root session lacked MFA or went beyond the planned task.
+
+  q-source:
+    type: question
+    text: Did it come from the owner's known network, with MFA, and without creating keys, users or policy changes?
+    yes: o-policy
+    no: o-tp
+    notes:
+      yes: The root activity came from a known network with MFA and no persistence changes.
+      no: The root activity came from {{ip}}, an unknown source, or created keys, users or policies.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Planned root task
+    anchor: The root user in {{account_id}} was used for planned root-only work with MFA.
+    risk: The risk here is abuse of unrestricted account credentials; it doesn't apply given the planned task and MFA.
+    actions:
+      - Close referencing the task
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Root used outside policy
+    anchor: The root user in {{account_id}} was used by its owner for work that does not need root, or without MFA.
+    risk: The risk here is routine root use making compromise more likely; it is a policy failure to correct.
+    actions:
+      - Tell the cloud owner to use IAM roles for this work and enforce hardware MFA on root
+      - Confirm no root access keys exist
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Root account compromised
+    anchor: The root user in {{account_id}} was used from {{ip}} without authorisation.
+    risk: The risk here is total control of the AWS account, including deletion of resources and backups; this is a P1.
+    actions:
+      - Call the customer on the P1 path
+      - Reset the root password, replace MFA and delete any root access keys
+      - Remove users, keys, roles and policies created by root
+      - Review all CloudTrail activity from {{ip}}
+    escalate: true
+    monitor: I will monitor for any further root activity and for activity from {{ip}}.

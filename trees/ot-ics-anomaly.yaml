@@ -1,0 +1,99 @@
+id: ot-ics-anomaly
+title: OT/ICS Protocol Anomaly
+category: network
+summary: >-
+  An industrial protocol command (Modbus write, S7 program download, DNP3 control, EtherNet/IP
+  configuration) from a host that does not normally send it, or IT-to-OT traffic crossing
+  the boundary. Safety comes first: never isolate OT assets without the site's operators.
+applies_to:
+  - Unauthorized PLC program change
+  - Modbus write from unknown host
+  - New IT-to-OT connection
+  - Engineering workstation activity outside maintenance window
+mitre: [T0843, T0855, T0886]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK for ICS T0843 Program Download"
+    url: https://attack.mitre.org/techniques/T0843/
+  - title: "MITRE ATT&CK for ICS T0855 Unauthorized Command Message"
+    url: https://attack.mitre.org/techniques/T0855/
+  - title: CISA ICS recommended practices
+    url: https://www.cisa.gov/resources-tools/resources/ics-recommended-practices
+entities:
+  - { key: src_ip, label: Source host, example: "10.200.5.14" }
+  - { key: target, label: Target controller or asset, example: "PLC-PUMP-03" }
+start: c-traffic
+nodes:
+  c-traffic:
+    type: check
+    text: Describe the command, the source and the target, using the OT monitoring platform.
+    look_for:
+      - Protocol and function (read, write, program download, stop or start CPU, firmware)
+      - Whether the source is an engineering workstation, HMI or historian, or an IT host
+      - Maintenance windows and site contacts from the customer runbook
+    kql:
+      - title: Flows from the source to OT ports (48h)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(48h)
+          | where SourceIP == "{{src_ip}}"
+          | where DestinationPort in (502, 102, 20000, 44818, 2222, 4840, 47808, 1911, 2404)
+          | summarize Sessions = count(), First = min(TimeGenerated), Last = max(TimeGenerated) by DestinationIP, DestinationPort, ApplicationProtocol
+    note: I described the OT command from {{src_ip}} to {{target}}.
+    next: q-engineering
+
+  q-engineering:
+    type: question
+    text: Is the source an authorised engineering workstation during a planned maintenance window, confirmed with site operations?
+    yes: o-benign
+    no: q-state-changing
+    notes:
+      yes: "{{src_ip}} is an authorised engineering workstation working in a planned window."
+      no: "{{src_ip}} is not an authorised engineering source, or no maintenance was planned."
+
+  q-state-changing:
+    type: question
+    text: Did the command change process state or logic (writes, program download, CPU stop, firmware), rather than only read?
+    yes: o-tp
+    no: o-tp-recon
+    notes:
+      yes: The command from {{src_ip}} changed state or logic on {{target}}.
+      no: The traffic from {{src_ip}} only read from {{target}}.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Planned engineering work
+    anchor: The command to {{target}} came from an authorised engineering workstation during planned maintenance.
+    risk: The risk here is unauthorised manipulation of physical processes; it doesn't apply given site confirmation.
+    actions:
+      - Close referencing the maintenance record
+
+  o-tp-recon:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised OT reconnaissance
+    anchor: "{{src_ip}}, which has no authorised OT role, read from {{target}}."
+    risk: The risk here is an attacker mapping the industrial process before acting; the IT-to-OT path must be closed.
+    actions:
+      - Notify site operations and the customer's OT security lead
+      - Investigate {{src_ip}} on the IT side and block its path into OT
+    escalate: true
+    monitor: I will monitor OT boundaries for further traffic from {{src_ip}}.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised change to an industrial controller
+    anchor: "{{src_ip}} sent state-changing commands to {{target}} without authorisation."
+    risk: The risk here is disruption or damage to physical processes and safety; this is a P1 with safety implications.
+    actions:
+      - Call site operations and the customer P1 contact immediately; let operators decide on isolation
+      - Preserve OT monitoring and controller logs; compare controller logic with the known good version
+      - Block the source's path into OT at the boundary firewall if operators agree
+      - Engage ICS incident response
+    escalate: true
+    monitor: I will monitor all OT boundaries and controllers for further commands.

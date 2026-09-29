@@ -63,33 +63,248 @@ nodes:
     note: I checked for related alerts on {{entity}} and for recent firings of the same rule.
     next: ch-route
 
+  # BEGIN GENERATED ROUTER (python tools/gen_router.py)
   ch-route:
     type: choice
-    text: Which alert type is this?
-    why: A dedicated tree asks the questions that matter for that alert type. Use the generic path only if none fits.
+    text: Which kind of alert is this?
+    why: A dedicated playbook asks the questions that matter for that alert type. Use the generic path only if none fits.
     options:
-      - { label: "Email: phishing or suspicious email", next: l-phishing }
-      - { label: "Identity: unfamiliar or impossible-travel sign-in", next: l-signin }
-      - { label: "Identity: password spray or brute force", next: l-spray }
-      - { label: "Identity: token theft or AiTM", next: l-aitm }
-      - { label: "Identity: OAuth app consent", next: l-oauth }
-      - { label: "Mailbox: inbox rule or forwarding", next: l-inbox }
-      - { label: "Endpoint: malware or EDR detection", next: l-edr }
-      - { label: "Endpoint: suspicious PowerShell or LOLBin", next: l-powershell }
-      - { label: "Network: IDS, firewall or network anomaly", next: l-network }
-      - { label: "Cloud: Azure or AWS control-plane action", next: l-cloud }
+      - { label: "Email and collaboration (15)", next: ch-email }
+      - { label: "Identity: Entra ID and Active Directory (29)", next: ch-identity }
+      - { label: "Endpoint: Windows, Linux and servers (24)", next: ch-endpoint }
+      - { label: "Network, perimeter and OT (13)", next: ch-network }
+      - { label: "Cloud and SaaS: Azure, AWS and M365 data (18)", next: ch-cloud }
       - { label: "None of these: use the generic flow", next: q-obviously-benign }
 
-  l-phishing: { type: link, text: Continue in the phishing tree, tree: phishing-email }
-  l-signin: { type: link, text: Continue in the sign-in tree, tree: atypical-signin }
-  l-spray: { type: link, text: Continue in the password spray tree, tree: password-spray }
-  l-aitm: { type: link, text: Continue in the token theft tree, tree: aitm-token-theft }
-  l-oauth: { type: link, text: Continue in the OAuth consent tree, tree: oauth-consent-grant }
-  l-inbox: { type: link, text: Continue in the inbox rule tree, tree: inbox-rule-forwarding }
-  l-edr: { type: link, text: Continue in the EDR tree, tree: edr-malware-detection }
-  l-powershell: { type: link, text: Continue in the PowerShell tree, tree: suspicious-powershell }
-  l-network: { type: link, text: Continue in the network tree, tree: network-ids-alert }
-  l-cloud: { type: link, text: Continue in the cloud tree, tree: cloud-control-plane }
+  ch-email:
+    type: choice
+    text: "Which email or collaboration alert?"
+    options:
+      - { label: "Callback Phishing (TOAD)", next: l-callback-phishing }
+      - { label: "Exchange Mail Flow (Transport) Rule Change", next: l-mail-flow-rule-change }
+      - { label: "Executive Impersonation (CEO Fraud)", next: l-executive-impersonation }
+      - { label: "HTML Smuggling Attachment", next: l-html-smuggling }
+      - { label: "Mailbox Delegation or Send-As Permission Added", next: l-mailbox-delegation-added }
+      - { label: "Malicious Email Removed After Delivery (ZAP)", next: l-malware-zap-after-delivery }
+      - { label: "Mass Email Deletion", next: l-mass-email-deletion }
+      - { label: "Microsoft Teams External Phishing or Fake Helpdesk", next: l-teams-external-phishing }
+      - { label: "Phishing Sent from an Internal Account", next: l-internal-phishing-sent }
+      - { label: "Phishing or Suspicious Email", next: l-phishing-email }
+      - { label: "QR Code Phishing (Quishing)", next: l-qr-code-phishing }
+      - { label: "Suspicious Inbox Rule or Mail Forwarding", next: l-inbox-rule-forwarding }
+      - { label: "User Clicked a Malicious URL", next: l-malicious-url-click }
+      - { label: "User Restricted from Sending Email", next: l-restricted-sender }
+      - { label: "Vendor Email Compromise (Bank Detail Change)", next: l-vendor-email-compromise }
+      - { label: "None of these: use the generic flow", next: q-obviously-benign }
+
+  ch-identity:
+    type: choice
+    text: "Which identity alert?"
+    options:
+      - { label: "AD CS Certificate Abuse", next: l-adcs-certificate-abuse }
+      - { label: "AS-REP Roasting", next: l-asrep-roasting }
+      - { label: "Active Directory Reconnaissance", next: l-ad-reconnaissance }
+      - { label: "Activity by a Disabled or Departed User", next: l-deprovisioned-user-activity }
+      - { label: "Break-Glass Account Sign-in", next: l-break-glass-signin }
+      - { label: "Conditional Access Policy Changed or Deleted", next: l-conditional-access-change }
+      - { label: "Credential Added to App or Service Principal", next: l-service-principal-credential-added }
+      - { label: "DCSync (Directory Replication Request)", next: l-dcsync }
+      - { label: "Device Code Phishing", next: l-device-code-phishing }
+      - { label: "Domain Federation or Authentication Trust Change", next: l-federation-trust-change }
+      - { label: "Golden Ticket or Forged Kerberos Ticket", next: l-golden-ticket }
+      - { label: "Kerberoasting", next: l-kerberoasting }
+      - { label: "Leaked Credentials", next: l-leaked-credentials }
+      - { label: "MFA Fatigue or Suspicious MFA Approval", next: l-mfa-fatigue }
+      - { label: "New Account Created and Made Admin", next: l-admin-account-created }
+      - { label: "OAuth App Consent Grant", next: l-oauth-consent-grant }
+      - { label: "On-Premises Privileged Group Membership Change", next: l-ad-privileged-group-change }
+      - { label: "Pass-the-Hash, Pass-the-Ticket or Overpass-the-Hash", next: l-pass-the-hash-ticket }
+      - { label: "Password Spray or Brute Force", next: l-password-spray }
+      - { label: "Password or MFA Reset Followed by Risky Sign-in", next: l-helpdesk-reset-takeover }
+      - { label: "Privileged Entra Role Assignment", next: l-privileged-role-assignment }
+      - { label: "Shadow Credentials or RBCD Attribute Change", next: l-shadow-credentials }
+      - { label: "Sign-in from Anonymous, TOR or Malicious IP", next: l-risky-ip-signin }
+      - { label: "Successful Legacy Authentication Sign-in", next: l-legacy-auth-success }
+      - { label: "Suspicious Guest Invitation or Guest Promotion", next: l-suspicious-guest-invite }
+      - { label: "Suspicious MFA Method Registration", next: l-suspicious-mfa-registration }
+      - { label: "Temporary Access Pass Created", next: l-temporary-access-pass-created }
+      - { label: "Token Theft or AiTM Phishing", next: l-aitm-token-theft }
+      - { label: "Unfamiliar or Impossible-Travel Sign-in", next: l-atypical-signin }
+      - { label: "None of these: use the generic flow", next: q-obviously-benign }
+
+  ch-endpoint:
+    type: choice
+    text: "Which endpoint alert?"
+    options:
+      - { label: "Antivirus or EDR Tampering", next: l-security-tool-tampering }
+      - { label: "Cryptominer on Endpoint or Server", next: l-endpoint-coinminer }
+      - { label: "DLL Sideloading", next: l-dll-sideloading }
+      - { label: "Data Staging in Archives", next: l-data-staging-archive }
+      - { label: "Event Log Cleared", next: l-event-log-cleared }
+      - { label: "Infostealer Malware", next: l-infostealer }
+      - { label: "LSASS Credential Dumping", next: l-lsass-credential-dumping }
+      - { label: "Large Copy to Removable Media", next: l-usb-data-transfer }
+      - { label: "Linux Reverse Shell or Suspicious Shell Activity", next: l-linux-reverse-shell }
+      - { label: "Local Account Created or Added to Administrators", next: l-local-admin-added }
+      - { label: "Malware or EDR Detection", next: l-edr-malware-detection }
+      - { label: "Offensive Security Tool or C2 Framework", next: l-offensive-tool-detected }
+      - { label: "Office Application Spawned a Suspicious Process", next: l-office-child-process }
+      - { label: "Process Injection or Hollowing", next: l-process-injection }
+      - { label: "Ransomware Behaviour", next: l-ransomware-behaviour }
+      - { label: "Registry Run Key or Startup Folder Persistence", next: l-registry-run-key-persistence }
+      - { label: "Remote Execution (PsExec, WMI, WinRM, RDP)", next: l-remote-execution-lateral }
+      - { label: "Suspicious PowerShell or LOLBin Execution", next: l-suspicious-powershell }
+      - { label: "Suspicious Scheduled Task", next: l-scheduled-task-persistence }
+      - { label: "Suspicious Service Installation", next: l-suspicious-service-install }
+      - { label: "Unauthorised Remote Access Tool", next: l-rmm-tool-unauthorised }
+      - { label: "Vulnerable Driver Loaded (BYOVD)", next: l-vulnerable-driver-byovd }
+      - { label: "WMI Event Subscription Persistence", next: l-wmi-persistence }
+      - { label: "Web Shell on a Server", next: l-web-shell }
+      - { label: "None of these: use the generic flow", next: q-obviously-benign }
+
+  ch-network:
+    type: choice
+    text: "Which network, perimeter or OT alert?"
+    options:
+      - { label: "Anomalous VPN Login", next: l-vpn-anomalous-login }
+      - { label: "Cryptomining Pool Traffic", next: l-cryptomining-traffic }
+      - { label: "DGA, Newly Registered or Malicious Domain Lookup", next: l-suspicious-domain-lookup }
+      - { label: "DNS Tunnelling or DNS Exfiltration", next: l-dns-tunnelling }
+      - { label: "Edge Device Exploitation (VPN, Firewall, Gateway)", next: l-edge-device-exploitation }
+      - { label: "Firewall or Network Device Configuration Change", next: l-network-device-config-change }
+      - { label: "Inbound RDP or SSH Brute Force", next: l-inbound-brute-force }
+      - { label: "Internal Port Scan or Host Discovery", next: l-internal-port-scan }
+      - { label: "Large or Unusual Outbound Data Transfer", next: l-large-outbound-transfer }
+      - { label: "Network, IDS or Firewall Alert", next: l-network-ids-alert }
+      - { label: "OT/ICS Protocol Anomaly", next: l-ot-ics-anomaly }
+      - { label: "TOR Traffic from an Internal Host", next: l-tor-traffic }
+      - { label: "Web Proxy Hit on Malicious Category", next: l-proxy-malicious-category }
+      - { label: "None of these: use the generic flow", next: q-obviously-benign }
+
+  ch-cloud:
+    type: choice
+    text: "Which cloud or SaaS alert?"
+    options:
+      - { label: "AWS Credentials Used Outside Their Workload", next: l-aws-credential-exfiltration }
+      - { label: "AWS IAM Privilege Escalation", next: l-aws-iam-privesc }
+      - { label: "AWS Root Account Usage", next: l-aws-root-usage }
+      - { label: "Azure Elevate Access or Subscription Owner Added", next: l-azure-elevate-access }
+      - { label: "Cloud Control-Plane Anomaly (Azure / AWS)", next: l-cloud-control-plane }
+      - { label: "Cloud Logging or Monitoring Disabled", next: l-cloud-logging-disabled }
+      - { label: "Cloud Resource Hijacking (Mining)", next: l-cloud-cryptomining }
+      - { label: "DLP Match on Sensitive Data Leaving", next: l-dlp-sensitive-upload }
+      - { label: "Key Vault or Secrets Manager Access Spike", next: l-keyvault-secret-access }
+      - { label: "LLM Abuse with Stolen Cloud Credentials (LLMjacking)", next: l-llmjacking }
+      - { label: "Mass Download or Deletion from Cloud Storage", next: l-cloud-storage-exfil }
+      - { label: "Mass External or Anonymous Sharing", next: l-mass-external-sharing }
+      - { label: "SaaS Mass Deletion or Cloud Ransomware", next: l-saas-mass-deletion }
+      - { label: "Secret Exposed in a Code Repository", next: l-secret-exposed-repo }
+      - { label: "SharePoint or OneDrive Mass Download", next: l-sharepoint-mass-download }
+      - { label: "Storage Bucket or Container Made Public", next: l-public-storage-exposure }
+      - { label: "Suspicious Kubernetes Workload or Access", next: l-kubernetes-suspicious-workload }
+      - { label: "VM Run Command or Extension Execution", next: l-vm-run-command }
+      - { label: "None of these: use the generic flow", next: q-obviously-benign }
+
+  l-ad-privileged-group-change: { type: link, text: "Continue in On-Premises Privileged Group Membership Change", tree: ad-privileged-group-change }
+  l-ad-reconnaissance: { type: link, text: "Continue in Active Directory Reconnaissance", tree: ad-reconnaissance }
+  l-adcs-certificate-abuse: { type: link, text: "Continue in AD CS Certificate Abuse", tree: adcs-certificate-abuse }
+  l-admin-account-created: { type: link, text: "Continue in New Account Created and Made Admin", tree: admin-account-created }
+  l-aitm-token-theft: { type: link, text: "Continue in Token Theft or AiTM Phishing", tree: aitm-token-theft }
+  l-asrep-roasting: { type: link, text: "Continue in AS-REP Roasting", tree: asrep-roasting }
+  l-atypical-signin: { type: link, text: "Continue in Unfamiliar or Impossible-Travel Sign-in", tree: atypical-signin }
+  l-aws-credential-exfiltration: { type: link, text: "Continue in AWS Credentials Used Outside Their Workload", tree: aws-credential-exfiltration }
+  l-aws-iam-privesc: { type: link, text: "Continue in AWS IAM Privilege Escalation", tree: aws-iam-privesc }
+  l-aws-root-usage: { type: link, text: "Continue in AWS Root Account Usage", tree: aws-root-usage }
+  l-azure-elevate-access: { type: link, text: "Continue in Azure Elevate Access or Subscription Owner Added", tree: azure-elevate-access }
+  l-break-glass-signin: { type: link, text: "Continue in Break-Glass Account Sign-in", tree: break-glass-signin }
+  l-callback-phishing: { type: link, text: "Continue in Callback Phishing (TOAD)", tree: callback-phishing }
+  l-cloud-control-plane: { type: link, text: "Continue in Cloud Control-Plane Anomaly (Azure / AWS)", tree: cloud-control-plane }
+  l-cloud-cryptomining: { type: link, text: "Continue in Cloud Resource Hijacking (Mining)", tree: cloud-cryptomining }
+  l-cloud-logging-disabled: { type: link, text: "Continue in Cloud Logging or Monitoring Disabled", tree: cloud-logging-disabled }
+  l-cloud-storage-exfil: { type: link, text: "Continue in Mass Download or Deletion from Cloud Storage", tree: cloud-storage-exfil }
+  l-conditional-access-change: { type: link, text: "Continue in Conditional Access Policy Changed or Deleted", tree: conditional-access-change }
+  l-cryptomining-traffic: { type: link, text: "Continue in Cryptomining Pool Traffic", tree: cryptomining-traffic }
+  l-data-staging-archive: { type: link, text: "Continue in Data Staging in Archives", tree: data-staging-archive }
+  l-dcsync: { type: link, text: "Continue in DCSync (Directory Replication Request)", tree: dcsync }
+  l-deprovisioned-user-activity: { type: link, text: "Continue in Activity by a Disabled or Departed User", tree: deprovisioned-user-activity }
+  l-device-code-phishing: { type: link, text: "Continue in Device Code Phishing", tree: device-code-phishing }
+  l-dll-sideloading: { type: link, text: "Continue in DLL Sideloading", tree: dll-sideloading }
+  l-dlp-sensitive-upload: { type: link, text: "Continue in DLP Match on Sensitive Data Leaving", tree: dlp-sensitive-upload }
+  l-dns-tunnelling: { type: link, text: "Continue in DNS Tunnelling or DNS Exfiltration", tree: dns-tunnelling }
+  l-edge-device-exploitation: { type: link, text: "Continue in Edge Device Exploitation (VPN, Firewall, Gateway)", tree: edge-device-exploitation }
+  l-edr-malware-detection: { type: link, text: "Continue in Malware or EDR Detection", tree: edr-malware-detection }
+  l-endpoint-coinminer: { type: link, text: "Continue in Cryptominer on Endpoint or Server", tree: endpoint-coinminer }
+  l-event-log-cleared: { type: link, text: "Continue in Event Log Cleared", tree: event-log-cleared }
+  l-executive-impersonation: { type: link, text: "Continue in Executive Impersonation (CEO Fraud)", tree: executive-impersonation }
+  l-federation-trust-change: { type: link, text: "Continue in Domain Federation or Authentication Trust Change", tree: federation-trust-change }
+  l-golden-ticket: { type: link, text: "Continue in Golden Ticket or Forged Kerberos Ticket", tree: golden-ticket }
+  l-helpdesk-reset-takeover: { type: link, text: "Continue in Password or MFA Reset Followed by Risky Sign-in", tree: helpdesk-reset-takeover }
+  l-html-smuggling: { type: link, text: "Continue in HTML Smuggling Attachment", tree: html-smuggling }
+  l-inbound-brute-force: { type: link, text: "Continue in Inbound RDP or SSH Brute Force", tree: inbound-brute-force }
+  l-inbox-rule-forwarding: { type: link, text: "Continue in Suspicious Inbox Rule or Mail Forwarding", tree: inbox-rule-forwarding }
+  l-infostealer: { type: link, text: "Continue in Infostealer Malware", tree: infostealer }
+  l-internal-phishing-sent: { type: link, text: "Continue in Phishing Sent from an Internal Account", tree: internal-phishing-sent }
+  l-internal-port-scan: { type: link, text: "Continue in Internal Port Scan or Host Discovery", tree: internal-port-scan }
+  l-kerberoasting: { type: link, text: "Continue in Kerberoasting", tree: kerberoasting }
+  l-keyvault-secret-access: { type: link, text: "Continue in Key Vault or Secrets Manager Access Spike", tree: keyvault-secret-access }
+  l-kubernetes-suspicious-workload: { type: link, text: "Continue in Suspicious Kubernetes Workload or Access", tree: kubernetes-suspicious-workload }
+  l-large-outbound-transfer: { type: link, text: "Continue in Large or Unusual Outbound Data Transfer", tree: large-outbound-transfer }
+  l-leaked-credentials: { type: link, text: "Continue in Leaked Credentials", tree: leaked-credentials }
+  l-legacy-auth-success: { type: link, text: "Continue in Successful Legacy Authentication Sign-in", tree: legacy-auth-success }
+  l-linux-reverse-shell: { type: link, text: "Continue in Linux Reverse Shell or Suspicious Shell Activity", tree: linux-reverse-shell }
+  l-llmjacking: { type: link, text: "Continue in LLM Abuse with Stolen Cloud Credentials (LLMjacking)", tree: llmjacking }
+  l-local-admin-added: { type: link, text: "Continue in Local Account Created or Added to Administrators", tree: local-admin-added }
+  l-lsass-credential-dumping: { type: link, text: "Continue in LSASS Credential Dumping", tree: lsass-credential-dumping }
+  l-mail-flow-rule-change: { type: link, text: "Continue in Exchange Mail Flow (Transport) Rule Change", tree: mail-flow-rule-change }
+  l-mailbox-delegation-added: { type: link, text: "Continue in Mailbox Delegation or Send-As Permission Added", tree: mailbox-delegation-added }
+  l-malicious-url-click: { type: link, text: "Continue in User Clicked a Malicious URL", tree: malicious-url-click }
+  l-malware-zap-after-delivery: { type: link, text: "Continue in Malicious Email Removed After Delivery (ZAP)", tree: malware-zap-after-delivery }
+  l-mass-email-deletion: { type: link, text: "Continue in Mass Email Deletion", tree: mass-email-deletion }
+  l-mass-external-sharing: { type: link, text: "Continue in Mass External or Anonymous Sharing", tree: mass-external-sharing }
+  l-mfa-fatigue: { type: link, text: "Continue in MFA Fatigue or Suspicious MFA Approval", tree: mfa-fatigue }
+  l-network-device-config-change: { type: link, text: "Continue in Firewall or Network Device Configuration Change", tree: network-device-config-change }
+  l-network-ids-alert: { type: link, text: "Continue in Network, IDS or Firewall Alert", tree: network-ids-alert }
+  l-oauth-consent-grant: { type: link, text: "Continue in OAuth App Consent Grant", tree: oauth-consent-grant }
+  l-offensive-tool-detected: { type: link, text: "Continue in Offensive Security Tool or C2 Framework", tree: offensive-tool-detected }
+  l-office-child-process: { type: link, text: "Continue in Office Application Spawned a Suspicious Process", tree: office-child-process }
+  l-ot-ics-anomaly: { type: link, text: "Continue in OT/ICS Protocol Anomaly", tree: ot-ics-anomaly }
+  l-pass-the-hash-ticket: { type: link, text: "Continue in Pass-the-Hash, Pass-the-Ticket or Overpass-the-Hash", tree: pass-the-hash-ticket }
+  l-password-spray: { type: link, text: "Continue in Password Spray or Brute Force", tree: password-spray }
+  l-phishing-email: { type: link, text: "Continue in Phishing or Suspicious Email", tree: phishing-email }
+  l-privileged-role-assignment: { type: link, text: "Continue in Privileged Entra Role Assignment", tree: privileged-role-assignment }
+  l-process-injection: { type: link, text: "Continue in Process Injection or Hollowing", tree: process-injection }
+  l-proxy-malicious-category: { type: link, text: "Continue in Web Proxy Hit on Malicious Category", tree: proxy-malicious-category }
+  l-public-storage-exposure: { type: link, text: "Continue in Storage Bucket or Container Made Public", tree: public-storage-exposure }
+  l-qr-code-phishing: { type: link, text: "Continue in QR Code Phishing (Quishing)", tree: qr-code-phishing }
+  l-ransomware-behaviour: { type: link, text: "Continue in Ransomware Behaviour", tree: ransomware-behaviour }
+  l-registry-run-key-persistence: { type: link, text: "Continue in Registry Run Key or Startup Folder Persistence", tree: registry-run-key-persistence }
+  l-remote-execution-lateral: { type: link, text: "Continue in Remote Execution (PsExec, WMI, WinRM, RDP)", tree: remote-execution-lateral }
+  l-restricted-sender: { type: link, text: "Continue in User Restricted from Sending Email", tree: restricted-sender }
+  l-risky-ip-signin: { type: link, text: "Continue in Sign-in from Anonymous, TOR or Malicious IP", tree: risky-ip-signin }
+  l-rmm-tool-unauthorised: { type: link, text: "Continue in Unauthorised Remote Access Tool", tree: rmm-tool-unauthorised }
+  l-saas-mass-deletion: { type: link, text: "Continue in SaaS Mass Deletion or Cloud Ransomware", tree: saas-mass-deletion }
+  l-scheduled-task-persistence: { type: link, text: "Continue in Suspicious Scheduled Task", tree: scheduled-task-persistence }
+  l-secret-exposed-repo: { type: link, text: "Continue in Secret Exposed in a Code Repository", tree: secret-exposed-repo }
+  l-security-tool-tampering: { type: link, text: "Continue in Antivirus or EDR Tampering", tree: security-tool-tampering }
+  l-service-principal-credential-added: { type: link, text: "Continue in Credential Added to App or Service Principal", tree: service-principal-credential-added }
+  l-shadow-credentials: { type: link, text: "Continue in Shadow Credentials or RBCD Attribute Change", tree: shadow-credentials }
+  l-sharepoint-mass-download: { type: link, text: "Continue in SharePoint or OneDrive Mass Download", tree: sharepoint-mass-download }
+  l-suspicious-domain-lookup: { type: link, text: "Continue in DGA, Newly Registered or Malicious Domain Lookup", tree: suspicious-domain-lookup }
+  l-suspicious-guest-invite: { type: link, text: "Continue in Suspicious Guest Invitation or Guest Promotion", tree: suspicious-guest-invite }
+  l-suspicious-mfa-registration: { type: link, text: "Continue in Suspicious MFA Method Registration", tree: suspicious-mfa-registration }
+  l-suspicious-powershell: { type: link, text: "Continue in Suspicious PowerShell or LOLBin Execution", tree: suspicious-powershell }
+  l-suspicious-service-install: { type: link, text: "Continue in Suspicious Service Installation", tree: suspicious-service-install }
+  l-teams-external-phishing: { type: link, text: "Continue in Microsoft Teams External Phishing or Fake Helpdesk", tree: teams-external-phishing }
+  l-temporary-access-pass-created: { type: link, text: "Continue in Temporary Access Pass Created", tree: temporary-access-pass-created }
+  l-tor-traffic: { type: link, text: "Continue in TOR Traffic from an Internal Host", tree: tor-traffic }
+  l-usb-data-transfer: { type: link, text: "Continue in Large Copy to Removable Media", tree: usb-data-transfer }
+  l-vendor-email-compromise: { type: link, text: "Continue in Vendor Email Compromise (Bank Detail Change)", tree: vendor-email-compromise }
+  l-vm-run-command: { type: link, text: "Continue in VM Run Command or Extension Execution", tree: vm-run-command }
+  l-vpn-anomalous-login: { type: link, text: "Continue in Anomalous VPN Login", tree: vpn-anomalous-login }
+  l-vulnerable-driver-byovd: { type: link, text: "Continue in Vulnerable Driver Loaded (BYOVD)", tree: vulnerable-driver-byovd }
+  l-web-shell: { type: link, text: "Continue in Web Shell on a Server", tree: web-shell }
+  l-wmi-persistence: { type: link, text: "Continue in WMI Event Subscription Persistence", tree: wmi-persistence }
+  # END GENERATED ROUTER
 
   q-obviously-benign:
     type: question

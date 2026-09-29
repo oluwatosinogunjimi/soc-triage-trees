@@ -1,0 +1,97 @@
+id: vm-run-command
+title: VM Run Command or Extension Execution
+category: cloud
+summary: >-
+  Code was pushed into a virtual machine from the cloud control plane: Azure Run Command,
+  a Custom Script Extension, or AWS SSM SendCommand. It needs no network path or VM
+  credentials, only cloud rights, so attackers with a compromised cloud admin love it.
+applies_to:
+  - Run Command executed on virtual machine
+  - Suspicious Custom Script Extension deployed
+  - SSM SendCommand from unusual principal
+mitre: [T1651]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1651 Cloud Administration Command"
+    url: https://attack.mitre.org/techniques/T1651/
+  - title: Microsoft Defender for Cloud, alerts for Azure VMs
+    url: https://learn.microsoft.com/en-us/azure/defender-for-cloud/alerts-azure-compute
+entities:
+  - { key: principal, label: Caller, example: "cloudops@contoso.com" }
+  - { key: vm, label: Target VM, example: "vm-sql-prod-01" }
+start: c-command
+nodes:
+  c-command:
+    type: check
+    text: Pull the command, the caller and the script content.
+    kql:
+      - title: Azure run command and extension writes (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where OperationNameValue has_any ("virtualMachines/runCommand", "runCommands/write", "extensions/write")
+          | where _ResourceId has "{{vm}}" or Caller =~ "{{principal}}"
+          | project TimeGenerated, OperationNameValue, Caller, CallerIpAddress, _ResourceId, ActivityStatusValue, Properties
+      - title: AWS SSM commands (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where EventName in ("SendCommand", "StartSession") and (UserIdentityArn has "{{principal}}" or RequestParameters has "{{vm}}")
+          | project TimeGenerated, EventName, UserIdentityArn, SourceIpAddress, RequestParameters
+    note: I pulled the command run on {{vm}} by {{principal}} and its content.
+    next: q-routine
+
+  q-routine:
+    type: question
+    text: Is it a routine operation (patching, monitoring agent install, configuration management) by the usual automation or ops account?
+    yes: o-fp
+    no: q-content
+    notes:
+      yes: The command on {{vm}} was a routine operation by the usual automation.
+      no: The command on {{vm}} was not routine.
+
+  q-content:
+    type: question
+    text: Does the script do something offensive (add users, download tools, dump credentials, disable security, reverse shell)?
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: The script run on {{vm}} performed offensive actions.
+      no: The script run on {{vm}} performed administrative actions with no clear offensive intent.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Routine operation
+    anchor: The command run on {{vm}} by {{principal}} was a routine operation.
+    risk: The risk here is code execution through the control plane; it doesn't apply given the routine automation.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unusual admin command
+    anchor: "{{principal}} ran a non-routine administrative command on {{vm}}."
+    risk: The risk here is misuse of control-plane execution, which stays open until the owner confirms it.
+    actions:
+      - Ask the cloud owner to confirm the command
+    monitor: I will monitor {{principal}} for further run commands.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Malicious control-plane execution
+    anchor: "{{principal}} used control-plane execution to run offensive commands on {{vm}}."
+    risk: The risk here is attacker control of VMs through a compromised cloud identity; containment is required now.
+    actions:
+      - Revoke sessions for {{principal}}
+      - Isolate {{vm}} and reverse the script's changes
+      - Check other VMs for the same command
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for run commands across all subscriptions and accounts.

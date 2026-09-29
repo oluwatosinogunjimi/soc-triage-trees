@@ -1,0 +1,97 @@
+id: mass-external-sharing
+title: Mass External or Anonymous Sharing
+category: cloud
+summary: >-
+  A user created many anonymous links or shared many files with external addresses,
+  especially personal email. Collaboration projects do this. So do attackers and leavers.
+applies_to:
+  - Unusual file share activities
+  - Anonymous link created for sensitive file
+  - Unusual external user file activity
+mitre: [T1567, T1537]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Defender for Cloud Apps anomaly detection policies
+    url: https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
+  - title: "MITRE ATT&CK T1567 Exfiltration Over Web Service"
+    url: https://attack.mitre.org/techniques/T1567/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+start: c-shares
+nodes:
+  c-shares:
+    type: check
+    text: List the links and recipients.
+    kql:
+      - title: Sharing activity by the user (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("AnonymousLinkCreated", "SharingInvitationCreated", "AddedToSecureLink", "SecureLinkCreated", "SharingSet", "CompanyLinkCreated")
+          | summarize Count = count(), Targets = make_set(TargetUserOrGroupName, 30), Files = make_set(OfficeObjectId, 20) by Operation, ClientIP
+    note: I listed the links and external recipients created by {{user}}.
+    next: q-partner
+
+  q-partner:
+    type: question
+    text: Are the recipients a known partner domain for an active project, and the files non-sensitive?
+    yes: o-benign
+    no: q-personal
+    notes:
+      yes: "{{user}} shared non-sensitive files with a known partner domain."
+      no: The sharing went to unknown or personal recipients, or involved sensitive files.
+
+  q-personal:
+    type: question
+    text: Did files go to personal addresses of the user (their own Gmail or Outlook.com), or anonymous links?
+    yes: q-session
+    no: q-session
+    notes:
+      yes: Files were shared to personal addresses or anonymous links.
+      no: Files were shared to unknown business recipients.
+
+  q-session:
+    type: question
+    text: Was the sharing done from a suspicious session (unfamiliar IP, risky sign-in)?
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: The sharing came from a suspicious session of {{user}}.
+      no: The sharing came from the user's own normal session.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Partner collaboration
+    anchor: "{{user}} shared non-sensitive files with a known partner for an active project."
+    risk: The risk here is data leaving through external sharing; it doesn't apply given the partner and content.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Risky sharing by the user
+    anchor: "{{user}} shared files externally from their own session to recipients with no known business relationship."
+    risk: The risk here is data leakage, deliberate or careless, which stays open until the purpose is confirmed.
+    actions:
+      - Ask the user's manager to confirm the purpose
+      - Remove anonymous links to sensitive files
+    monitor: I will monitor {{user}} for further external sharing.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Sharing by a compromised account
+    anchor: Files were shared externally from a suspicious session of {{user}}.
+    risk: The risk here is data exfiltration through the account; containment is required now.
+    actions:
+      - Remove the links and external permissions
+      - Revoke sessions and reset the password for {{user}}
+      - List the files exposed and escalate to the customer
+    escalate: true
+    monitor: I will monitor {{user}} for further sharing and sign-ins from new infrastructure.

@@ -1,0 +1,111 @@
+id: public-storage-exposure
+title: Storage Bucket or Container Made Public
+category: cloud
+summary: >-
+  An S3 bucket, Azure blob container or storage account became publicly readable, Block
+  Public Access was turned off, or anonymous access was granted. The data inside decides
+  the severity. Check whether anyone anonymous has already read it.
+applies_to:
+  - Policy:S3/BucketPublicAccessGranted
+  - Policy:S3/BucketBlockPublicAccessDisabled
+  - Policy:S3/AccountBlockPublicAccessDisabled
+  - Azure storage container set to public access
+mitre: [T1530, T1562]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types (S3)
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: "MITRE ATT&CK T1530 Data from Cloud Storage"
+    url: https://attack.mitre.org/techniques/T1530/
+entities:
+  - { key: bucket, label: Bucket or container, example: "contoso-hr-exports" }
+  - { key: principal, label: Who changed it, example: "arn:aws:iam::111122223333:user/dev1" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull the change and who made it.
+    kql:
+      - title: S3 public access changes (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where EventName in ("PutBucketPolicy", "PutBucketAcl", "PutObjectAcl", "DeleteBucketPolicy", "PutPublicAccessBlock",
+                                "DeletePublicAccessBlock", "PutAccountPublicAccessBlock")
+          | where RequestParameters has "{{bucket}}"
+          | project TimeGenerated, EventName, UserIdentityArn, SourceIpAddress, RequestParameters
+      - title: Azure container public access changes (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where OperationNameValue has_any ("storageAccounts/write", "blobServices/containers/write")
+          | where _ResourceId has "{{bucket}}"
+          | project TimeGenerated, OperationNameValue, Caller, CallerIpAddress, Properties
+    note: I pulled the public access change on {{bucket}} by {{principal}}.
+    next: q-intended
+
+  q-intended:
+    type: question
+    text: Is the bucket meant to be public (website assets, public downloads) and does it contain only public content?
+    yes: o-benign
+    no: q-anon-read
+    notes:
+      yes: "{{bucket}} is meant to be public and holds only public content."
+      no: "{{bucket}} holds non-public data."
+
+  q-anon-read:
+    type: question
+    text: Has anyone read objects anonymously or from unknown IPs since the change?
+    kql:
+      - title: Anonymous or external reads from the bucket (data events, 7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where EventName in ("GetObject", "ListObjects", "ListObjectsV2") and RequestParameters has "{{bucket}}"
+          | summarize Reads = count(), Principals = make_set(UserIdentityArn, 10) by SourceIpAddress, UserIdentityType
+    yes: o-tp-exposed
+    no: o-tp-closed
+    notes:
+      yes: Objects in {{bucket}} were read anonymously or from unknown IPs.
+      no: I found no anonymous reads, but data event logging may not cover every object.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Intentionally public bucket
+    anchor: "{{bucket}} is meant to be public and holds only public content."
+    risk: The risk here is data exposure through public storage; it doesn't apply given the content.
+    actions:
+      - Close
+    tuning: Tag the bucket as approved public so the finding can be suppressed for it.
+
+  o-tp-closed:
+    type: outcome
+    verdict: true_positive
+    title: Sensitive data exposed, no reads found
+    anchor: "{{bucket}}, which holds non-public data, was made public by {{principal}}, and I found no anonymous reads."
+    risk: The risk here is data exposure to anyone on the internet; closing access now limits it.
+    actions:
+      - Restore Block Public Access and remove public ACLs or policy statements
+      - Ask {{principal}} why it was changed
+      - Recommend account-level Block Public Access
+    escalate: true
+    monitor: I will monitor {{bucket}} for further policy changes.
+
+  o-tp-exposed:
+    type: outcome
+    verdict: true_positive
+    title: Sensitive data read by outsiders
+    anchor: "{{bucket}} was made public and its objects were read by unknown parties."
+    risk: The risk here is a data breach with possible regulatory notification duties; the customer must be told now.
+    actions:
+      - Close public access immediately
+      - List the objects read and their sensitivity
+      - Escalate to the customer, including their data protection lead
+    escalate: true
+    monitor: I will monitor {{bucket}} for further anonymous access attempts.

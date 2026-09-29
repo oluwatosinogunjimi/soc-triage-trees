@@ -79,6 +79,16 @@ code, pre, .mono { font-family: var(--font-mono); }
 .search { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
 .cat { display: grid; gap: 2px; }
 .cat-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 6px 0 2px; }
+details.cat > summary.cat-label { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 4px 2px; border-radius: 4px; }
+details.cat > summary.cat-label::-webkit-details-marker { display: none; }
+details.cat > summary.cat-label::before { content: "\25B8"; margin-right: 6px; transition: transform .15s; }
+details.cat[open] > summary.cat-label::before { transform: rotate(90deg); }
+details.cat > summary.cat-label > span:first-child { flex: 1; }
+details.cat > summary.cat-label:hover { color: var(--ink); }
+.cat-count { font-family: var(--font-mono); font-weight: 500; letter-spacing: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+.lib-count { margin: 0; font-size: 12px; }
+.library .panel-body { max-height: calc(100vh - 140px); overflow-y: auto; }
+@media (max-width: 760px) { .library .panel-body { max-height: none; } }
 .tree-btn {
   display: grid; gap: 1px; text-align: left; width: 100%; padding: 7px 9px; border: 0; border-radius: 4px;
   background: transparent; cursor: pointer;
@@ -298,7 +308,7 @@ footer.foot a { color: var(--muted); }
   <nav class="panel library" aria-label="Playbook library">
     <div class="panel-head"><h2>Playbooks</h2></div>
     <div class="panel-body">
-      <input class="search" id="search" type="search" placeholder="Search alert name, MITRE ID..." aria-label="Search playbooks">
+      <input class="search" id="search" type="search" placeholder="Search alert, technique, e.g. T1558 or kerberos" aria-label="Search playbooks">
       <div id="lib"></div>
     </div>
   </nav>
@@ -450,24 +460,34 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
 
   // ---------- library ----------
+  const libOpen = new Set();
   function renderLibrary() {
     const q = document.getElementById("search").value.trim().toLowerCase();
     const lib = document.getElementById("lib"); lib.replaceChildren();
+    const words = q.split(/\s+/).filter(Boolean);
+    let shown = 0;
     Object.keys(CATS).forEach(cat => {
-      const items = bundle.trees.filter(t => t.category === cat).filter(t => {
-        if (!q) return true;
+      const all = bundle.trees.filter(t => t.category === cat);
+      const items = all.filter(t => {
+        if (!words.length) return true;
         const hay = [t.title, t.summary, (t.applies_to || []).join(" "), (t.mitre || []).join(" "), t.id].join(" ").toLowerCase();
-        return hay.includes(q);
+        return words.every(w => hay.includes(w));
       });
       if (!items.length) return;
-      const box = h("div", { class: "cat" }, h("div", { class: "cat-label" }, CATS[cat]));
+      shown += items.length;
+      const isOpen = words.length > 0 || cat === "triage" || all.some(t => t.id === S.tree) || libOpen.has(cat);
+      const box = h("details", { class: "cat", open: isOpen ? true : null },
+        h("summary", { class: "cat-label" }, h("span", {}, CATS[cat]), h("span", { class: "cat-count" }, words.length ? items.length + "/" + all.length : String(all.length))));
+      box.addEventListener("toggle", () => { if (box.open) libOpen.add(cat); else libOpen.delete(cat); });
       items.forEach(t => box.append(h("button", {
         class: "tree-btn", type: "button", "aria-current": String(t.id === S.tree),
         onclick: () => startTree(t.id)
       }, h("span", { class: "t" }, t.title), h("span", { class: "m" }, Object.keys(t.nodes).length + " nodes" + (t.mitre && t.mitre.length ? " · " + t.mitre.slice(0, 2).join(" ") : "")))));
       lib.append(box);
     });
-    if (!lib.children.length) lib.append(h("p", { class: "empty" }, "No playbook matches that search."));
+    const total = bundle.trees.length;
+    lib.prepend(h("p", { class: "empty lib-count" }, words.length ? shown + " of " + total + " playbooks" : total + " playbooks"));
+    if (!shown) lib.append(h("p", { class: "empty" }, "No playbook matches that search."));
   }
 
   // ---------- header ----------
@@ -798,7 +818,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     verdictOrder.forEach(v => outcomes.filter(([nid]) => t.nodes[nid].verdict === v).forEach(([nid]) => {
       outs.append(h("button", { class: "g-out v-" + v, type: "button", title: VERDICT_LABEL[v] + ": show in map", onclick: () => revealInMap(nid) }, t.nodes[nid].title));
     }));
-    links.forEach(([nid]) => outs.append(h("button", { class: "g-out g-link", type: "button", onclick: () => revealInMap(nid) }, "→ " + TREES[t.nodes[nid].tree].title)));
+    if (links.length > 6) {
+      outs.append(h("span", { class: "g-out g-link" }, "→ Routes to " + links.length + " playbooks through the menus in the steps"));
+    } else {
+      links.forEach(([nid]) => outs.append(h("button", { class: "g-out g-link", type: "button", onclick: () => revealInMap(nid) }, "→ " + TREES[t.nodes[nid].tree].title)));
+    }
     det.append(h("div", { class: "glance-grid" }, h("div", {}, h("div", { class: "cat-label" }, "Stages in order, with the alternatives at each"), list), outs));
     return det;
   }

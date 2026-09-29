@@ -1,0 +1,95 @@
+id: proxy-malicious-category
+title: Web Proxy Hit on Malicious Category
+category: network
+summary: >-
+  The web proxy or secure web gateway logged a request to a site categorised as malware,
+  phishing, C2 or newly observed. Blocked hits are mostly noise. Allowed hits and repeated
+  blocked hits from a non-browser process need a look.
+applies_to:
+  - Proxy blocked malicious website
+  - Secure web gateway malware category hit
+  - Access to phishing category allowed
+mitre: [T1071.001, T1189]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1189 Drive-by Compromise"
+    url: https://attack.mitre.org/techniques/T1189/
+entities:
+  - { key: user, label: User, example: "jdoe" }
+  - { key: url, label: URL or domain, example: "update-flashplayer.example" }
+start: c-requests
+nodes:
+  c-requests:
+    type: check
+    text: Pull the requests and the proxy action.
+    kql:
+      - title: Proxy requests to the URL (7d)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(7d)
+          | where RequestURL has "{{url}}" or DestinationHostName has "{{url}}"
+          | summarize Requests = count(), Actions = make_set(DeviceAction), Agents = make_set(RequestClientApplication, 5),
+                      First = min(TimeGenerated), Last = max(TimeGenerated) by SourceIP, SourceUserName
+    note: I pulled the proxy requests by {{user}} to {{url}}.
+    next: q-allowed
+
+  q-allowed:
+    type: question
+    text: Was any request allowed?
+    yes: q-what
+    no: q-repeated
+    notes:
+      yes: At least one request to {{url}} was allowed.
+      no: Every request to {{url}} was blocked.
+
+  q-repeated:
+    type: question
+    text: Are the blocked requests repeating at intervals or from a non-browser user agent?
+    yes: l-domain
+    no: o-blocked
+    notes:
+      yes: The blocked requests repeat regularly or come from a non-browser agent, suggesting malware.
+      no: The blocked requests were a one-off from a browser.
+
+  q-what:
+    type: question
+    text: Did the allowed request download a file or present a login page?
+    yes: l-click
+    no: o-benign
+    notes:
+      yes: The allowed request downloaded a file or presented a login page.
+      no: The allowed request returned only page content with no download or form.
+
+  l-domain:
+    type: link
+    text: Beacon-like traffic. Continue in the suspicious domain tree.
+    tree: suspicious-domain-lookup
+    node: q-process
+
+  l-click:
+    type: link
+    text: Continue in the malicious URL click tree.
+    tree: malicious-url-click
+    node: ch-page
+
+  o-blocked:
+    type: outcome
+    verdict: benign_positive
+    title: One-off blocked visit
+    anchor: A one-off browser visit by {{user}} to {{url}} was blocked by the proxy.
+    risk: The risk here is malware or phishing from the site; it doesn't apply as the proxy blocked it.
+    actions:
+      - Close
+    tuning: Consider suppressing single blocked browser hits and alerting on allowed or repeated ones.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Allowed visit, nothing delivered
+    anchor: "{{user}} reached {{url}}, but no file or login page was delivered."
+    risk: The risk here is drive-by compromise or credential phishing; it doesn't apply as nothing was delivered.
+    actions:
+      - Block {{url}} at the proxy

@@ -1,0 +1,115 @@
+id: dlp-sensitive-upload
+title: DLP Match on Sensitive Data Leaving
+category: cloud
+summary: >-
+  A DLP policy matched sensitive data (card numbers, national IDs, health or customer data,
+  labelled documents) being emailed externally, uploaded to personal cloud or pasted into a
+  web app, including generative AI tools. Most are mistakes. Intent and volume decide it.
+applies_to:
+  - DLP policy match (email, endpoint, SharePoint)
+  - Sensitive data uploaded to personal cloud storage
+  - Sensitive data pasted into generative AI site
+mitre: [T1567.002, T1048]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Purview Data Loss Prevention
+    url: https://learn.microsoft.com/en-us/purview/dlp-learn-about-dlp
+  - title: "MITRE ATT&CK T1567.002 Exfiltration to Cloud Storage"
+    url: https://attack.mitre.org/techniques/T1567/002/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+start: c-match
+nodes:
+  c-match:
+    type: check
+    text: Read the match, including data types, count, destination and channel.
+    kql:
+      - title: DLP matches for the user (14d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(14d)
+          | where Operation in~ ("DLPRuleMatch", "DlpRuleMatch")
+          | where UserId =~ "{{user}}"
+          | project TimeGenerated, Workload = OfficeWorkload, Operation, OfficeObjectId, ExtraData = tostring(pack_all())
+      - title: Endpoint DLP events (14d)
+        platform: xdr
+        query: |
+          CloudAppEvents
+          | where Timestamp > ago(14d)
+          | where ActionType has "DLP" and AccountDisplayName has tostring(split("{{user}}", "@")[0])
+          | project Timestamp, ActionType, Application, RawEventData
+    note: I read the DLP matches for {{user}}, including data types, counts and destinations.
+    next: q-business
+
+  q-business:
+    type: question
+    text: Is the destination a legitimate business recipient for this data (customer, regulator, approved processor) over an approved channel?
+    yes: o-fp
+    no: q-volume
+    notes:
+      yes: The data went to a legitimate business recipient over an approved channel.
+      no: The data went to a personal, unknown or unapproved destination.
+
+  q-volume:
+    type: question
+    text: Is it bulk or repeated (many records, many files, several days), rather than a one-off?
+    yes: q-context
+    no: o-mistake
+    notes:
+      yes: The transfer was bulk or repeated.
+      no: The transfer was a one-off with a small amount of data.
+
+  q-context:
+    type: question
+    text: Is there compromise or insider context (risky session, leaver, HR concern)?
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: The transfer has compromise or insider context.
+      no: The transfer has no compromise or insider context.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Legitimate business transfer
+    anchor: The sensitive data sent by {{user}} went to a legitimate recipient over an approved channel.
+    risk: The risk here is sensitive data leakage; it doesn't apply given the recipient and channel.
+    actions:
+      - Close
+    tuning: Add the recipient domain to the DLP policy's trusted list if this flow is routine.
+
+  o-mistake:
+    type: outcome
+    verdict: benign_positive
+    title: One-off mistake
+    anchor: "{{user}} sent a small amount of sensitive data to an unapproved destination once."
+    risk: The risk here is data leakage; the exposure is small but real and may need the data protection lead's review.
+    actions:
+      - Notify the user's manager and the data protection lead per policy
+      - Ask for deletion at the destination if possible
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Bulk transfer, intent unknown
+    anchor: "{{user}} sent sensitive data in bulk to an unapproved destination, with no compromise or insider context."
+    risk: The risk here is a reportable data breach, which stays open until the business confirms the purpose.
+    actions:
+      - Escalate to the customer's data protection lead through the agreed channel
+    monitor: I will monitor {{user}} for further DLP matches.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Sensitive data exfiltration
+    anchor: Sensitive data was sent in bulk from the account of {{user}} in a compromise or insider context.
+    risk: The risk here is a reportable data breach; the business must act now.
+    actions:
+      - Escalate to the customer's security and data protection leads
+      - Contain the account if compromised; involve HR and legal if insider
+      - Preserve the DLP evidence
+    escalate: true
+    monitor: I will monitor {{user}} for further transfers across all channels.

@@ -1,0 +1,106 @@
+id: internal-port-scan
+title: Internal Port Scan or Host Discovery
+category: network
+summary: >-
+  One internal host touched many ports or many hosts in a short time. Vulnerability
+  scanners and monitoring do this every day. An ordinary workstation doing it means
+  someone is mapping the network.
+applies_to:
+  - Port sweep / port scan detected (internal)
+  - Network discovery activity
+  - Impact:EC2/PortSweep
+mitre: [T1046, T1018]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1046 Network Service Discovery"
+    url: https://attack.mitre.org/techniques/T1046/
+entities:
+  - { key: src_ip, label: Scanning host IP, example: "10.20.4.18" }
+start: c-scan
+nodes:
+  c-scan:
+    type: check
+    text: Measure the scan and identify the process doing it.
+    kql:
+      - title: Connection fan-out from the source (24h)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(24h)
+          | where LocalIP == "{{src_ip}}" and RemoteIPType == "Private"
+          | summarize Targets = dcount(RemoteIP), Ports = dcount(RemotePort), SamplePorts = make_set(RemotePort, 30),
+                      Failed = countif(ActionType == "ConnectionFailed") by DeviceName, InitiatingProcessFileName, bin(Timestamp, 1h)
+          | where Targets > 20 or Ports > 50
+    note: I measured the connection fan-out from {{src_ip}} and the process behind it.
+    next: q-scanner
+
+  q-scanner:
+    type: question
+    text: Is the source an approved scanner or monitoring system (Nessus, Qualys, Rapid7, Lansweeper, NMS) in its scan window?
+    yes: o-fp
+    no: q-tool
+    notes:
+      yes: "{{src_ip}} is an approved scanner or monitoring system."
+      no: "{{src_ip}} is not an approved scanner."
+
+  q-tool:
+    type: question
+    text: Is the process a scanning or offensive tool (nmap, masscan, Advanced IP Scanner, SoftPerfect, netscan, SharpHound) or unknown?
+    yes: q-user-explains
+    no: o-inconclusive
+    notes:
+      yes: The scan on {{src_ip}} was run by a scanning tool.
+      no: The traffic came from an ordinary application, not a scanner.
+
+  q-user-explains:
+    type: question
+    text: Can the device owner explain it with an approved task (IT troubleshooting with a ticket)?
+    yes: o-benign
+    no: o-tp
+    notes:
+      yes: The device owner explained the scan with an approved task.
+      no: Nobody can explain the scan from {{src_ip}}.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Approved scanner
+    anchor: The scan from {{src_ip}} came from an approved scanner in its window.
+    risk: The risk here is attacker reconnaissance; it doesn't apply given the approved scanner.
+    actions:
+      - Close
+    tuning: Exclude the scanner IP for this detection.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved ad-hoc scan
+    anchor: The scan from {{src_ip}} was an approved IT task by the device owner.
+    risk: The risk here is attacker reconnaissance; it doesn't apply given the ticket.
+    actions:
+      - Close referencing the ticket
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Fan-out from an application
+    anchor: An ordinary application on {{src_ip}} contacted many hosts or ports.
+    risk: The risk here is discovery by malware hiding in an application, which stays open until the behaviour is explained.
+    actions:
+      - Ask IT whether the application does this normally
+    monitor: I will monitor {{src_ip}} for further fan-out or remote admin connections.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised internal reconnaissance
+    anchor: "{{src_ip}} ran an unauthorised network scan with a scanning tool."
+    risk: The risk here is an attacker mapping targets for lateral movement, often shortly before ransomware; containment is required now.
+    actions:
+      - Isolate the host and investigate how the tool arrived
+      - Reset the account that ran it
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for remote execution and logons from {{src_ip}}.

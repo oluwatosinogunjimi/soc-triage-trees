@@ -1,0 +1,93 @@
+id: kubernetes-suspicious-workload
+title: Suspicious Kubernetes Workload or Access
+category: cloud
+summary: >-
+  Exec into a pod, a privileged container or one with a host mount, a new ClusterRoleBinding,
+  secrets read in bulk, or anonymous API access. Each can lead from one pod to the node and
+  the whole cluster.
+applies_to:
+  - Execution:Kubernetes/ExecInKubeSystemPod
+  - PrivilegeEscalation:Kubernetes/AnomalousBehavior.WorkloadDeployed!PrivilegedContainer
+  - CredentialAccess:Kubernetes/AnomalousBehavior.SecretsAccessed
+  - Policy:Kubernetes/AnonymousAccessGranted
+mitre: [T1609, T1610, T1611, T1552.007]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types (Kubernetes)
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: Microsoft threat matrix for Kubernetes
+    url: https://microsoft.github.io/Threat-Matrix-for-Kubernetes/
+entities:
+  - { key: cluster, label: Cluster, example: "aks-prod-weu" }
+  - { key: principal, label: Kubernetes user or service account, example: "system:serviceaccount:default:web" }
+start: c-audit
+nodes:
+  c-audit:
+    type: check
+    text: Pull the API calls made by the principal.
+    kql:
+      - title: AKS audit events by the principal (48h)
+        platform: sentinel
+        query: |
+          AzureDiagnostics
+          | where TimeGenerated > ago(48h)
+          | where Category == "kube-audit" and Resource =~ "{{cluster}}"
+          | extend A = parse_json(log_s)
+          | extend User = tostring(A.user.username), Verb = tostring(A.verb), Uri = tostring(A.requestURI), Code = toint(A.responseStatus.code)
+          | where User =~ "{{principal}}" or Uri has_any ("/exec", "clusterrolebindings", "/secrets")
+          | project TimeGenerated, User, Verb, Uri, Code, SourceIPs = tostring(A.sourceIPs)
+    note: I pulled the API calls made by {{principal}} in {{cluster}}.
+    next: q-platform
+
+  q-platform:
+    type: question
+    text: Is the principal a platform component or CI/CD identity doing its normal job (GitOps controller, monitoring agent, a known SRE)?
+    yes: o-fp
+    no: q-escalation
+    notes:
+      yes: "{{principal}} is a platform or CI/CD identity doing its normal job."
+      no: "{{principal}} is not a platform identity, or acted outside its normal job."
+
+  q-escalation:
+    type: question
+    text: Did it create privileged pods, host mounts, cluster-admin bindings, or read secrets across namespaces?
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: "{{principal}} created privileged workloads or bindings, or read secrets across namespaces."
+      no: "{{principal}} did not escalate privilege."
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Platform activity
+    anchor: The activity by {{principal}} in {{cluster}} is normal platform or CI/CD behaviour.
+    risk: The risk here is container escape and cluster takeover; it doesn't apply given the known identity.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unusual but not escalating
+    anchor: "{{principal}} acted outside its normal pattern in {{cluster}} without escalating privilege."
+    risk: The risk here is a compromised workload probing the cluster, which stays open until the owning team explains it.
+    actions:
+      - Ask the owning team to explain the activity
+    monitor: I will monitor {{principal}} for privileged workloads and secret reads.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Kubernetes privilege escalation
+    anchor: "{{principal}} escalated privilege in {{cluster}} through privileged workloads, bindings or bulk secret reads."
+    risk: The risk here is node and cluster takeover and theft of every secret in the cluster; containment is required now.
+    actions:
+      - Delete the rogue pods and bindings; cordon affected nodes
+      - Revoke the principal's token and rotate secrets that were read
+      - Find the entry point (exposed dashboard, vulnerable app, leaked kubeconfig)
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{cluster}} for privileged pods, new bindings and exec into pods.

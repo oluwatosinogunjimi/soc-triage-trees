@@ -1,0 +1,89 @@
+id: cloud-logging-disabled
+title: Cloud Logging or Monitoring Disabled
+category: cloud
+summary: >-
+  CloudTrail stopped or deleted, GuardDuty or Defender for Cloud disabled, diagnostic
+  settings removed, flow logs or S3 access logging turned off. Attackers blind you before
+  they act. Treat unexplained logging loss as the start of an incident.
+applies_to:
+  - Stealth:IAMUser/CloudTrailLoggingDisabled
+  - Stealth:S3/ServerAccessLoggingDisabled
+  - Diagnostic settings deleted
+  - DefenseEvasion:IAMUser/BedrockLoggingDisabled
+mitre: [T1562.008]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1562.008 Disable or Modify Cloud Logs"
+    url: https://attack.mitre.org/techniques/T1562/008/
+  - title: AWS GuardDuty finding types
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+entities:
+  - { key: principal, label: "Principal (ARN, UPN or key)", example: "arn:aws:iam::111122223333:user/ops" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Identify exactly what logging changed and who changed it.
+    kql:
+      - title: AWS logging changes (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where EventName in ("StopLogging", "DeleteTrail", "UpdateTrail", "PutEventSelectors", "DeleteFlowLogs", "DeleteDetector",
+                                "UpdateDetector", "DisableSecurityHub", "PutBucketLogging", "DeleteConfigRule", "StopConfigurationRecorder", "DeleteModelInvocationLoggingConfiguration")
+          | project TimeGenerated, EventName, UserIdentityArn, SourceIpAddress, UserAgent, AWSRegion, RequestParameters
+      - title: Azure diagnostic and Defender changes (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where OperationNameValue has_any ("diagnosticSettings/delete", "diagnosticSettings/write", "pricings/write", "workspaces/delete", "dataCollectionRules/delete")
+          | project TimeGenerated, OperationNameValue, Caller, CallerIpAddress, _ResourceId, ActivityStatusValue
+    note: I identified the logging change made by {{principal}}.
+    next: q-planned
+
+  q-planned:
+    type: question
+    text: Is it a planned change (log pipeline migration, trail consolidation, decommissioning a resource) with a ticket?
+    yes: q-replacement
+    no: l-cloud
+    notes:
+      yes: The logging change by {{principal}} was planned with a ticket.
+      no: No planned change covers the logging change by {{principal}}.
+
+  q-replacement:
+    type: question
+    text: Is equivalent logging still in place (a new trail, an organisation trail, a replacement setting)?
+    yes: o-benign
+    no: o-gap
+    notes:
+      yes: Equivalent logging is still in place after the change.
+      no: The change left a logging gap.
+
+  l-cloud:
+    type: link
+    text: Unplanned. Check the principal and the source in the cloud control-plane tree.
+    tree: cloud-control-plane
+    node: q-source
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Planned logging change, coverage kept
+    anchor: The logging change by {{principal}} was planned and equivalent logging remains in place.
+    risk: The risk here is attackers blinding monitoring; it doesn't apply as coverage continues.
+    actions:
+      - Close referencing the ticket
+
+  o-gap:
+    type: outcome
+    verdict: benign_positive
+    title: Planned change, coverage gap
+    anchor: The planned logging change by {{principal}} left a gap in coverage.
+    risk: The risk here is activity going unrecorded during the gap; it is a process issue that the cloud team should close.
+    actions:
+      - Ask the cloud team to restore equivalent logging
+    monitor: I will check that logging is restored.

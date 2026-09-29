@@ -1,0 +1,94 @@
+id: cloud-storage-exfil
+title: Mass Download or Deletion from Cloud Storage
+category: cloud
+summary: >-
+  A principal pulled or deleted far more objects than usual from S3 or Azure Blob, often
+  from a new IP. Could be a data migration, a backup job, or an attacker taking data and
+  deleting it for extortion.
+applies_to:
+  - Exfiltration:S3/AnomalousBehavior
+  - Exfiltration:S3/MaliciousIPCaller
+  - Impact:S3/AnomalousBehavior.Delete
+  - Unusual volume of blob reads or deletes
+mitre: [T1530, T1485, T1537]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types (S3)
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: "MITRE ATT&CK T1537 Transfer Data to Cloud Account"
+    url: https://attack.mitre.org/techniques/T1537/
+entities:
+  - { key: principal, label: Principal, example: "arn:aws:iam::111122223333:role/etl" }
+  - { key: bucket, label: Bucket or storage account, example: "contoso-finance" }
+start: c-volume
+nodes:
+  c-volume:
+    type: check
+    text: Measure reads and deletes by principal and source.
+    kql:
+      - title: S3 object reads and deletes (48h)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(48h)
+          | where EventName in ("GetObject", "DeleteObject", "DeleteObjects", "CopyObject", "PutBucketReplication") and RequestParameters has "{{bucket}}"
+          | summarize Count = count(), First = min(TimeGenerated), Last = max(TimeGenerated) by EventName, UserIdentityArn, SourceIpAddress, UserAgent
+      - title: Azure blob reads and deletes (48h)
+        platform: sentinel
+        query: |
+          StorageBlobLogs
+          | where TimeGenerated > ago(48h)
+          | where AccountName =~ "{{bucket}}"
+          | where OperationName in ("GetBlob", "DeleteBlob", "CopyBlob")
+          | summarize Count = count(), MB = round(sum(ResponseBodySize) / 1048576.0, 1) by OperationName, CallerIpAddress, AuthenticationType, RequesterObjectId
+    note: I measured reads and deletes on {{bucket}} by {{principal}}.
+    next: q-job
+
+  q-job:
+    type: question
+    text: Is it a known job (backup, ETL, migration, lifecycle policy) from its usual source?
+    yes: o-fp
+    no: q-destination
+    notes:
+      yes: The activity on {{bucket}} is a known job from its usual source.
+      no: The activity on {{bucket}} is not a known job.
+
+  q-destination:
+    type: question
+    text: Did data go to an external account or IP (CopyObject to a foreign bucket, replication change, reads from unknown IPs), or were objects deleted after being read?
+    yes: o-tp
+    no: l-cloud
+    notes:
+      yes: Data from {{bucket}} went to an external destination or was deleted after reading.
+      no: The data stayed within the account, but the activity is unexplained.
+
+  l-cloud:
+    type: link
+    text: Check the principal in the cloud control-plane tree.
+    tree: cloud-control-plane
+    node: q-source
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known job
+    anchor: The activity on {{bucket}} by {{principal}} is a known job from its usual source.
+    risk: The risk here is data theft or destruction; it doesn't apply given the known job.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Cloud data theft or destruction
+    anchor: Data in {{bucket}} was taken to an external destination or deleted by {{principal}} without authorisation.
+    risk: The risk here is data breach and extortion, including deletion to pressure payment; containment is required now.
+    actions:
+      - Revoke the principal's credentials and sessions
+      - Block the destination account or IP; remove rogue replication rules
+      - Restore deleted objects from versioning or backup
+      - Scope the data taken and escalate to the customer
+    escalate: true
+    monitor: I will monitor {{bucket}} and the principal for further access.

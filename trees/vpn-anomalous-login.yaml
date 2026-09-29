@@ -1,0 +1,110 @@
+id: vpn-anomalous-login
+title: Anomalous VPN Login
+category: network
+summary: >-
+  A VPN session from an unusual country, a hosting provider, at an odd time, or for an
+  account that rarely uses VPN. VPN credentials are a top ransomware entry point,
+  especially without MFA.
+applies_to:
+  - VPN login from unusual country
+  - VPN brute force followed by success
+  - Concurrent VPN sessions from different locations
+mitre: [T1133, T1078]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1133 External Remote Services"
+    url: https://attack.mitre.org/techniques/T1133/
+entities:
+  - { key: user, label: VPN user, example: "jdoe" }
+  - { key: ip, label: Source IP, example: "185.220.101.44" }
+start: c-sessions
+nodes:
+  c-sessions:
+    type: check
+    text: Pull the user's VPN history and this session.
+    kql:
+      - title: VPN events for the user from firewall logs (30d)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(30d)
+          | where Activity has_any ("vpn", "VPN", "ssl", "tunnel", "login", "auth") and (SourceUserName =~ "{{user}}" or DestinationUserName =~ "{{user}}")
+          | summarize Events = count(), First = min(TimeGenerated), Last = max(TimeGenerated), Outcomes = make_set(DeviceAction, 10) by SourceIP, DeviceVendor, Activity
+          | order by Last desc
+    note: I pulled the VPN history for {{user}} and the session from {{ip}}.
+    next: q-mfa
+
+  q-mfa:
+    type: question
+    text: Does the VPN enforce MFA, and did this session complete it?
+    yes: q-baseline
+    no: q-baseline
+    notes:
+      yes: The VPN session from {{ip}} completed MFA.
+      no: The VPN session from {{ip}} did not use MFA.
+
+  q-baseline:
+    type: question
+    text: Is the source consistent with the user (known country or ISP, travel confirmed, usual hours)?
+    yes: o-benign
+    no: q-preceded
+    notes:
+      yes: "{{ip}} is consistent with the normal VPN use of {{user}}."
+      no: "{{ip}} is inconsistent with the normal VPN use of {{user}}."
+
+  q-preceded:
+    type: question
+    text: Was the session preceded by failures (brute force) or followed by internal scanning, RDP or admin share access?
+    yes: o-tp
+    no: q-user-confirm
+    notes:
+      yes: The session followed brute force or was followed by internal reconnaissance or remote access.
+      no: The session had no preceding failures or suspicious internal activity.
+
+  q-user-confirm:
+    type: question
+    text: Does the user confirm the session?
+    yes: o-benign
+    no: o-tp
+    unknown: o-inconclusive
+    notes:
+      yes: "{{user}} confirmed the VPN session from {{ip}}."
+      no: "{{user}} did not recognise the VPN session from {{ip}}."
+      unknown: I have not yet received confirmation from {{user}}.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate VPN session
+    anchor: The VPN session for {{user}} from {{ip}} is consistent with their normal use or confirmed by them.
+    risk: The risk here is network access with stolen VPN credentials; it doesn't apply given the baseline or confirmation.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Awaiting user confirmation
+    anchor: I could not confirm whether the VPN session from {{ip}} was made by {{user}}.
+    risk: The risk here is an attacker inside the network through the VPN, which stays open until confirmed.
+    actions:
+      - Chase the user
+      - Terminate the session as a precaution if the VPN lacks MFA
+    monitor: I will monitor {{user}} for VPN sessions from {{ip}} and internal activity from the VPN address.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: VPN account compromised
+    anchor: The VPN account {{user}} was used from {{ip}} by someone other than the user.
+    risk: The risk here is direct internal network access, a common ransomware entry point; containment is required now.
+    actions:
+      - Terminate the session and disable the VPN account, reset its password
+      - Block {{ip}}
+      - Trace everything the VPN address touched internally
+      - Recommend MFA on the VPN if absent
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for VPN logons from {{ip}} and its ASN.

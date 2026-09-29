@@ -1,0 +1,111 @@
+id: sharepoint-mass-download
+title: SharePoint or OneDrive Mass Download
+category: cloud
+summary: >-
+  A user or app downloaded or synced an unusual number of files. Leavers taking data,
+  compromised accounts and OAuth apps all look like this. So does a new laptop syncing
+  OneDrive for the first time.
+applies_to:
+  - Unusual multiple file download activities
+  - Mass Access to Sensitive Files
+  - Suspicious OAuth app file download activities
+mitre: [T1530, T1213.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Defender for Cloud Apps anomaly detection policies
+    url: https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
+  - title: "MITRE ATT&CK T1213.002 Data from Information Repositories: SharePoint"
+    url: https://attack.mitre.org/techniques/T1213/002/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+start: c-downloads
+nodes:
+  c-downloads:
+    type: check
+    text: Measure the downloads by site, client and IP.
+    kql:
+      - title: Downloads and syncs by the user (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("FileDownloaded", "FileSyncDownloadedFull", "FileAccessed", "FileCopied")
+          | summarize Files = count(), Sites = make_set(Site_Url, 10), First = min(TimeGenerated), Last = max(TimeGenerated)
+                    by ClientIP, UserAgent, Operation
+          | order by Files desc
+    note: I measured the downloads by {{user}} by site, client and IP.
+    next: q-sync
+
+  q-sync:
+    type: question
+    text: Is it a first sync on a new managed device, or a known app, from the user's usual network?
+    yes: o-fp
+    no: q-account-risk
+    notes:
+      yes: The downloads by {{user}} are a sync to a new managed device or a known app.
+      no: The downloads by {{user}} came from an unusual client, IP or app.
+
+  q-account-risk:
+    type: question
+    text: Is the session suspicious (unfamiliar IP, risky sign-in, OAuth app, token anomaly)?
+    yes: o-tp-compromise
+    no: q-insider
+    notes:
+      yes: The session that downloaded the files was suspicious.
+      no: The session was the user's own normal session.
+
+  q-insider:
+    type: question
+    text: Is the user leaving or under HR concern, or did they take data outside their role (check through the agreed contact)?
+    yes: o-tp-insider
+    no: o-inconclusive
+    notes:
+      yes: "{{user}} is leaving or under HR concern, or took data outside their role."
+      no: HR raised no concern and the data is within the role of {{user}}.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Device sync or known app
+    anchor: The downloads by {{user}} were a first sync on a managed device or a known app.
+    risk: The risk here is bulk data theft; it doesn't apply given the managed device and usual network.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unusual volume, no risk context
+    anchor: "{{user}} downloaded an unusual number of files in their own session, with no HR or compromise context."
+    risk: The risk here is data leaving the organisation, which stays open until the purpose is confirmed.
+    actions:
+      - Ask the user's manager to confirm the purpose
+    monitor: I will monitor {{user}} for further bulk downloads and external sharing.
+
+  o-tp-compromise:
+    type: outcome
+    verdict: true_positive
+    title: Data taken through a compromised session
+    anchor: Files were downloaded in bulk from a suspicious session of {{user}}.
+    risk: The risk here is a data breach through account takeover; containment is required now.
+    actions:
+      - Revoke sessions, reset the password and review OAuth apps for {{user}}
+      - List the files downloaded and their sensitivity
+      - Escalate to the customer
+    escalate: true
+    monitor: I will monitor {{user}} for further downloads and sign-ins from new infrastructure.
+
+  o-tp-insider:
+    type: outcome
+    verdict: true_positive
+    title: Probable insider data theft
+    anchor: "{{user}}, who is leaving or under HR concern, downloaded company files in bulk."
+    risk: The risk here is theft of company data by an insider; the business needs to act quickly and quietly.
+    actions:
+      - Escalate to the customer's security lead, HR and legal through the agreed channel
+      - Preserve the file list and do not alert the user
+    escalate: true
+    monitor: I will monitor {{user}} for further downloads, sharing and USB activity.

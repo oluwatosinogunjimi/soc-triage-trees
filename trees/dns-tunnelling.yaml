@@ -1,0 +1,111 @@
+id: dns-tunnelling
+title: DNS Tunnelling or DNS Exfiltration
+category: network
+summary: >-
+  A host sends high volumes of long, random-looking DNS queries (often TXT or NULL) to one
+  domain. That is data or command traffic hidden in DNS. Some security and CDN products
+  also use long encoded subdomains, so check the domain first.
+applies_to:
+  - Suspicious DNS query from a device in the organization
+  - DNS tunnelling detected
+  - Trojan:EC2/DNSDataExfiltration
+mitre: [T1071.004, T1048.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1071.004 Application Layer Protocol: DNS"
+    url: https://attack.mitre.org/techniques/T1071/004/
+  - title: "MITRE ATT&CK T1048.003 Exfiltration Over Unencrypted Non-C2 Protocol"
+    url: https://attack.mitre.org/techniques/T1048/003/
+entities:
+  - { key: host, label: Source host or IP, example: "10.20.4.18" }
+  - { key: domain, label: Parent domain queried, example: "cdn-sync.example" }
+start: c-queries
+nodes:
+  c-queries:
+    type: check
+    text: Profile the queries to the domain.
+    kql:
+      - title: Query volume, length and types to the domain (24h)
+        platform: sentinel
+        query: |
+          DnsEvents
+          | where TimeGenerated > ago(24h)
+          | where Name endswith "{{domain}}"
+          | extend SubLen = strlen(Name) - strlen("{{domain}}")
+          | summarize Queries = count(), UniqueNames = dcount(Name), AvgSubLen = avg(SubLen), MaxSubLen = max(SubLen),
+                      Types = make_set(QueryType) by ClientIP
+          | order by Queries desc
+      - title: Which process sends the queries (24h)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(24h)
+          | where ActionType == "DnsQueryResponse"
+          | extend Q = tostring(parse_json(AdditionalFields).DnsQueryString)
+          | where Q endswith "{{domain}}"
+          | summarize Queries = count() by DeviceName, InitiatingProcessFileName, InitiatingProcessFolderPath
+    note: I profiled the DNS queries from {{host}} to {{domain}}.
+    next: q-known-service
+
+  q-known-service:
+    type: question
+    text: Is the domain a known service that uses encoded subdomains (security vendor lookups, CDN, telemetry, anti-spam DNSBL)?
+    yes: o-fp
+    no: q-pattern
+    notes:
+      yes: "{{domain}} is a known service that uses encoded subdomains."
+      no: "{{domain}} is not a known service."
+
+  q-pattern:
+    type: question
+    text: Is the pattern tunnel-like (many unique subdomains, long high-entropy labels, TXT or NULL records, steady volume from one process)?
+    yes: q-process
+    no: o-inconclusive
+    notes:
+      yes: The queries to {{domain}} are tunnel-like, with many long unique subdomains.
+      no: The queries to {{domain}} are unusual but not tunnel-like.
+
+  q-process:
+    type: question
+    text: Is the sending process a normal resolver path (DNS client service) for a browser, or a suspicious binary or script?
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: The queries come from a suspicious process on {{host}}.
+      no: The queries come through the DNS client service, so the process needs EDR confirmation.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known service lookups
+    anchor: The queries from {{host}} to {{domain}} belong to a known service that uses encoded subdomains.
+    risk: The risk here is data exfiltration over DNS; it doesn't apply given the known service.
+    actions:
+      - Close
+    tuning: Allowlist the domain for this detection.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unusual DNS, not clearly a tunnel
+    anchor: The queries from {{host}} to {{domain}} are unusual but do not look like a tunnel.
+    risk: The risk here is low-rate DNS command and control, which stays open until the process is identified.
+    actions:
+      - Identify the process on {{host}} through EDR
+    monitor: I will monitor queries to {{domain}} for volume or length increases.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: DNS tunnel
+    anchor: "{{host}} is tunnelling data or commands through DNS queries to {{domain}}."
+    risk: The risk here is data exfiltration and command and control that bypasses web proxies; containment is required now.
+    actions:
+      - Isolate {{host}}
+      - Sinkhole or block {{domain}} at the resolvers
+      - Run the EDR tree on the sending process
+      - Estimate the volume exfiltrated from query counts and label sizes
+    escalate: true
+    monitor: I will monitor all resolvers for queries to {{domain}} and similar patterns.

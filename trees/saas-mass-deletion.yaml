@@ -1,0 +1,105 @@
+id: saas-mass-deletion
+title: SaaS Mass Deletion or Cloud Ransomware
+category: cloud
+summary: >-
+  Many files deleted, renamed with a new extension, or overwritten in SharePoint, OneDrive or
+  another SaaS store, or a ransom note uploaded. Sync clients on an infected endpoint can
+  push ransomware into the cloud, or an attacker can do it through the API.
+applies_to:
+  - Unusual file deletion activities
+  - Ransomware payment instruction file uploaded
+  - Mass file rename in OneDrive
+mitre: [T1485, T1486]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Defender for Cloud Apps anomaly detection policies
+    url: https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
+  - title: "MITRE ATT&CK T1485 Data Destruction"
+    url: https://attack.mitre.org/techniques/T1485/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+start: c-activity
+nodes:
+  c-activity:
+    type: check
+    text: Measure deletions, renames and uploads, and their client.
+    kql:
+      - title: Deletions, renames and uploads by the user (48h)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(48h)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("FileDeleted", "FileRecycled", "FileRenamed", "FileModified", "FileUploaded", "FileDeletedFirstStageRecycleBin")
+          | summarize Count = count(), Extensions = make_set(SourceFileExtension, 20), First = min(TimeGenerated) by Operation, ClientIP, UserAgent
+    note: I measured the deletions, renames and uploads by {{user}} and their client.
+    next: q-encryption
+
+  q-encryption:
+    type: question
+    text: Do the changes show encryption (new unknown extensions, ransom note files, overwrites of many file types)?
+    yes: q-source
+    no: q-cleanup
+    notes:
+      yes: The changes show encryption or ransom notes.
+      no: The changes are deletions without encryption signs.
+
+  q-source:
+    type: question
+    text: Did it come through a sync client on a device (then the device is infected) or through the web or API?
+    yes: l-ransomware
+    no: o-tp-api
+    notes:
+      yes: The encryption came through a sync client on a device.
+      no: The encryption came through the web or API, from a compromised session or app.
+
+  l-ransomware:
+    type: link
+    text: The device is the source. Continue in the ransomware tree.
+    tree: ransomware-behaviour
+
+  q-cleanup:
+    type: question
+    text: Is it a user clean-up or retention policy from the usual session?
+    yes: o-benign
+    no: o-tp-destruction
+    notes:
+      yes: The deletions are a user clean-up or retention policy.
+      no: The deletions came from an unusual session or have no explanation.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Clean-up or retention
+    anchor: The deletions by {{user}} are a clean-up or retention policy from the usual session.
+    risk: The risk here is data destruction; it doesn't apply given the explanation.
+    actions:
+      - Close
+
+  o-tp-api:
+    type: outcome
+    verdict: true_positive
+    title: Cloud ransomware through the API
+    anchor: Files owned by {{user}} were encrypted through the web or API from a compromised session or app.
+    risk: The risk here is data loss and extortion across shared sites; containment is required now.
+    actions:
+      - Revoke sessions and app consents for {{user}}
+      - Restore files with OneDrive or SharePoint restore to a point before the activity
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor for further mass modification across the tenant.
+
+  o-tp-destruction:
+    type: outcome
+    verdict: true_positive
+    title: Malicious deletion
+    anchor: Files were deleted in bulk from the account of {{user}} without explanation.
+    risk: The risk here is data destruction by an attacker or insider; recovery windows are limited.
+    actions:
+      - Restore from the recycle bin or a restore point
+      - Revoke sessions and investigate the account
+      - Escalate to the customer
+    escalate: true
+    monitor: I will monitor {{user}} for further deletions.

@@ -1,0 +1,107 @@
+id: large-outbound-transfer
+title: Large or Unusual Outbound Data Transfer
+category: network
+summary: >-
+  A host sent far more data out than usual, to one destination, often over HTTPS, SFTP or
+  a cloud storage API. Backups and cloud sync do this legitimately. Exfiltration tools like
+  rclone to MEGA are the classic bad case.
+applies_to:
+  - Unusual volume of outbound traffic
+  - Behavior:EC2/TrafficVolumeUnusual
+  - Possible data exfiltration
+mitre: [T1048, T1567.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1567.002 Exfiltration to Cloud Storage"
+    url: https://attack.mitre.org/techniques/T1567/002/
+  - title: "MITRE ATT&CK T1048 Exfiltration Over Alternative Protocol"
+    url: https://attack.mitre.org/techniques/T1048/
+entities:
+  - { key: host, label: Source host or IP, example: "SRV-FS01" }
+  - { key: dst_ip, label: Destination IP, example: "31.216.144.5" }
+start: c-volume
+nodes:
+  c-volume:
+    type: check
+    text: Measure the transfer and compare with the host's baseline.
+    kql:
+      - title: Outbound bytes by destination versus baseline (firewall, 14d)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(14d)
+          | where SourceIP == "{{host}}" or SourceHostName =~ "{{host}}"
+          | summarize SentMB = round(sum(SentBytes) / 1048576.0, 1) by DestinationIP, bin(TimeGenerated, 1d)
+          | order by SentMB desc
+      - title: Process behind the connections (48h)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(48h)
+          | where (DeviceName =~ "{{host}}" or LocalIP == "{{host}}") and RemoteIP == "{{dst_ip}}"
+          | summarize Connections = count() by InitiatingProcessFileName, InitiatingProcessCommandLine, RemoteUrl, RemotePort
+    note: I measured the outbound transfer from {{host}} to {{dst_ip}} against its baseline.
+    next: q-known-dest
+
+  q-known-dest:
+    type: question
+    text: Is the destination a sanctioned service (backup provider, the customer's cloud tenant, a partner SFTP) used by the expected process?
+    yes: o-fp
+    no: q-tool
+    notes:
+      yes: "{{dst_ip}} is a sanctioned service used by the expected process."
+      no: "{{dst_ip}} is not a sanctioned destination."
+
+  q-tool:
+    type: question
+    text: Is the process an exfiltration-style tool (rclone, MEGAsync, WinSCP, curl, restic) or a browser uploading to personal storage?
+    yes: q-context
+    no: o-inconclusive
+    notes:
+      yes: The transfer was made with an exfiltration-style tool or to personal storage.
+      no: The transfer was made by an application with no clear exfiltration pattern.
+
+  q-context:
+    type: question
+    text: Is there intrusion context (staging archives, recent lateral movement, other alerts) or insider context (leaver)?
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: The transfer is part of wider intrusion or insider activity.
+      no: I found no wider context, but the tool and destination are unsanctioned.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Sanctioned transfer
+    anchor: The transfer from {{host}} to {{dst_ip}} was a sanctioned backup or sync.
+    risk: The risk here is data exfiltration; it doesn't apply given the sanctioned destination and process.
+    actions:
+      - Close
+    tuning: Baseline the sanctioned destination for this host.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unexplained volume
+    anchor: "{{host}} sent an unusual volume to {{dst_ip}} through an application I could not tie to exfiltration or a sanctioned use."
+    risk: The risk here is undetected data loss, which stays open until the owner explains the transfer.
+    actions:
+      - Ask the system owner to explain the transfer
+    monitor: I will monitor {{host}} for further transfers to {{dst_ip}}.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Data exfiltration
+    anchor: Data left {{host}} for {{dst_ip}} through an unsanctioned tool or destination.
+    risk: The risk here is data theft for extortion or competitive loss; containment is required now.
+    actions:
+      - Block {{dst_ip}} and the service domain
+      - Isolate {{host}} and identify the account that ran the tool
+      - Scope the data sent (paths the tool read)
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for connections to the same service and tool.

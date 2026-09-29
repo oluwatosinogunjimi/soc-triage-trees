@@ -1,0 +1,111 @@
+id: inbound-brute-force
+title: Inbound RDP or SSH Brute Force
+category: network
+summary: >-
+  Many failed logons against an exposed RDP, SSH or WinRM service from the internet. The
+  internet does this constantly. What matters is whether any attempt succeeded and why the
+  service is exposed at all.
+applies_to:
+  - UnauthorizedAccess:EC2/RDPBruteForce
+  - UnauthorizedAccess:EC2/SSHBruteForce
+  - Multiple failed RDP logons from external IP
+  - Suspected brute-force attack (Kerberos, NTLM) from external source
+mitre: [T1110.001, T1133]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: "MITRE ATT&CK T1110.001 Password Guessing"
+    url: https://attack.mitre.org/techniques/T1110/001/
+entities:
+  - { key: host, label: Targeted host, example: "SRV-JUMP01" }
+  - { key: src_ip, label: Attacking IP, example: "45.141.84.12" }
+start: c-attempts
+nodes:
+  c-attempts:
+    type: check
+    text: Count attempts and successes against the host.
+    kql:
+      - title: Failed and successful remote logons (24h)
+        platform: xdr
+        query: |
+          DeviceLogonEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{host}}" and RemoteIPType == "Public"
+          | summarize Failed = countif(ActionType == "LogonFailed"), Success = countif(ActionType == "LogonSuccess"),
+                      Accounts = make_set(AccountName, 30), First = min(Timestamp), Last = max(Timestamp) by RemoteIP, LogonType
+          | order by Failed desc
+      - title: Windows logon failures and successes (Events 4625/4624, 24h)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(24h)
+          | where Computer has "{{host}}" and EventID in (4624, 4625)
+          | where IpAddress !startswith "10." and IpAddress !startswith "192.168." and IpAddress !startswith "172." and IpAddress != "-"
+          | summarize Failed = countif(EventID == 4625), Success = countif(EventID == 4624), Accounts = make_set(TargetUserName, 30) by IpAddress
+    note: I counted the logon attempts against {{host}}, including from {{src_ip}}.
+    next: q-success
+
+  q-success:
+    type: question
+    text: Did any logon from an external IP succeed?
+    yes: q-expected-user
+    no: q-exposure
+    notes:
+      yes: A logon to {{host}} from the internet succeeded.
+      no: Every external logon attempt against {{host}} failed.
+
+  q-expected-user:
+    type: question
+    text: Is the successful logon an expected user from an expected location (named admin, vendor with an allowlisted IP)?
+    yes: q-exposure
+    no: o-tp
+    notes:
+      yes: The successful logon was an expected user from an expected location.
+      no: The successful logon was not an expected user or location.
+
+  q-exposure:
+    type: question
+    text: Is exposing this service to the internet approved and documented?
+    yes: o-benign
+    no: o-exposure
+    notes:
+      yes: Internet exposure of the service on {{host}} is approved and documented.
+      no: The service on {{host}} is exposed to the internet without approval.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Background brute force, approved exposure
+    anchor: "{{host}} received failed brute-force attempts, including from {{src_ip}}, on an approved exposed service."
+    risk: The risk here is a guessed password on an internet-facing service; it doesn't apply as no attempt succeeded.
+    actions:
+      - Block {{src_ip}}
+      - Recommend account lockout, MFA or IP allowlisting on the service
+
+  o-exposure:
+    type: outcome
+    verdict: true_positive
+    title: Unapproved exposure under attack
+    anchor: "{{host}} exposes a remote access service to the internet without approval and is being brute-forced."
+    risk: The risk here is a guessed password giving direct access, a common ransomware entry point; the exposure must be closed.
+    actions:
+      - Ask the customer to remove the exposure or put it behind VPN
+      - Block {{src_ip}}
+    monitor: I will monitor {{host}} for successful external logons until the exposure is closed.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Brute force succeeded
+    anchor: An attacker logged on to {{host}} from the internet after brute-forcing credentials.
+    risk: The risk here is hands-on intrusion from an internet-facing foothold; containment is required now.
+    actions:
+      - Isolate {{host}} and remove its internet exposure
+      - Disable and reset the compromised account
+      - Review what the attacker did in the session
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for logons with the compromised account anywhere in the estate.

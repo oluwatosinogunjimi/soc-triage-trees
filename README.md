@@ -6,19 +6,18 @@ This project grew out of the article [Lessons from the SOC: How Analysts Can Tri
 
 ## What's inside
 
-| Tree | Category | Built on |
+100 playbooks. See the full list with alert names and ATT&CK mappings in [docs/CATALOGUE.md](docs/CATALOGUE.md).
+
+| Category | Playbooks | Examples |
 |---|---|---|
-| Universal Triage Flow | Start here | The article's triage flow, NIST SP 800-61r3 |
-| Phishing or Suspicious Email | Email | Microsoft phishing IR playbook |
-| Suspicious Inbox Rule or Mail Forwarding | Email | Microsoft phishing IR playbook, T1564.008, T1114.003 |
-| Unfamiliar or Impossible-Travel Sign-in | Identity | Entra sign-in logs and error codes, T1078.004 |
-| Password Spray or Brute Force | Identity | Microsoft password spray IR playbook |
-| Token Theft or AiTM Phishing | Identity | Microsoft token theft playbook |
-| OAuth App Consent Grant | Identity | Microsoft app consent IR playbook |
-| Malware or EDR Detection | Endpoint | The article's endpoint section, MDE investigation |
-| Suspicious PowerShell or LOLBin Execution | Endpoint | T1059.001, T1218, LOLBAS |
-| Network, IDS or Firewall Alert | Network | The article's network section, T1190, T1071 |
-| Cloud Control-Plane Anomaly (Azure / AWS) | Cloud | The article's cloud section, T1562.008, T1496 |
+| Start here | 1 | Universal Triage Flow, which routes to every other playbook |
+| Email and collaboration | 15 | Phishing, BEC and vendor fraud, QR code phishing, HTML smuggling, callback phishing, Teams fake helpdesk, mail flow rules |
+| Identity | 29 | Impossible travel, AiTM, MFA fatigue, device code phishing, OAuth consent, privileged role changes, Kerberoasting, DCSync, golden ticket, AD CS abuse |
+| Endpoint | 24 | EDR malware, ransomware, LSASS dumping, Cobalt Strike, BYOVD, RMM tools, persistence (tasks, services, Run keys, WMI), web shells, Linux reverse shells |
+| Network, perimeter and OT | 13 | IDS alerts, DNS tunnelling, VPN anomalies, inbound brute force, edge device exploitation, exfiltration volume, OT/ICS commands |
+| Cloud and SaaS | 18 | AWS root use, stolen keys, logging disabled, public buckets, Key Vault harvesting, Kubernetes, SharePoint mass download, DLP, exposed secrets, LLMjacking |
+
+The checks draw on the Microsoft incident response playbooks, Entra ID Protection and Defender for Identity detection references, Defender for Cloud Apps policies, AWS GuardDuty finding types, CISA advisories and MITRE ATT&CK, with sources listed in each tree.
 
 Every tree has:
 
@@ -52,6 +51,7 @@ schema/tree.schema.json  the contract every tree must meet
 tools/validate.py      schema plus graph checks (orphans, broken edges, cycles, placeholders)
 tools/build.py         validate, then bundle into dist/
 tools/new_tree.py      scaffold a new tree that already validates
+tools/gen_router.py    regenerate the Universal Triage menus and docs/CATALOGUE.md
 site/viewer.html       the viewer (walkthrough, map, closure note)
 tests/                 pytest suite for the validator and build
 ```

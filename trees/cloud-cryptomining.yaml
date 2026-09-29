@@ -1,0 +1,79 @@
+id: cloud-cryptomining
+title: Cloud Resource Hijacking (Mining)
+category: cloud
+summary: >-
+  Many large or GPU instances launched, often in regions the customer never uses, or
+  compute talking to mining pools. Usually the result of leaked keys. The bill grows by the
+  hour, so contain first.
+applies_to:
+  - Unusual instance type launched
+  - Unusual region for cloud resource
+  - Unusual multiple VM creation activities
+  - Impact:IAMUser/CostHarvesting
+mitre: [T1496, T1578.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1496 Resource Hijacking"
+    url: https://attack.mitre.org/techniques/T1496/
+  - title: Defender for Cloud Apps anomaly detection policies
+    url: https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
+entities:
+  - { key: principal, label: Principal that launched the resources, example: "arn:aws:iam::111122223333:user/ci" }
+start: c-launches
+nodes:
+  c-launches:
+    type: check
+    text: List the launches by principal, region and size.
+    kql:
+      - title: EC2 launches by region and type (48h)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(48h)
+          | where EventName in ("RunInstances", "CreateFleet", "RequestSpotInstances", "CreateComputeEnvironment")
+          | where UserIdentityArn has "{{principal}}" or UserIdentityAccessKeyId == "{{principal}}"
+          | extend InstanceType = tostring(parse_json(RequestParameters).instanceType)
+          | summarize Launches = count(), Types = make_set(InstanceType), IPs = make_set(SourceIpAddress) by AWSRegion
+      - title: Azure VM creation by caller (48h)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(48h)
+          | where OperationNameValue =~ "Microsoft.Compute/virtualMachines/write" and Caller =~ "{{principal}}"
+          | summarize VMs = count(), IPs = make_set(CallerIpAddress) by ResourceGroup, Location = tostring(Properties_d.resourceLocation)
+    note: I listed the compute launched by {{principal}} by region and size.
+    next: q-expected
+
+  q-expected:
+    type: question
+    text: Is it expected (a known ML training job, autoscaling, a planned regional expansion)?
+    yes: o-fp
+    no: o-tp
+    notes:
+      yes: The launches by {{principal}} are expected workload.
+      no: The launches by {{principal}} are not expected, often in unused regions or GPU sizes.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Expected compute
+    anchor: The compute launched by {{principal}} is expected workload.
+    risk: The risk here is resource hijacking through stolen credentials; it doesn't apply given the known workload.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Cloud resource hijacking
+    anchor: "{{principal}} was used to launch unauthorised compute for mining or resource abuse."
+    risk: The risk here is large financial loss by the hour and a compromised identity with launch rights; containment is required now.
+    actions:
+      - Revoke or deactivate the principal's credentials
+      - Terminate the unauthorised resources in every region after snapshotting one for evidence
+      - Find how the credential leaked
+      - Recommend service control policies that deny unused regions
+    escalate: true
+    monitor: I will monitor all regions for new launches and for use of the principal.

@@ -1,0 +1,97 @@
+id: azure-elevate-access
+title: Azure Elevate Access or Subscription Owner Added
+category: cloud
+summary: >-
+  A Global Administrator used "elevate access" to become User Access Administrator over
+  all subscriptions, or someone was made Owner of a subscription or management group. This
+  turns tenant control into control of every Azure resource.
+applies_to:
+  - Microsoft.Authorization/elevateAccess/action
+  - Anomalous activity following Global Administrator elevation
+  - Owner role assigned at subscription or management group
+mitre: [T1098.003, T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft, elevate access to manage all Azure subscriptions
+    url: https://learn.microsoft.com/en-us/azure/role-based-access-control/elevate-access-global-admin
+  - title: Microsoft Defender for Identity XDR alerts (privilege escalation)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: actor, label: Account that elevated or assigned, example: "ga-admin@contoso.com" }
+  - { key: assignee, label: Account given the role, example: "ga-admin@contoso.com" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull the elevation or assignment and what followed.
+    kql:
+      - title: Elevations and high-privilege role assignments (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where OperationNameValue has_any ("elevateAccess", "roleAssignments/write")
+          | project TimeGenerated, OperationNameValue, Caller, CallerIpAddress, _ResourceId, ActivityStatusValue, Properties
+      - title: What the actor did afterwards (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where Caller =~ "{{actor}}" or Caller =~ "{{assignee}}"
+          | summarize Ops = count() by OperationNameValue
+          | order by Ops desc
+    note: I pulled the elevation or role assignment by {{actor}} for {{assignee}}.
+    next: q-ticket
+
+  q-ticket:
+    type: question
+    text: Is there a ticket (break-fix on a lost subscription, onboarding a cloud admin) and was the actor's session clean?
+    yes: q-reverted
+    no: o-tp
+    notes:
+      yes: The change by {{actor}} is ticketed and came from a clean session.
+      no: The change by {{actor}} has no ticket or came from a risky session.
+
+  q-reverted:
+    type: question
+    text: For elevate access, was it removed after the task, and were only the ticketed actions taken?
+    yes: o-benign
+    no: o-policy
+    notes:
+      yes: The elevated access was removed after the ticketed task.
+      no: The elevated access is still in place or was used beyond the ticket.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Ticketed elevation
+    anchor: "{{actor}} elevated access or assigned the role for a ticketed task and removed it afterwards."
+    risk: The risk here is tenant-wide control of Azure resources; it doesn't apply given the ticket and clean-up.
+    actions:
+      - Close referencing the ticket
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Standing elevated access
+    anchor: "{{actor}} elevated access for a ticketed task but left it in place or used it beyond the ticket."
+    risk: The risk here is standing access to every subscription; removing it closes the exposure.
+    actions:
+      - Remove the User Access Administrator assignment at root scope
+      - Confirm the extra actions with the customer
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised Azure-wide privilege
+    anchor: "{{actor}} gained or granted control over Azure subscriptions without authorisation."
+    risk: The risk here is control of every Azure resource, including deletion of backups and data theft; this is a P1.
+    actions:
+      - Remove the elevation and role assignments
+      - Revoke sessions for {{actor}} and {{assignee}}; treat the Global Administrator as compromised
+      - Review every action taken with the new rights
+      - Call the customer on the P1 path
+    escalate: true
+    monitor: I will monitor for further role assignments at subscription and management group scope.

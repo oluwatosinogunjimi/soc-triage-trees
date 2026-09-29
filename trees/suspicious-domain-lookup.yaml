@@ -1,0 +1,90 @@
+id: suspicious-domain-lookup
+title: DGA, Newly Registered or Malicious Domain Lookup
+category: network
+summary: >-
+  A host resolved or connected to a domain that looks algorithmically generated, was
+  registered in the last few days, or matches threat intelligence. Find the process
+  behind it. That decides between a browser ad and malware.
+applies_to:
+  - Connection to newly registered domain
+  - DGA domain request (Trojan:EC2/DGADomainRequest)
+  - DNS lookup to known malicious domain
+  - Connection to sinkholed domain
+mitre: [T1568.002, T1071.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1568.002 Domain Generation Algorithms"
+    url: https://attack.mitre.org/techniques/T1568/002/
+entities:
+  - { key: host, label: Source host, example: "WKS-MKT-019" }
+  - { key: domain, label: Domain, example: "xkq3v9lzp2h.info" }
+start: c-lookups
+nodes:
+  c-lookups:
+    type: check
+    text: See which process looked up the domain and whether it connected.
+    kql:
+      - title: Process connections to the domain (7d)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(7d)
+          | where RemoteUrl has "{{domain}}"
+          | summarize Connections = count(), First = min(Timestamp), Last = max(Timestamp)
+                    by DeviceName, InitiatingProcessFileName, InitiatingProcessFolderPath, RemoteIP, ActionType
+    note: I found which process on {{host}} looked up {{domain}} and whether it connected.
+    next: q-intel
+
+  q-intel:
+    type: question
+    text: Does threat intelligence tie the domain to malware, phishing or C2 (not just "newly registered")?
+    yes: q-process
+    no: q-process-benign
+    notes:
+      yes: Threat intelligence ties {{domain}} to malware, phishing or command and control.
+      no: Threat intelligence has no malicious attribution for {{domain}} beyond its age or shape.
+
+  q-process-benign:
+    type: question
+    text: Is the lookup from a browser or known app with no follow-on download or beaconing?
+    yes: o-fp
+    no: q-process
+    notes:
+      yes: The lookup came from a browser or known app with no follow-on activity.
+      no: The lookup came from an unexpected process.
+
+  q-process:
+    type: question
+    text: Is the process suspicious (unsigned, from AppData or Temp, a script host), or does it repeat at regular intervals?
+    yes: l-edr
+    no: o-benign-browse
+    notes:
+      yes: A suspicious process on {{host}} contacted {{domain}}, or it repeats at regular intervals.
+      no: A browser on {{host}} visited {{domain}} once, without follow-on activity.
+
+  l-edr:
+    type: link
+    text: Continue in the EDR tree for the process.
+    tree: edr-malware-detection
+    node: q-behaviour
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Benign new domain
+    anchor: The lookup of {{domain}} from {{host}} came from normal browsing or a known app with no follow-on activity.
+    risk: The risk here is malware command and control; it doesn't apply as the domain has no malicious attribution and nothing followed.
+    actions:
+      - Close
+
+  o-benign-browse:
+    type: outcome
+    verdict: benign_positive
+    title: User browsed to a bad domain
+    anchor: A browser on {{host}} visited {{domain}}, a malicious domain, with no download or follow-on activity.
+    risk: The risk here is drive-by malware or credential phishing; it doesn't apply as nothing followed the visit.
+    actions:
+      - Block {{domain}} at the proxy or DNS
+      - Check whether the user entered credentials if it was a phishing page

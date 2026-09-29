@@ -1,0 +1,93 @@
+id: aws-iam-privesc
+title: AWS IAM Privilege Escalation
+category: cloud
+summary: >-
+  An IAM principal attached AdministratorAccess, created an inline admin policy, created a
+  new user or access key, changed a role's trust policy, or used iam:PassRole to reach a
+  more powerful role. These are the standard AWS escalation paths.
+applies_to:
+  - PrivilegeEscalation:IAMUser/AnomalousBehavior
+  - Persistence:IAMUser/AnomalousBehavior
+  - AttachUserPolicy AdministratorAccess
+  - UpdateAssumeRolePolicy to external account
+mitre: [T1098.003, T1098.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types (IAM)
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: "MITRE ATT&CK T1098.003 Additional Cloud Roles"
+    url: https://attack.mitre.org/techniques/T1098/003/
+entities:
+  - { key: principal, label: Principal making the changes, example: "arn:aws:iam::111122223333:user/dev1" }
+start: c-changes
+nodes:
+  c-changes:
+    type: check
+    text: List every IAM change by the principal.
+    kql:
+      - title: IAM changes by the principal (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where EventSource == "iam.amazonaws.com"
+          | where EventName in ("AttachUserPolicy", "AttachRolePolicy", "AttachGroupPolicy", "PutUserPolicy", "PutRolePolicy",
+                                "CreateUser", "CreateAccessKey", "CreateLoginProfile", "UpdateLoginProfile", "UpdateAssumeRolePolicy",
+                                "AddUserToGroup", "CreatePolicyVersion", "SetDefaultPolicyVersion", "PassRole")
+          | where UserIdentityArn has "{{principal}}"
+          | project TimeGenerated, EventName, SourceIpAddress, UserAgent, ErrorCode, RequestParameters
+    note: I listed every IAM change made by {{principal}}.
+    next: q-pipeline
+
+  q-pipeline:
+    type: question
+    text: Is it infrastructure-as-code or an identity admin working a ticket, from the usual pipeline or network?
+    yes: o-benign
+    no: q-escalates
+    notes:
+      yes: The IAM changes by {{principal}} came from the usual pipeline or an admin working a ticket.
+      no: The IAM changes by {{principal}} have no pipeline or ticket behind them.
+
+  q-escalates:
+    type: question
+    text: Did the principal grant itself or a new identity more privilege, or trust an external account?
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: "{{principal}} escalated privilege or trusted an external account."
+      no: The changes by {{principal}} did not increase privilege.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Managed IAM change
+    anchor: The IAM changes by {{principal}} came from the usual pipeline or a ticketed admin action.
+    risk: The risk here is privilege escalation in AWS; it doesn't apply given the managed source.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unexplained low-impact IAM change
+    anchor: "{{principal}} made IAM changes without a ticket, none of which increased privilege."
+    risk: The risk here is preparation for escalation, which stays open until the owner explains it.
+    actions:
+      - Ask the principal's owner to explain the changes
+    monitor: I will monitor {{principal}} for further IAM changes.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: AWS privilege escalation
+    anchor: "{{principal}} escalated privilege or created external trust in AWS without authorisation."
+    risk: The risk here is account takeover and persistence through new admin identities; containment is required now.
+    actions:
+      - Detach the added policies, delete created users and keys, revert trust policies
+      - Revoke sessions for {{principal}} and find how it was compromised
+      - Review actions taken with the new privilege
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for IAM changes by any principal from the same source.

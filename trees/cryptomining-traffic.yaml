@@ -1,0 +1,85 @@
+id: cryptomining-traffic
+title: Cryptomining Pool Traffic
+category: network
+summary: >-
+  Network logs show a host talking to a mining pool (Stratum protocol, pool domains, ports
+  3333/4444/14444). This catches unmanaged devices, IoT and cloud instances that have no
+  EDR. The source decides the next step.
+applies_to:
+  - CryptoCurrency:EC2/BitcoinTool.B
+  - Impact:EC2/BitcoinDomainRequest.Reputation
+  - Firewall detected Stratum mining protocol
+mitre: [T1496]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types (CryptoCurrency)
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: "MITRE ATT&CK T1496 Resource Hijacking"
+    url: https://attack.mitre.org/techniques/T1496/
+entities:
+  - { key: src_ip, label: Source IP, example: "10.40.2.77" }
+start: c-flows
+nodes:
+  c-flows:
+    type: check
+    text: Confirm the pool traffic and identify the source device.
+    kql:
+      - title: Firewall sessions to mining pools (7d)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(7d)
+          | where SourceIP == "{{src_ip}}"
+          | where DestinationPort in (3333, 4444, 5555, 7777, 14444, 45700) or RequestURL has_any ("pool", "xmr", "monero", "nicehash", "2miners", "nanopool")
+          | summarize Sessions = count(), MB = round(sum(SentBytes + ReceivedBytes) / 1048576.0, 1), First = min(TimeGenerated)
+                    by DestinationIP, DestinationPort, RequestURL, ApplicationProtocol
+    note: I confirmed the mining pool traffic from {{src_ip}} and identified the device.
+    next: q-managed
+
+  q-managed:
+    type: question
+    text: Is the source a managed endpoint with EDR?
+    yes: l-endpoint
+    no: q-kind
+    notes:
+      yes: "{{src_ip}} is a managed endpoint with EDR."
+      no: "{{src_ip}} is an unmanaged device, IoT or cloud workload without EDR."
+
+  l-endpoint:
+    type: link
+    text: Continue in the endpoint coinminer tree.
+    tree: endpoint-coinminer
+
+  q-kind:
+    type: question
+    text: Is it an internet-facing server, appliance or cloud workload (rather than a personal device on guest Wi-Fi)?
+    yes: o-tp-server
+    no: o-policy
+    notes:
+      yes: "{{src_ip}} is an internet-facing server, appliance or cloud workload."
+      no: "{{src_ip}} is a personal or guest device."
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Personal device mining
+    anchor: A personal or guest device at {{src_ip}} is mining cryptocurrency.
+    risk: The risk here is resource abuse on the network; it is a policy matter as the device is not corporate.
+    actions:
+      - Block the pool destinations at the firewall
+      - Ask the network team to identify and remove the device
+
+  o-tp-server:
+    type: outcome
+    verdict: true_positive
+    title: Compromised server or appliance mining
+    anchor: "{{src_ip}}, an internet-facing server, appliance or workload, is mining cryptocurrency."
+    risk: The risk here is an attacker with code execution on an exposed system; the miner is only the visible payload.
+    actions:
+      - Isolate the system
+      - Find the exploited service or credential and patch or rotate it
+      - Block the pool destinations
+    escalate: true
+    monitor: I will monitor the estate for pool traffic from any source.

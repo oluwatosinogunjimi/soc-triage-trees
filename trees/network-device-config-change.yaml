@@ -1,0 +1,100 @@
+id: network-device-config-change
+title: Firewall or Network Device Configuration Change
+category: network
+summary: >-
+  An admin logged on to a firewall, router, switch or VPN appliance and changed rules, NAT,
+  admin accounts or logging. Attackers who reach these devices open inbound access or
+  disable logging. Every change should map to a ticket.
+applies_to:
+  - Firewall policy modified
+  - New admin account on network device
+  - Logging disabled on firewall
+  - Admin login to network device from unusual source
+mitre: [T1562.004, T1098]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1562.004 Disable or Modify System Firewall"
+    url: https://attack.mitre.org/techniques/T1562/004/
+entities:
+  - { key: device, label: Network device, example: "FW-EDGE-01" }
+  - { key: admin, label: Admin account, example: "netadmin" }
+  - { key: ip, label: Admin source IP, example: "10.1.1.25" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull the admin session and the configuration changes.
+    kql:
+      - title: Admin logons and config events on the device (7d)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(7d)
+          | where DeviceName =~ "{{device}}" or Computer =~ "{{device}}"
+          | where Activity has_any ("admin", "login", "config", "policy", "commit", "user", "log")
+          | project TimeGenerated, DeviceVendor, Activity, SourceIP, SourceUserName, DeviceAction, Message
+          | order by TimeGenerated asc
+    note: I pulled the admin session by {{admin}} from {{ip}} on {{device}} and the changes made.
+    next: q-ticket
+
+  q-ticket:
+    type: question
+    text: Is there a change ticket matching the time and the change?
+    yes: q-source
+    no: q-impact
+    notes:
+      yes: The change on {{device}} matches a change ticket.
+      no: No change ticket covers the change on {{device}}.
+
+  q-source:
+    type: question
+    text: Did the admin connect from the management network or jump host, with their named account?
+    yes: o-benign
+    no: q-impact
+    notes:
+      yes: "{{admin}} connected from the management network with a named account."
+      no: "{{admin}} connected from {{ip}}, outside the management network, or with a shared account."
+
+  q-impact:
+    type: question
+    text: Does the change open inbound access, add admin accounts, weaken VPN or disable logging?
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: The change opens access, adds accounts or reduces logging.
+      no: The change does not weaken security.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved network change
+    anchor: "{{admin}} changed {{device}} under a change ticket from the management network."
+    risk: The risk here is an attacker opening access through network devices; it doesn't apply given the ticket and source.
+    actions:
+      - Close referencing the ticket
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unticketed low-impact change
+    anchor: "{{admin}} changed {{device}} without a ticket, but the change does not weaken security."
+    risk: The risk here is uncontrolled change on a critical device, which stays open until the network team confirms it.
+    actions:
+      - Ask the network team to confirm and retro-ticket the change
+    monitor: I will monitor {{device}} for further unticketed changes.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised security-weakening change
+    anchor: "{{device}} was changed to open access, add accounts or reduce logging without authorisation."
+    risk: The risk here is attacker-controlled network access and blind spots; containment is required now.
+    actions:
+      - Revert the change and remove rogue accounts
+      - Rotate device admin credentials and check firmware for known CVEs
+      - Review traffic through any opened rule
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{device}} for admin logons and configuration changes.

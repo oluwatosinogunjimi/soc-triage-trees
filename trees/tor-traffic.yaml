@@ -1,0 +1,72 @@
+id: tor-traffic
+title: TOR Traffic from an Internal Host
+category: network
+summary: >-
+  An internal host is talking to TOR entry nodes or running a TOR client or relay. Malware
+  and ransomware use TOR for command and control; some users run TOR Browser. Neither
+  belongs on a corporate network.
+applies_to:
+  - UnauthorizedAccess:EC2/TorClient
+  - UnauthorizedAccess:EC2/TorRelay
+  - Connection to TOR network detected
+mitre: [T1090.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1090.003 Proxy: Multi-hop Proxy"
+    url: https://attack.mitre.org/techniques/T1090/003/
+  - title: TOR Project, list of relays (for TI enrichment)
+    url: https://metrics.torproject.org/rs.html
+entities:
+  - { key: host, label: Internal host, example: "WKS-ENG-031" }
+start: c-traffic
+nodes:
+  c-traffic:
+    type: check
+    text: Find the process making TOR connections.
+    kql:
+      - title: TOR-style connections and binaries (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceNetworkEvents | where RemotePort in (9001, 9030, 9050, 9051, 9150) and RemoteIPType == "Public"
+               | project Timestamp, DeviceName, Kind = "Network", Detail = strcat(RemoteIP, ":", RemotePort), Proc = InitiatingProcessFileName, Path = InitiatingProcessFolderPath),
+            (DeviceProcessEvents | where FileName in~ ("tor.exe", "tor", "obfs4proxy.exe") or FolderPath has "Tor Browser"
+               | project Timestamp, DeviceName, Kind = "Process", Detail = ProcessCommandLine, Proc = InitiatingProcessFileName, Path = FolderPath)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{host}}"
+    note: I found the process making TOR connections on {{host}}.
+    next: q-browser
+
+  q-browser:
+    type: question
+    text: Is it the TOR Browser started by the user from their profile?
+    yes: o-policy
+    no: o-tp
+    notes:
+      yes: The TOR traffic from {{host}} came from TOR Browser started by the user.
+      no: The TOR traffic from {{host}} came from a standalone TOR client or unknown process.
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: User running TOR Browser
+    anchor: A user on {{host}} ran TOR Browser.
+    risk: The risk here is covert channels and policy evasion; it is a policy breach rather than malware.
+    actions:
+      - Remove TOR Browser and inform the user's manager per policy
+      - Recommend blocking TOR at the firewall
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Malware using TOR
+    anchor: A non-browser process on {{host}} is communicating over TOR.
+    risk: The risk here is command and control that bypasses proxy inspection, typical of ransomware and backdoors; containment is required now.
+    actions:
+      - Isolate {{host}}
+      - Run the EDR tree on the process
+      - Block TOR entry nodes at the perimeter
+    escalate: true
+    monitor: I will monitor the estate for TOR connections from any host.

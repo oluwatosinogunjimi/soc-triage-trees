@@ -1,0 +1,82 @@
+id: llmjacking
+title: LLM Abuse with Stolen Cloud Credentials (LLMjacking)
+category: cloud
+summary: >-
+  Stolen cloud keys used to call hosted models (Amazon Bedrock, Azure OpenAI, Vertex AI),
+  often after enabling model access or disabling invocation logging, then resold as a
+  proxy. The first sign is usually cost or an unfamiliar principal calling InvokeModel.
+applies_to:
+  - Impact:IAMUser/AnomalousModelInvocation
+  - DefenseEvasion:IAMUser/BedrockLoggingDisabled
+  - Unusual Azure OpenAI usage spike
+  - PutFoundationModelEntitlement from unfamiliar principal
+mitre: [T1496, T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: AWS GuardDuty finding types (Bedrock and AI)
+    url: https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html
+  - title: "Sysdig: LLMjacking, stolen cloud credentials used in new AI attack"
+    url: https://sysdig.com/blog/llmjacking-stolen-cloud-credentials-used-in-new-ai-attack/
+entities:
+  - { key: principal, label: Principal or access key, example: "AKIAEXAMPLE1234567" }
+start: c-calls
+nodes:
+  c-calls:
+    type: check
+    text: Measure model calls and configuration changes by the principal.
+    kql:
+      - title: Bedrock activity by the principal (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where EventSource == "bedrock.amazonaws.com"
+          | where UserIdentityArn has "{{principal}}" or UserIdentityAccessKeyId == "{{principal}}"
+          | summarize Calls = count(), First = min(TimeGenerated), Last = max(TimeGenerated)
+                    by EventName, AWSRegion, SourceIpAddress, UserAgent
+          | order by Calls desc
+    note: I measured model calls and configuration changes by {{principal}}.
+    next: q-known-app
+
+  q-known-app:
+    type: question
+    text: Is the principal a known application or team that uses these models from its usual source and region?
+    yes: o-fp
+    no: q-config
+    notes:
+      yes: "{{principal}} is a known application using the models from its usual source."
+      no: "{{principal}} does not normally call these models, or called them from a new source or region."
+
+  q-config:
+    type: question
+    text: Did the principal enable model access, create provisioned throughput, or disable invocation logging?
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: "{{principal}} changed model access or logging configuration, a hallmark of LLMjacking."
+      no: "{{principal}} only invoked models without changing configuration."
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known AI workload
+    anchor: The model calls by {{principal}} come from a known application at its usual source.
+    risk: The risk here is model abuse with stolen keys; it doesn't apply given the known workload.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: LLMjacking
+    anchor: "{{principal}} was used to call hosted models without authorisation."
+    risk: The risk here is large unexpected cost and misuse of models under the customer's account; containment is required now.
+    actions:
+      - Deactivate the key or revoke the principal's sessions
+      - Re-enable invocation logging and remove unapproved model access and provisioned throughput
+      - Find how the key leaked and run the credential misuse checks
+      - Recommend service control policies limiting model access to approved roles
+    escalate: true
+    monitor: I will monitor for model calls and entitlement changes by any unapproved principal.

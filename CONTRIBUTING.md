@@ -6,6 +6,7 @@ A tree is one YAML file in `trees/`. The file name is the tree id. You never nee
 python tools/new_tree.py mfa-fatigue "MFA Fatigue / Push Bombing" identity
 # edit trees/mfa-fatigue.yaml
 python tools/validate.py
+python tools/gen_router.py   # adds it to the Universal Triage menus and the catalogue
 python tools/build.py && python -m http.server -d dist
 ```
 
@@ -62,6 +63,7 @@ Declare the values an analyst fills in once under `entities`, then use them anyw
 ## Review checklist
 
 - [ ] `python tools/validate.py` passes with no warnings
+- [ ] `python tools/gen_router.py` has been run (CI fails if the router or catalogue is stale)
 - [ ] Every path reaches an outcome that a senior analyst would agree with
 - [ ] Queries were run against a real workspace
 - [ ] No client names, real IPs, real users or internal hostnames anywhere (use the examples format)

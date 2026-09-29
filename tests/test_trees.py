@@ -119,3 +119,15 @@ def test_build_produces_site(tmp_path):
     html = (ROOT / "dist" / "index.html").read_text()
     assert "/*__TREE_DATA__*/null" not in html
     assert '"universal-triage"' in html
+
+
+def test_router_and_catalogue_are_current():
+    result = subprocess.run([sys.executable, str(ROOT / "tools" / "gen_router.py"), "--check"], cwd=ROOT, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout
+
+
+def test_every_playbook_is_reachable_from_universal_triage():
+    trees, _, _ = validate(ROOT / "trees")
+    linked = {n["tree"] for n in trees["universal-triage"]["nodes"].values() if n["type"] == "link"}
+    missing = sorted(t for t, tree in trees.items() if tree["category"] != "triage" and t not in linked)
+    assert not missing, f"Not routed from universal-triage: {missing}"
