@@ -90,6 +90,82 @@ a { color: var(--accent); }
 .btn.sm { padding: 4px 9px; font-size: 13px; }
 @media (max-width: 600px) { .bar .btn .lbl { display: none; } }
 
+/* ---------- navigation ---------- */
+.primary-nav { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+.nav-link { all: unset; box-sizing: border-box; cursor: pointer; padding: 6px 10px; border-radius: var(--r); font-size: 14px; font-weight: 500;
+  color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px; min-height: 34px; }
+.nav-link:hover { background: var(--surface-2); color: var(--ink); }
+.nav-link[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+.nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nav-link svg { width: 14px; height: 14px; }
+details.browse { position: relative; }
+details.browse > summary { list-style: none; }
+details.browse > summary::-webkit-details-marker { display: none; }
+details.browse[open] > summary { background: var(--surface-2); color: var(--ink); }
+.browse-menu { position: absolute; top: calc(100% + 8px); left: 0; width: 300px; padding: 6px; display: grid; gap: 1px; z-index: 40; box-shadow: var(--shadow); }
+.browse-menu button, .menu-sheet button, .menu-sheet a { all: unset; box-sizing: border-box; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  gap: 16px; padding: 9px 10px; border-radius: 6px; font-size: 14px; }
+.browse-menu button:hover, .browse-menu button:focus-visible, .menu-sheet button:hover, .menu-sheet a:hover,
+.menu-sheet button:focus-visible, .menu-sheet a:focus-visible { background: var(--surface-2); }
+.browse-menu .count, .menu-sheet .count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.search-trigger { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--muted);
+  padding: 5px 7px 5px 10px; border-radius: var(--r); cursor: pointer; font-size: 13.5px; min-width: 230px; min-height: 34px; }
+.search-trigger:hover { border-color: var(--ink-2); color: var(--ink-2); }
+.search-trigger svg { width: 15px; height: 15px; flex: none; }
+.search-trigger kbd { margin-left: auto; }
+.btn.ext svg { width: 12px; height: 12px; opacity: .7; }
+a.btn { text-decoration: none; }
+a.btn:not(.primary):not(.ghost) { color: var(--ink-2); }
+.menu-sheet svg { width: 14px; height: 14px; flex: none; color: var(--muted); }
+.menu-btn { display: none !important; }
+.menu-sheet { position: fixed; top: 60px; right: 12px; left: 12px; z-index: 60; padding: 8px; display: grid; gap: 1px; box-shadow: var(--shadow);
+  max-height: calc(100vh - 80px); overflow: auto; }
+.menu-sheet .m-sub { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); padding: 10px 10px 4px; font-weight: 600; }
+.menu-sheet hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
+@media (max-width: 1180px) { .wide-only { display: none !important; } .search-trigger { min-width: 0; } }
+@media (max-width: 780px) {
+  .primary-nav { display: none; } .menu-btn { display: inline-flex !important; }
+  .search-trigger .lbl, .search-trigger kbd { display: none; }
+  .search-trigger { padding: 7px; background: transparent; border-color: transparent; }
+}
+.case-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.case-crumbs button { all: unset; cursor: pointer; color: var(--accent); }
+.case-crumbs button:hover { text-decoration: underline; }
+.case-crumbs button:focus-visible { outline: 2px solid var(--accent); border-radius: 3px; }
+section[id^="cat-"] { scroll-margin-top: 84px; }
+.credit { font-size: 14px !important; }
+.credit a, footer.foot a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.credit a:hover, footer.foot a:hover { color: var(--accent); text-decoration-color: currentColor; }
+
+/* ---------- jump palette ---------- */
+.pal-ov { position: fixed; inset: 0; z-index: 90; background: rgba(13, 17, 22, .45); display: grid; justify-items: center; align-items: start; padding: 10vh 16px 16px; }
+.pal { width: min(660px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+  overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 72vh; }
+.pal-top { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.pal-top svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.pal-top input { all: unset; flex: 1; min-width: 0; font-size: 16px; }
+.pal-list { list-style: none; margin: 0; padding: 6px; overflow: auto; position: relative; }
+.pal-list li.opt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.pal-list li.opt[aria-selected="true"] { background: var(--accent-soft); }
+.pal-list .pt { font-weight: 600; font-size: 14.5px; }
+.pal-list .pc { font-size: 12px; color: var(--muted); align-self: center; white-space: nowrap; }
+.pal-list .ps { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-list .pg { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 10px 10px 4px; }
+.pal-empty { padding: 18px 14px; color: var(--muted); }
+.pal-foot { display: flex; flex-wrap: wrap; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+
+/* ---------- about ---------- */
+.about { max-width: 860px; margin: 0 auto; padding-block: 36px 48px; padding-inline: 16px; display: grid; gap: 28px; }
+.about h1 { font-size: clamp(34px, 5vw, 48px); }
+.about h2 { font-size: 22px; margin-bottom: 8px; }
+.about p, .about li { color: var(--ink-2); max-width: 70ch; }
+.about ol, .about ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.author { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; padding: 20px; }
+.avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 21px; }
+.link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+@media (max-width: 520px) { .author { grid-template-columns: 1fr; } }
+
 /* ---------- library ---------- */
 .home { max-width: 1240px; margin: 0 auto; padding-block: 32px 48px; padding-inline: 16px; display: grid; gap: 30px; }
 .hero { display: grid; gap: 14px; justify-items: start; }
@@ -398,7 +474,7 @@ footer.foot { text-align: center; color: var(--muted); font-size: 12px; padding-
 
 <header class="bar" id="bar"></header>
 <div id="app"></div>
-<footer class="foot">Triage Trees · playbooks are YAML in the repository, validated in CI · case data stays in this browser</footer>
+<footer class="foot">Triage Trees by <a href="https://www.linkedin.com/in/oluwatosin-ogunjimi/" target="_blank" rel="noopener">Oluwatosin Ogunjimi</a> · <a href="https://medium.com/@OluwatosinOgunjimi" target="_blank" rel="noopener">Medium</a> · <a href="https://www.linkedin.com/in/oluwatosin-ogunjimi/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://github.com/oluwatosinogunjimi/soc-triage-trees" target="_blank" rel="noopener">GitHub</a> · case data stays in this browser</footer>
 <div class="panel pop" id="shortcuts" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -425,6 +501,13 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     ["cloud", "Cloud and SaaS", "AWS and Azure control plane, storage, secrets, Kubernetes and M365 data."]
   ];
   const CAT_NAME = Object.fromEntries(CATS.map(c => [c[0], c[1]]));
+  const LINKS = {
+    linkedin: "https://www.linkedin.com/in/oluwatosin-ogunjimi/",
+    medium: "https://medium.com/@OluwatosinOgunjimi",
+    article: "https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7",
+    github: "https://github.com/oluwatosinogunjimi/soc-triage-trees"
+  };
+  const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
   const VERDICTS = ["true_positive", "inconclusive", "benign_positive", "false_positive"];
   const VLABEL = { false_positive: "False positive", benign_positive: "Benign true positive", true_positive: "True positive", inconclusive: "Inconclusive" };
   const VTOKEN = { true_positive: "tp", inconclusive: "inc", benign_positive: "btp", false_positive: "fp" };
@@ -453,6 +536,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     S = Object.assign(blank(), { entities: S.entities, signoff: S.signoff, view: "case", tree: hashId, node: TREES[hashId].start });
   } else if (hashId && TREES[hashId]) S.view = "case";
   else if (hashId === "library") S.view = "home";
+  else if (hashId === "about") S.view = "about";
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
   let query = "";
 
@@ -484,7 +568,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
     fit: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>', copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
-    plusCase: '<path d="M12 5v14M5 12h14"/>'
+    plusCase: '<path d="M12 5v14M5 12h14"/>',
+    ext: '<path d="M7 17 17 7M9 7h8v8"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', chevron: '<path d="m6 9 6 6 6-6"/>'
   };
   const icon = n => svg(ICON[n]);
   const node = (tid, nid) => TREES[tid].nodes[nid];
@@ -604,12 +689,25 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   // ================= navigation =================
   function setHash(v) { try { history.replaceState(null, "", "#" + v); } catch (e) {} }
   function openTree(tid) {
+    closeOverlays(); closeMap();
     if (S.path.length && S.tree !== tid) previous = JSON.parse(JSON.stringify(S));
     const keep = { entities: S.entities, signoff: S.signoff, incSteps: S.incSteps, incActions: S.incActions };
     S = Object.assign(blank(), keep, { view: "case", tree: tid, node: TREES[tid].start });
     setHash(tid); save(); render(); window.scrollTo(0, 0);
   }
-  function goHome() { S.view = "home"; save(); setHash("library"); closeMap(); render(); window.scrollTo(0, 0); }
+  function goHome() { S.view = "home"; save(); setHash("library"); closeMap(); closeOverlays(); render(); window.scrollTo(0, 0); }
+  function goCategory(cat) {
+    if (cat === "triage") { openTree("universal-triage"); return; }
+    query = ""; goHome();
+    requestAnimationFrame(() => { const el = document.getElementById("cat-" + cat); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  }
+  function openAbout() { S.view = "about"; save(); setHash("about"); closeMap(); closeOverlays(); render(); window.scrollTo(0, 0); }
+  function closeOverlays() {
+    document.querySelectorAll("details.browse[open]").forEach(d => { d.open = false; });
+    const m = document.getElementById("menu-sheet"); if (m) m.remove();
+    const b = document.querySelector(".menu-btn"); if (b) b.setAttribute("aria-expanded", "false");
+    closePalette();
+  }
   function resume() { S.view = "case"; save(); setHash(S.tree); render(); window.scrollTo(0, 0); }
   function answer(ans, target, label) {
     S.path.push({ tree: S.tree, node: S.node, answer: ans, label: label || null });
@@ -632,23 +730,130 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   function renderBar() {
     const bar = document.getElementById("bar"); bar.replaceChildren();
     const mark = svg('<circle cx="5" cy="12" r="2.6" fill="currentColor"/><circle cx="19" cy="5.5" r="2.6"/><circle cx="19" cy="18.5" r="2.6" fill="currentColor"/><path d="M7.4 11 16.6 6.5M7.4 13l9.2 4.5"/>', "brand-mark");
-    bar.append(h("button", { class: "brand", type: "button", onclick: goHome, "aria-label": "Triage Trees, back to library" }, mark, "Triage Trees"));
-    if (S.view === "case") {
-      const t = TREES[S.tree];
-      bar.append(h("nav", { class: "crumbs", "aria-label": "Breadcrumb" }, h("span", { class: "c-sep1" }, "/"), h("span", { class: "c-cat" }, CAT_NAME[t.category]), h("span", {}, "/"), h("b", {}, t.title)));
-    }
-    bar.append(h("span", { class: "grow" }));
-    if (S.view === "case") {
-      bar.append(h("button", { class: "btn ghost sm", type: "button", onclick: goHome, "aria-label": "Library" }, icon("grid"), h("span", { class: "lbl" }, "Library")));
-      bar.append(h("button", { class: "btn sm", type: "button", onclick: newCase, "aria-label": "New case" }, icon("plusCase"), h("span", { class: "lbl" }, "New case")));
-    }
-    bar.append(h("button", { class: "btn ghost sm", type: "button", "aria-label": "Keyboard shortcuts", onclick: toggleShortcuts }, h("kbd", {}, "?")));
+    const counts = c => bundle.trees.filter(t => t.category === c).length;
+    const browse = h("details", { class: "browse" },
+      h("summary", { class: "nav-link", "aria-current": null }, "Browse", svg(ICON.chevron)),
+      h("div", { class: "panel browse-menu", role: "menu" }, CATS.map(([cat, label]) =>
+        h("button", { type: "button", role: "menuitem", onclick: () => goCategory(cat) }, h("span", {}, cat === "triage" ? "Universal Triage (start here)" : label), h("span", { class: "count" }, counts(cat))))));
+    const parts = [
+      h("button", { class: "brand", type: "button", onclick: goHome, "aria-label": "Triage Trees, back to library" }, mark, "Triage Trees"),
+      h("nav", { class: "primary-nav", "aria-label": "Main" },
+        h("button", { class: "nav-link", type: "button", onclick: goHome, "aria-current": S.view === "home" ? "page" : null }, "Library"),
+        browse,
+        h("button", { class: "nav-link", type: "button", onclick: openAbout, "aria-current": S.view === "about" ? "page" : null }, "About")),
+      h("span", { class: "grow" }),
+      h("button", { class: "search-trigger", type: "button", onclick: openPalette, "aria-label": "Jump to a playbook" }, svg(ICON.search), h("span", { class: "lbl" }, "Jump to a playbook"), h("kbd", {}, IS_MAC ? "\u2318K" : "Ctrl K")),
+      S.view === "case" ? h("button", { class: "btn sm", type: "button", onclick: newCase, "aria-label": "New case" }, icon("plusCase"), h("span", { class: "lbl" }, "New case")) : null,
+      h("a", { class: "btn ghost sm ext wide-only", href: LINKS.medium, target: "_blank", rel: "noopener" }, "Medium", icon("ext")),
+      h("a", { class: "btn ghost sm ext wide-only", href: LINKS.linkedin, target: "_blank", rel: "noopener" }, "LinkedIn", icon("ext")),
+      h("button", { class: "btn ghost sm", type: "button", "aria-label": "Keyboard shortcuts", onclick: toggleShortcuts }, h("kbd", {}, "?")),
+      h("button", { class: "btn ghost sm menu-btn", type: "button", "aria-label": "Menu", "aria-expanded": "false", onclick: toggleMenu }, icon("menu"))
+    ];
+    bar.append(...parts.filter(Boolean));
   }
+  function toggleMenu(e) {
+    const btn = e.currentTarget;
+    const old = document.getElementById("menu-sheet");
+    if (old) { old.remove(); btn.setAttribute("aria-expanded", "false"); return; }
+    const go = fn => () => { closeOverlays(); fn(); };
+    const sheet = h("div", { class: "panel menu-sheet", id: "menu-sheet", role: "menu" },
+      h("button", { type: "button", onclick: go(goHome) }, "Library"),
+      h("button", { type: "button", onclick: go(openPalette) }, "Jump to a playbook"),
+      S.view === "case" ? h("button", { type: "button", onclick: go(newCase) }, "New case") : null,
+      h("div", { class: "m-sub" }, "Browse"),
+      CATS.map(([cat, label]) => h("button", { type: "button", onclick: go(() => goCategory(cat)) },
+        h("span", {}, cat === "triage" ? "Universal Triage (start here)" : label), h("span", { class: "count" }, bundle.trees.filter(t => t.category === cat).length))),
+      h("hr"),
+      h("button", { type: "button", onclick: go(openAbout) }, "About"),
+      h("a", { href: LINKS.article, target: "_blank", rel: "noopener" }, "The article behind it", icon("ext")),
+      h("a", { href: LINKS.medium, target: "_blank", rel: "noopener" }, "Medium", icon("ext")),
+      h("a", { href: LINKS.linkedin, target: "_blank", rel: "noopener" }, "LinkedIn", icon("ext")),
+      h("a", { href: LINKS.github, target: "_blank", rel: "noopener" }, "GitHub", icon("ext")));
+    document.body.append(sheet); btn.setAttribute("aria-expanded", "true");
+    const first = sheet.querySelector("button"); if (first) first.focus();
+  }
+
+  // ================= jump palette =================
+  let palSel = 0;
+  function closePalette() { const p = document.getElementById("pal"); if (p) { p.remove(); document.body.style.overflow = ""; if (closePalette._ret) { try { closePalette._ret.focus(); } catch (e) {} } } }
+  function openPalette() {
+    if (document.getElementById("pal")) return;
+    closePalette._ret = document.activeElement;
+    const input = h("input", { type: "text", placeholder: "Alert name, technique ID or keyword", "aria-label": "Jump to a playbook", autocomplete: "off", spellcheck: "false",
+      role: "combobox", "aria-controls": "pal-list", "aria-expanded": "true" });
+    const list = h("ul", { class: "pal-list", id: "pal-list", role: "listbox" });
+    const box = h("div", { class: "pal", role: "dialog", "aria-modal": "true", "aria-label": "Jump to a playbook" },
+      h("div", { class: "pal-top" }, svg(ICON.search), input, h("kbd", {}, "Esc")), list,
+      h("div", { class: "pal-foot" }, h("span", {}, h("kbd", {}, "\u2191"), " ", h("kbd", {}, "\u2193"), " move"), h("span", {}, h("kbd", {}, "Enter"), " open"), h("span", {}, bundle.trees.length + " playbooks")));
+    const ov = h("div", { class: "pal-ov", id: "pal", onclick: e => { if (e.target === ov) closePalette(); } }, box);
+    let items = [];
+    const actions = () => {
+      const a = [];
+      if (S.view !== "case" && (S.path.length || S.started)) a.push({ kind: "action", title: "Resume: " + TREES[S.tree].title, sub: S.path.length + " steps answered", run: resume });
+      a.push({ kind: "action", title: "Universal Triage", sub: "Not sure which playbook fits? Start here.", run: () => openTree("universal-triage") });
+      a.push({ kind: "action", title: "Library", sub: "All playbooks by category", run: goHome });
+      a.push({ kind: "action", title: "About Triage Trees", sub: "What it is, where it came from, who built it", run: openAbout });
+      return a;
+    };
+    const draw = () => {
+      const ws = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+      list.replaceChildren();
+      let groups;
+      if (ws.length) {
+        const hits = bundle.trees.map(t => [t, score(t, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1] || a[0].title.localeCompare(b[0].title));
+        groups = [["Playbooks", hits.map(([t]) => ({ kind: "tree", t }))]];
+      } else {
+        groups = [["Go to", actions()]].concat(CATS.filter(c => c[0] !== "triage").map(([cat, label]) =>
+          [label, bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title)).map(t => ({ kind: "tree", t }))]));
+      }
+      items = [];
+      groups.forEach(([label, arr]) => {
+        if (!arr.length) return;
+        list.append(h("li", { class: "pg", role: "presentation" }, label));
+        arr.forEach(it => {
+          const i = items.length; items.push(it);
+          const title = it.kind === "tree" ? it.t.title : it.title;
+          const sub = it.kind === "tree" ? (it.t.applies_to || []).slice(0, 3).join(" \u00b7 ") : it.sub;
+          list.append(h("li", { class: "opt", role: "option", id: "pal-o-" + i, "aria-selected": "false", onmousemove: () => { if (palSel !== i) { palSel = i; mark(); } }, onclick: () => pick(i) },
+            h("span", { class: "pt", html: highlight(title, ws) }), h("span", { class: "pc" }, it.kind === "tree" ? CAT_NAME[it.t.category] : ""),
+            sub ? h("span", { class: "ps", html: highlight(sub, ws) }) : null));
+        });
+      });
+      if (!items.length) list.append(h("li", { class: "pal-empty", role: "presentation" }, "No playbook matches. Try the alert name as your SIEM shows it, or a technique ID like T1110."));
+      palSel = 0; mark();
+    };
+    const mark = () => {
+      list.querySelectorAll("li.opt").forEach(li => li.setAttribute("aria-selected", "false"));
+      const el = document.getElementById("pal-o-" + palSel);
+      if (el) {
+        el.setAttribute("aria-selected", "true"); input.setAttribute("aria-activedescendant", el.id);
+        const top = el.offsetTop, bot = top + el.offsetHeight;
+        if (palSel === 0) list.scrollTop = 0;
+        else if (top < list.scrollTop + 30) list.scrollTop = top - 30;
+        else if (bot > list.scrollTop + list.clientHeight) list.scrollTop = bot - list.clientHeight + 6;
+      }
+    };
+    const pick = i => {
+      const it = items[i]; if (!it) return;
+      closePalette._ret = null; closePalette();
+      if (it.kind === "tree") openTree(it.t.id); else it.run();
+    };
+    input.addEventListener("input", draw);
+    input.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown") { e.preventDefault(); palSel = Math.min(items.length - 1, palSel + 1); mark(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); palSel = Math.max(0, palSel - 1); mark(); }
+      else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); pick(palSel); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePalette(); }
+    });
+    document.body.append(ov); document.body.style.overflow = "hidden";
+    draw(); input.focus();
+  }
+
   function toggleShortcuts() {
     const p = document.getElementById("shortcuts");
     if (!p.hidden) { p.hidden = true; return; }
     p.replaceChildren(h("div", { class: "row between" }, h("div", { class: "panel-title" }, "Keyboard shortcuts"), h("button", { class: "btn ghost sm", type: "button", "aria-label": "Close", onclick: () => { p.hidden = true; } }, icon("close"))),
-      h("dl", {}, [["/", "Search playbooks"], ["Y  N  U", "Yes, No, Can't tell"], ["1 to 9", "Pick a route option"], ["Enter", "Start, continue or hand over"],
+      h("dl", {}, [[IS_MAC ? "\u2318 K" : "Ctrl K", "Jump to any playbook"], ["/", "Search (library) or jump (in a case)"], ["Y  N  U", "Yes, No, Can't tell"], ["1 to 9", "Pick a route option"], ["Enter", "Start, continue or hand over"],
         ["B", "Back one step"], ["M", "Open or close the map"], ["Esc", "Close the map or this panel"]].map(([k, v]) => [h("dt", {}, h("kbd", {}, k)), h("dd", {}, v)])));
     p.hidden = false;
   }
@@ -660,7 +865,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
           rest = [t.summary, (t.mitre || []).join(" "), t.id].join(" ").toLowerCase();
     let s = 0;
     for (const w of words) {
-      if (title.includes(w)) s += 5; else if (alerts.includes(w)) s += 3; else if (rest.includes(w)) s += 1; else return 0;
+      if (title.startsWith(w)) s += 7; else if (title.includes(w)) s += 5; else if (alerts.includes(w)) s += 3; else if (rest.includes(w)) s += 1; else return 0;
     }
     return s;
   }
@@ -688,6 +893,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const hero = h("section", { class: "hero" },
       h("h1", {}, "What fired?"),
       h("p", {}, "Pick the alert and walk it to a verdict. " + bundle.trees.length + " playbooks, a query at each step, and a closure note written from your answers."),
+      h("p", { class: "credit" }, "Built by ", h("a", { href: LINKS.linkedin, target: "_blank", rel: "noopener" }, "Oluwatosin Ogunjimi"),
+        ". It grew out of ", h("a", { href: LINKS.article, target: "_blank", rel: "noopener" }, "Lessons from the SOC"), " on Medium."),
       h("div", { class: "search-wrap" }, svg(ICON.search), input, h("kbd", {}, "/")),
       h("div", { class: "quick" }, h("span", {}, "Try"), QUICK.map(q => h("button", { class: "chip", type: "button", onclick: () => { query = q; input.value = q; renderResults(); } }, q))));
     app.append(h("main", { class: "home" }, hero, resumeCard(), results));
@@ -715,7 +922,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
               h("span", { class: "btn primary" }, "Start")))));
           return;
         }
-        results.append(h("section", {},
+        results.append(h("section", { id: "cat-" + cat },
           h("div", { class: "section-head" }, h("h2", {}, label), h("span", { class: "count" }, items.length + " playbooks"), h("p", {}, blurb)),
           h("div", { class: "cards" }, items.map(t => card(t, [])))));
       });
@@ -746,7 +953,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const sources = (t.sources && t.sources.length) ? h("details", { class: "sources" }, h("summary", {}, "Sources (" + t.sources.length + ")"),
       h("div", { class: "pop-src" }, h("ul", { style: "margin:0;padding-left:18px;display:grid;gap:5px;font-size:13px" }, t.sources.map(s => h("li", {}, h("a", { href: s.url, target: "_blank", rel: "noopener" }, s.title)))))) : null;
     const head = h("div", { class: "case-head" },
-      h("div", { style: "min-width:0" }, h("h1", {}, t.title),
+      h("div", { style: "min-width:0" },
+        h("nav", { class: "case-crumbs", "aria-label": "Breadcrumb" }, h("button", { type: "button", onclick: goHome }, "Library"), h("span", { "aria-hidden": "true" }, "/"),
+          h("button", { type: "button", onclick: () => goCategory(t.category) }, CAT_NAME[t.category])),
+        h("h1", {}, t.title),
         h("div", { class: "meta" },
           (t.mitre || []).map(id => h("a", { class: "chip mono", href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id)),
           h("span", {}, "v" + t.version + " · reviewed " + t.last_reviewed), sources)),
@@ -1279,7 +1489,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   document.addEventListener("keydown", (e) => {
     const tag = (e.target && e.target.tagName) || "";
     const typing = tag === "INPUT" || tag === "TEXTAREA" || (e.target && e.target.isContentEditable);
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) { e.preventDefault(); openPalette(); return; }
+    if (document.getElementById("pal")) { if (e.key === "Escape") closePalette(); return; }
     if (e.key === "Escape") {
+      if (document.getElementById("menu-sheet") || document.querySelector("details.browse[open]")) { closeOverlays(); return; }
       if (document.getElementById("map-ov")) { closeMap(); return; }
       if (!document.getElementById("shortcuts").hidden) { document.getElementById("shortcuts").hidden = true; return; }
       if (typing) e.target.blur();
@@ -1289,8 +1502,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     if (e.key === "?") { toggleShortcuts(); e.preventDefault(); return; }
     if (e.key === "/") {
       e.preventDefault();
-      if (S.view !== "home") goHome();
-      setTimeout(() => { const i = document.getElementById("home-search"); if (i) i.focus(); }, 0);
+      if (S.view !== "home") { openPalette(); return; }
+      const i = document.getElementById("home-search"); if (i) i.focus();
       return;
     }
     if (S.view !== "case") return;
@@ -1316,17 +1529,54 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   document.addEventListener("click", (e) => {
     const p = document.getElementById("shortcuts");
     if (!p.hidden && !p.contains(e.target) && !(e.target.closest && e.target.closest('[aria-label="Keyboard shortcuts"]'))) p.hidden = true;
-    document.querySelectorAll("details.sources[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+    document.querySelectorAll("details.sources[open], details.browse[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+    const ms = document.getElementById("menu-sheet");
+    if (ms && !ms.contains(e.target) && !(e.target.closest && e.target.closest(".menu-btn"))) closeOverlays();
   });
+
+  // ================= about =================
+  function renderAbout() {
+    const app = document.getElementById("app"); app.replaceChildren();
+    const ext = (href, label, primary) => h("a", { class: "btn" + (primary ? " primary" : ""), href, target: "_blank", rel: "noopener" }, label, icon("ext"));
+    const nQ = bundle.trees.reduce((a, t) => a + Object.values(t.nodes).filter(n => n.type === "question").length, 0);
+    const nAlso = bundle.trees.reduce((a, t) => a + Object.values(t.nodes).reduce((b, n) => b + (n.also_check || []).length, 0), 0);
+    app.append(h("main", { class: "about" },
+      h("section", { style: "display:grid;gap:12px" }, h("h1", {}, "About Triage Trees"),
+        h("p", { style: "font-size:17px" }, "Question-driven investigation playbooks for SOC analysts. Pick the alert, answer yes or no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and copy a closure note written from the path you took.")),
+      h("section", { class: "panel author" }, h("div", { class: "avatar", "aria-hidden": "true" }, "OO"),
+        h("div", {}, h("h2", { style: "margin:0" }, "Oluwatosin Ogunjimi"),
+          h("p", {}, "SOC analyst and cybersecurity writer. Triage Trees turns the questions from his article series into playbooks any analyst can walk."),
+          h("div", { class: "link-row" }, ext(LINKS.linkedin, "LinkedIn", true), ext(LINKS.medium, "Medium"), ext(LINKS.github, "GitHub")))),
+      h("section", {}, h("h2", {}, "Where it came from"),
+        h("p", {}, "The project grew out of ", h("a", { href: LINKS.article, target: "_blank", rel: "noopener" }, "Lessons from the SOC: How Analysts Can Triage Smarter, Tune Better, and Stop Drowning in Alerts"),
+          ". The article's question bank is now structured data, checked against vendor incident response playbooks and MITRE ATT&CK, with sources listed in every playbook.")),
+      h("section", {}, h("h2", {}, "How to use it"),
+        h("ol", {},
+          h("li", {}, "Find the alert: search the library, press ", h("kbd", {}, IS_MAC ? "\u2318K" : "Ctrl K"), " from anywhere, or start with Universal Triage if nothing fits."),
+          h("li", {}, "Fill the case entities once. They go into every query and the note."),
+          h("li", {}, "Answer each step. Wider checks under \u201cAlso check\u201d cover related activity; a yes is flagged before a benign close."),
+          h("li", {}, "At the verdict, tick the actions, add the ticket reference and copy the closure note."))),
+      h("section", {}, h("h2", {}, "What's inside"),
+        h("ul", {},
+          h("li", {}, bundle.trees.length + " playbooks across email, identity, endpoint, network and cloud."),
+          h("li", {}, nQ + " decision questions and " + nAlso + " wider checks."),
+          h("li", {}, "KQL for Microsoft Sentinel and Defender XDR at the step it answers. Test queries in your own workspace before relying on them."))),
+      h("section", {}, h("h2", {}, "Privacy"),
+        h("p", {}, "Case data stays in your browser's local storage and is never sent anywhere. Don't enter data your client's handling rules forbid storing on your workstation.")),
+      h("section", {}, h("h2", {}, "Contribute"),
+        h("p", {}, "Each playbook is one YAML file, validated in CI. Suggest a new use case or improve a question on GitHub."),
+        h("div", { class: "link-row" }, ext(LINKS.github, "Open the repository"), h("button", { class: "btn", type: "button", onclick: goHome }, "Back to the library")))));
+  }
 
   // ================= render =================
   function render() {
     renderBar();
-    if (S.view === "home") renderHome(); else renderCase(false);
+    if (S.view === "home") renderHome(); else if (S.view === "about") renderAbout(); else renderCase(false);
   }
   window.addEventListener("hashchange", () => {
     const id = location.hash.slice(1);
     if (id === "library") { if (S.view !== "home") goHome(); return; }
+    if (id === "about") { if (S.view !== "about") openAbout(); return; }
     if (TREES[id] && id !== S.tree) openTree(id);
   });
   render();

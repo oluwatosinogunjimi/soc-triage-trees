@@ -40,7 +40,7 @@ python tools/build.py          # validates, then writes dist/
 python -m http.server -d dist  # open http://localhost:8000
 ```
 
-`dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`.
+`dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`. Press `Ctrl K` (`⌘K` on Mac) anywhere to jump to a playbook.
 
 Case state (your path, evidence and entity values) stays in your own browser's local storage. Nothing is sent anywhere. Don't paste data into the tool that your client's handling rules forbid storing on your workstation.
 
@@ -64,6 +64,13 @@ Adding or improving a tree means editing one YAML file. See [CONTRIBUTING.md](CO
 ## Disclaimer
 
 These trees are guidance, not a substitute for your client's runbooks, RACI or legal and regulatory obligations. KQL is written against the public Microsoft Sentinel and Defender XDR schemas; table availability depends on the connectors and licences in each environment, so test queries before relying on them.
+
+## Author
+
+Built by Oluwatosin Ogunjimi, SOC analyst and cybersecurity writer.
+
+- LinkedIn: [oluwatosin-ogunjimi](https://www.linkedin.com/in/oluwatosin-ogunjimi/)
+- Medium: [@OluwatosinOgunjimi](https://medium.com/@OluwatosinOgunjimi)
 
 ## Licence
 
