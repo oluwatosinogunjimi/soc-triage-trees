@@ -1,0 +1,183 @@
+id: inbox-rule-forwarding
+title: Suspicious Inbox Rule or Mail Forwarding
+category: email
+summary: >-
+  A new or changed inbox rule, or mailbox forwarding. Attackers use rules to hide
+  replies, steal invoices and forward mail out. Check the rule's traits, then where it was
+  created from, looking back further than feels necessary.
+applies_to:
+  - Suspicious inbox manipulation rule
+  - Suspicious inbox forwarding
+  - New inbox rule created with suspicious name or actions
+  - Mail forwarding to external domain
+mitre: [T1564.008, T1114.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft incident response playbook, Phishing investigation (forwarding and inbox rules)
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing
+  - title: "MITRE ATT&CK T1564.008 Hide Artifacts: Email Hiding Rules"
+    url: https://attack.mitre.org/techniques/T1564/008/
+  - title: "MITRE ATT&CK T1114.003 Email Collection: Email Forwarding Rule"
+    url: https://attack.mitre.org/techniques/T1114/003/
+entities:
+  - { key: user, label: Mailbox owner UPN, example: "jdoe@contoso.com" }
+  - { key: rule_name, label: Rule name, example: ".." }
+  - { key: ip, label: IP the rule was created from, example: "91.92.109.43" }
+start: c-rule
+nodes:
+  c-rule:
+    type: check
+    text: Pull the rule and how it was created.
+    look_for:
+      - Conditions (from, subject or body keywords) and actions (forward, redirect, delete, move, mark as read)
+      - Client used (Outlook desktop logs UpdateInboxRules, OWA and PowerShell log New-InboxRule)
+      - Creator IP, country and user agent
+      - Any other rules or forwarding changes on the same mailbox
+    kql:
+      - title: Rule and forwarding changes for the mailbox (30d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(30d)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Remove-InboxRule", "Set-Mailbox")
+          | project TimeGenerated, Operation, ClientIP, Parameters,
+                    Extra = column_ifexists("OperationProperties", dynamic(null))
+          | order by TimeGenerated asc
+      - title: Rule changes with creator location (30d)
+        platform: xdr
+        query: |
+          CloudAppEvents
+          | where Timestamp > ago(30d)
+          | where ActionType in ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Set-Mailbox")
+          | where tostring(RawEventData.UserId) =~ "{{user}}"
+          | project Timestamp, ActionType, IPAddress, CountryCode, ISP, UserAgent,
+                    Parameters = tostring(RawEventData.Parameters)
+    note: I pulled rule "{{rule_name}}" on the mailbox of {{user}}, created from {{ip}}.
+    next: q-attacker-traits
+
+  q-attacker-traits:
+    type: question
+    text: Does the rule have attacker traits?
+    why: >-
+      Typical BEC rules forward or redirect externally, delete mail or move it to a folder
+      the user never opens (RSS Feeds, RSS Subscriptions, Conversation History, Archive),
+      mark it as read, filter on words like invoice, payment, wire, bank, password, MFA,
+      phish or hacked, and have a meaningless name such as "." or "..".
+    kql:
+      - title: Rules with BEC traits across the tenant (30d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(30d)
+          | where Operation in~ ("New-InboxRule", "Set-InboxRule")
+          | where Parameters has_any ("ForwardTo", "RedirectTo", "ForwardAsAttachmentTo", "DeleteMessage", "MoveToFolder", "MarkAsRead")
+          | where Parameters has_any ("RSS", "Conversation History", "Archive", "invoice", "payment", "wire",
+                                      "bank", "password", "phish", "hacked", "DeleteMessage")
+          | project TimeGenerated, UserId, ClientIP, Operation, Parameters
+    yes: q-creation-source
+    no: o-fp-ordinary-rule
+    notes:
+      yes: Rule "{{rule_name}}" has attacker traits, including hiding, deleting or forwarding mail.
+      no: Rule "{{rule_name}}" is an ordinary organising rule with no hiding, deletion or external forwarding.
+
+  q-creation-source:
+    type: question
+    text: Was the rule created from an IP, ASN and device the user normally uses, through their usual client?
+    why: >-
+      Look back at least 30 days of sign-ins, not just the day of the rule. The sign-in that
+      gave the attacker access often happened days before the rule was created, and a short
+      lookback will make the rule's IP look like the only odd event.
+    kql:
+      - title: Sign-in baseline around the rule (30d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(30d)
+          | where UserPrincipalName =~ "{{user}}" and ResultType == "0"
+          | summarize SignIns = count(), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)
+                    by IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion),
+                       Browser = tostring(DeviceDetail.browser)
+          | extend IsRuleIP = IPAddress == "{{ip}}"
+          | order by FirstSeen asc
+    yes: q-user-confirm
+    no: o-tp-bec
+    unknown: q-user-confirm
+    notes:
+      yes: The rule was created from {{ip}}, which is part of the normal sign-in baseline for {{user}}.
+      no: The rule was created from {{ip}}, which is outside the 30-day sign-in baseline for {{user}}.
+      unknown: I could not tie the rule creation to a known or unknown sign-in with confidence.
+
+  q-user-confirm:
+    type: question
+    text: Does the user confirm they created the rule for a legitimate purpose?
+    yes: q-external-policy
+    no: o-tp-bec
+    unknown: o-inconclusive
+    notes:
+      yes: "{{user}} confirmed creating rule \"{{rule_name}}\" and explained its purpose."
+      no: "{{user}} did not create rule \"{{rule_name}}\"."
+      unknown: I have not yet received confirmation from {{user}} about rule "{{rule_name}}".
+
+  q-external-policy:
+    type: question
+    text: Does the rule forward mail to an external personal address against policy?
+    yes: o-policy-violation
+    no: o-benign-confirmed
+    notes:
+      yes: The rule forwards company mail to an external personal address, which breaches policy.
+      no: The rule keeps mail inside the organisation.
+
+  o-fp-ordinary-rule:
+    type: outcome
+    verdict: false_positive
+    title: Ordinary organising rule
+    anchor: Rule "{{rule_name}}" on the mailbox of {{user}} only organises mail and has none of the traits used to hide or steal it.
+    risk: The risk here is an attacker hiding replies or forwarding mail out; it doesn't apply as the rule neither forwards, deletes nor hides mail.
+    actions: [Close]
+    tuning: Consider narrowing the rule to fire on forwarding, deletion or obscure-folder moves only.
+
+  o-benign-confirmed:
+    type: outcome
+    verdict: benign_positive
+    title: User-created rule, confirmed
+    anchor: "{{user}} created rule \"{{rule_name}}\" from a known location and confirmed its purpose."
+    risk: The risk here is a rule created by an attacker to hide activity; it doesn't apply given the known creation source and the user confirmation.
+    actions: [Close with the user confirmation quoted]
+
+  o-policy-violation:
+    type: outcome
+    verdict: benign_positive
+    title: Forwarding to personal mail, policy violation
+    anchor: "{{user}} created rule \"{{rule_name}}\" to forward company mail to a personal address."
+    risk: The risk here is data leaving the organisation through an unmanaged mailbox; removing the rule closes it.
+    actions:
+      - Remove the forwarding rule per policy and inform the customer
+      - Recommend blocking external auto-forwarding in the outbound spam policy
+
+  o-tp-bec:
+    type: outcome
+    verdict: true_positive
+    title: Malicious rule, mailbox compromised
+    anchor: Rule "{{rule_name}}" was created on the mailbox of {{user}} from {{ip}} by someone other than the user.
+    risk: The risk here is business email compromise, with the attacker hiding replies and intercepting payment conversations; containment is required now.
+    actions:
+      - Remove the rule and any forwarding on the mailbox
+      - Revoke sessions and refresh tokens, then reset the password
+      - Remove attacker MFA methods and OAuth consents, and check for mailbox delegates
+      - Review sent items for fraud emails to contacts and vendors
+      - Search other mailboxes for rules with the same name or from the same IP
+      - Escalate to the customer, including finance if invoices or payments were targeted
+    escalate: true
+    monitor: I will monitor {{user}} for new rules, forwarding changes and sign-ins from {{ip}}.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Awaiting user confirmation
+    anchor: I could not confirm whether {{user}} created rule "{{rule_name}}".
+    risk: The risk here is an attacker hiding mail through the rule, which stays open until the user confirms or the rule is removed.
+    actions: [Ask the user to confirm, Disable the rule as a precaution if it forwards or deletes mail]
+    monitor: I will monitor {{user}} for new rules, forwarding changes and unusual sign-ins until this is resolved.

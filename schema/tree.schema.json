@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oluwatosinogunjimi/soc-triage-trees/schema/tree.schema.json",
+  "title": "Triage tree",
+  "description": "One investigation decision tree for one alert type. See CONTRIBUTING.md for authoring guidance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "category", "summary", "version", "last_reviewed", "authors", "start", "nodes"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "title": { "type": "string", "minLength": 3 },
+    "category": { "enum": ["triage", "email", "identity", "endpoint", "network", "cloud"] },
+    "summary": { "type": "string", "minLength": 10 },
+    "applies_to": {
+      "description": "Example alert names this tree is meant for, used for search.",
+      "type": "array", "items": { "type": "string" }
+    },
+    "mitre": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$" }
+    },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "last_reviewed": { "type": "string", "format": "date" },
+    "authors": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["title", "url"],
+        "properties": { "title": { "type": "string" }, "url": { "type": "string", "pattern": "^https://" } }
+      }
+    },
+    "entities": {
+      "description": "Values the analyst fills in once; referenced as {{key}} in text, notes and KQL.",
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["key", "label"],
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "label": { "type": "string" },
+          "example": { "type": "string" }
+        }
+      }
+    },
+    "start": { "$ref": "#/$defs/nodeId" },
+    "nodes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/nodeId" },
+      "additionalProperties": { "$ref": "#/$defs/node" }
+    }
+  },
+  "$defs": {
+    "nodeId": { "type": "string", "pattern": "^[a-z]+(-[a-z0-9]+)+$" },
+    "kql": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["title", "platform", "query"],
+        "properties": {
+          "title": { "type": "string" },
+          "platform": { "enum": ["sentinel", "xdr", "both"] },
+          "query": { "type": "string", "minLength": 10 }
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "enum": ["question", "choice", "check", "outcome", "link"] } },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "question" } } }, "then": { "$ref": "#/$defs/question" } },
+        { "if": { "properties": { "type": { "const": "choice" } } }, "then": { "$ref": "#/$defs/choice" } },
+        { "if": { "properties": { "type": { "const": "check" } } }, "then": { "$ref": "#/$defs/check" } },
+        { "if": { "properties": { "type": { "const": "outcome" } } }, "then": { "$ref": "#/$defs/outcome" } },
+        { "if": { "properties": { "type": { "const": "link" } } }, "then": { "$ref": "#/$defs/link" } }
+      ]
+    },
+    "question": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "text", "yes", "no", "notes"],
+      "properties": {
+        "type": { "const": "question" },
+        "text": { "type": "string" },
+        "why": { "type": "string" },
+        "kql": { "$ref": "#/$defs/kql" },
+        "yes": { "$ref": "#/$defs/nodeId" },
+        "no": { "$ref": "#/$defs/nodeId" },
+        "unknown": { "$ref": "#/$defs/nodeId" },
+        "notes": {
+          "description": "Finding sentence written into the closure note for each answer.",
+          "type": "object", "additionalProperties": false, "required": ["yes", "no"],
+          "properties": { "yes": { "type": "string" }, "no": { "type": "string" }, "unknown": { "type": "string" } }
+        }
+      }
+    },
+    "choice": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "text", "options"],
+      "properties": {
+        "type": { "const": "choice" },
+        "text": { "type": "string" },
+        "why": { "type": "string" },
+        "kql": { "$ref": "#/$defs/kql" },
+        "options": {
+          "type": "array", "minItems": 2,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["label", "next"],
+            "properties": { "label": { "type": "string" }, "next": { "$ref": "#/$defs/nodeId" }, "note": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "text", "next", "note"],
+      "properties": {
+        "type": { "const": "check" },
+        "text": { "type": "string" },
+        "why": { "type": "string" },
+        "look_for": { "type": "array", "items": { "type": "string" } },
+        "kql": { "$ref": "#/$defs/kql" },
+        "next": { "$ref": "#/$defs/nodeId" },
+        "note": { "type": "string" }
+      }
+    },
+    "outcome": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "verdict", "title", "anchor", "risk", "actions"],
+      "properties": {
+        "type": { "const": "outcome" },
+        "verdict": { "enum": ["false_positive", "benign_positive", "true_positive", "inconclusive"] },
+        "title": { "type": "string" },
+        "anchor": { "description": "Sentence after the verdict that ties it to the evidence.", "type": "string" },
+        "risk": { "description": "Risk beat: the threat vector and why it does or does not apply.", "type": "string" },
+        "actions": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "monitor": { "type": "string" },
+        "escalate": { "type": "boolean" },
+        "tuning": { "description": "Tuning suggestion for recurring benign/false alerts.", "type": "string" }
+      }
+    },
+    "link": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "tree", "text"],
+      "properties": {
+        "type": { "const": "link" },
+        "text": { "type": "string" },
+        "tree": { "type": "string" },
+        "node": { "$ref": "#/$defs/nodeId" },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

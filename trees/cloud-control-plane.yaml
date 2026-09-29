@@ -1,0 +1,197 @@
+id: cloud-control-plane
+title: Cloud Control-Plane Anomaly (Azure / AWS)
+category: cloud
+summary: >-
+  An unusual API action in Azure or AWS: new region, logging disabled, new keys, role
+  changes, public exposure. Check change records and the principal's history first,
+  then how dangerous the action is and where the call came from.
+applies_to:
+  - Suspicious Azure Resource Manager operation
+  - Unusual AWS API call (GuardDuty)
+  - CloudTrail logging disabled
+  - New access key created for IAM user
+  - Unusual instance type launched
+mitre: [T1078.004, T1562.008, T1098.001, T1496, T1578]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "Lessons from the SOC (Cloud/SaaS Alerts section)"
+    url: https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7
+  - title: "MITRE ATT&CK T1562.008 Impair Defenses: Disable or Modify Cloud Logs"
+    url: https://attack.mitre.org/techniques/T1562/008/
+  - title: "MITRE ATT&CK T1496 Resource Hijacking"
+    url: https://attack.mitre.org/techniques/T1496/
+entities:
+  - { key: principal, label: "Principal (UPN, role ARN or access key ID)", example: "arn:aws:iam::111122223333:user/deploy" }
+  - { key: ip, label: Source IP of the call, example: "5.188.62.140" }
+start: c-action
+nodes:
+  c-action:
+    type: check
+    text: Establish who did what, to which resource, from where.
+    look_for:
+      - Human user, service principal, assumed role or long-lived access key
+      - Exact operation or event name and whether it succeeded
+      - Target resource, subscription or account, and region
+      - Source IP, user agent (console, CLI, SDK, Terraform)
+    kql:
+      - title: Azure activity by the principal (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where Caller =~ "{{principal}}"
+          | project TimeGenerated, OperationNameValue, ActivityStatusValue, CallerIpAddress,
+                    ResourceProviderValue, ResourceGroup, _ResourceId
+          | order by TimeGenerated asc
+      - title: AWS CloudTrail activity by the principal (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where UserIdentityArn has "{{principal}}" or UserIdentityAccessKeyId == "{{principal}}"
+          | project TimeGenerated, EventName, EventSource, AWSRegion, SourceIpAddress, UserAgent, ErrorCode,
+                    UserIdentityType, UserIdentityArn, UserIdentityAccessKeyId, RequestParameters
+          | order by TimeGenerated asc
+    note: I reviewed the control-plane activity by {{principal}} from {{ip}}.
+    next: q-change-record
+
+  q-change-record:
+    type: question
+    text: Is the action covered by an approved change, a deployment pipeline run or a known automation identity?
+    yes: o-fp-change
+    no: q-normal-for-principal
+    unknown: q-normal-for-principal
+    notes:
+      yes: The action matches an approved change or pipeline run for {{principal}}.
+      no: No change record or pipeline run covers the action by {{principal}}.
+      unknown: I could not find a change record for the action by {{principal}}.
+
+  q-normal-for-principal:
+    type: question
+    text: Has this principal performed this kind of operation, from this IP or region, in the last 30 days?
+    kql:
+      - title: Azure operation history for the principal (30d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated between (ago(30d) .. ago(1d))
+          | where Caller =~ "{{principal}}"
+          | summarize Count = count(), IPs = make_set(CallerIpAddress, 10), Last = max(TimeGenerated) by OperationNameValue
+          | order by Count desc
+      - title: AWS event history for the principal (30d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated between (ago(30d) .. ago(1d))
+          | where UserIdentityArn has "{{principal}}" or UserIdentityAccessKeyId == "{{principal}}"
+          | summarize Count = count(), IPs = make_set(SourceIpAddress, 10), Regions = make_set(AWSRegion), Last = max(TimeGenerated) by EventName
+          | order by Count desc
+    yes: q-owner-confirm
+    no: q-high-impact
+    notes:
+      yes: "{{principal}} regularly performs this operation from the same network and region."
+      no: The operation, source or region is new for {{principal}} compared with the last 30 days.
+
+  q-high-impact:
+    type: question
+    text: Is the action high impact?
+    why: >-
+      High impact: logging or monitoring disabled (StopLogging, DeleteTrail, diagnostic
+      settings deleted, GuardDuty or Defender disabled), new credentials or keys, new role
+      assignments or policies, security groups opened to 0.0.0.0/0, snapshots or buckets
+      made public or shared, compute launched in unused regions or GPU sizes, secrets read.
+    kql:
+      - title: High-impact AWS events by the principal (7d)
+        platform: sentinel
+        query: |
+          AWSCloudTrail
+          | where TimeGenerated > ago(7d)
+          | where UserIdentityArn has "{{principal}}" or UserIdentityAccessKeyId == "{{principal}}"
+          | where EventName in ("StopLogging", "DeleteTrail", "UpdateTrail", "PutEventSelectors", "DeleteFlowLogs",
+                                "DeleteDetector", "CreateAccessKey", "CreateLoginProfile", "UpdateLoginProfile",
+                                "CreateUser", "AttachUserPolicy", "AttachRolePolicy", "PutUserPolicy", "PutRolePolicy",
+                                "AuthorizeSecurityGroupIngress", "ModifySnapshotAttribute", "ModifyDBSnapshotAttribute",
+                                "PutBucketPolicy", "PutBucketAcl", "DeleteBucketPolicy", "RunInstances",
+                                "GetSecretValue", "ScheduleKeyDeletion", "DisableKey")
+          | project TimeGenerated, EventName, AWSRegion, SourceIpAddress, UserAgent, ErrorCode, RequestParameters
+      - title: High-impact Azure operations by the principal (7d)
+        platform: sentinel
+        query: |
+          AzureActivity
+          | where TimeGenerated > ago(7d)
+          | where Caller =~ "{{principal}}"
+          | where OperationNameValue has_any ("roleAssignments/write", "diagnosticSettings/delete",
+                                             "securityRules/write", "listKeys/action", "snapshots/beginGetAccess",
+                                             "policyAssignments/delete", "virtualMachines/write", "vaults/accessPolicies/write")
+          | project TimeGenerated, OperationNameValue, ActivityStatusValue, CallerIpAddress, _ResourceId
+    yes: q-source
+    no: q-owner-confirm
+    notes:
+      yes: The action by {{principal}} is high impact, affecting logging, credentials, permissions or exposure.
+      no: The action by {{principal}} is low impact.
+
+  q-source:
+    type: question
+    text: Did the call come from an unexpected source (unfamiliar IP, ASN or country, TOR or VPS, unusual user agent, key used outside its workload)?
+    yes: o-tp-cloud
+    no: q-owner-confirm
+    unknown: q-owner-confirm
+    notes:
+      yes: The call came from {{ip}}, which is outside the expected sources for {{principal}}.
+      no: The call came from {{ip}}, an expected source for {{principal}}.
+      unknown: I could not establish whether {{ip}} is an expected source for {{principal}}.
+
+  q-owner-confirm:
+    type: question
+    text: Does the principal's owner or the cloud team confirm the action was intended?
+    yes: o-benign-confirmed
+    no: o-tp-cloud
+    unknown: o-inconclusive
+    notes:
+      yes: The owner of {{principal}} confirmed the action was intended.
+      no: The owner of {{principal}} did not recognise the action.
+      unknown: I have not yet received confirmation from the owner of {{principal}}.
+
+  o-fp-change:
+    type: outcome
+    verdict: benign_positive
+    title: Approved change
+    anchor: The action by {{principal}} is covered by an approved change or pipeline run.
+    risk: The risk here is unauthorised change to cloud resources; it doesn't apply given the approved change record.
+    actions: [Close referencing the change record]
+    tuning: Exclude the pipeline identity for this operation, scoped to its resources.
+
+  o-benign-confirmed:
+    type: outcome
+    verdict: benign_positive
+    title: Owner confirmed
+    anchor: The owner of {{principal}} confirmed the action from {{ip}} was intended.
+    risk: The risk here is misuse of cloud credentials; it doesn't apply given the owner confirmation and the expected source.
+    actions: [Close with the confirmation quoted, Recommend raising change records for similar actions in future]
+
+  o-tp-cloud:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised cloud activity
+    anchor: "{{principal}} performed an unauthorised action from {{ip}}."
+    risk: The risk here is persistence, data exposure or resource abuse through compromised cloud credentials; containment is required now.
+    actions:
+      - Disable or rotate the access keys, or revoke the user's sessions
+      - Remove any keys, users, role assignments or policies the attacker created
+      - Revert security-impacting changes (re-enable logging, close exposed rules)
+      - Snapshot evidence, then stop unauthorised resources
+      - Review all activity by {{principal}} and from {{ip}} in the surrounding 24 hours
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for further activity by {{principal}}, from {{ip}}, and for new credentials created in the account.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Awaiting owner confirmation
+    anchor: I could not confirm whether the action by {{principal}} from {{ip}} was authorised.
+    risk: The risk here is misuse of the principal's credentials, which stays open until the owner confirms.
+    actions: [Chase the owner or cloud team, Consider rotating keys as a precaution for high-impact actions]
+    monitor: I will monitor {{principal}} for further unusual operations until this is resolved.

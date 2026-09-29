@@ -1,0 +1,164 @@
+id: universal-triage
+title: Universal Triage Flow
+category: triage
+summary: >-
+  Start here for any alert. Understand what fired, route to a use-case tree when one
+  exists, and otherwise bucket the alert as benign, false positive, true positive or
+  needs more work.
+applies_to: [Any alert, Unfamiliar detection, Custom analytics rule]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "Lessons from the SOC: How Analysts Can Triage Smarter (Oluwatosin Ogunjimi)"
+    url: https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7
+  - title: NIST SP 800-61r3 Incident Response Recommendations (CSF 2.0 Community Profile)
+    url: https://csrc.nist.gov/pubs/sp/800/61/r3/final
+entities:
+  - { key: alert, label: Alert / rule name, example: "Suspicious PowerShell command line" }
+  - { key: entity, label: "Primary entity (user, host, IP)", example: "jdoe@contoso.com" }
+start: c-context
+nodes:
+  c-context:
+    type: check
+    text: Understand what fired before touching any data.
+    why: >-
+      The same alert name can mean a known bad hash, a behaviour pattern or a very broad
+      rule. Each leads to a different investigation, so read the detection logic first.
+    look_for:
+      - The detection logic or analytics rule query, and which fields matched
+      - The primary entity and its role (privileged account, server, crown-jewel asset)
+      - Severity, source product and whether the product already took an action
+      - Any client-specific runbook, RACI or known exclusion for this rule
+    note: I reviewed the detection logic for {{alert}} and identified {{entity}} as the primary entity.
+    next: c-bigger-picture
+
+  c-bigger-picture:
+    type: check
+    text: Check whether this alert is alone or part of something bigger.
+    why: >-
+      Tunnel vision on one alert is how campaigns get missed. Five low alerts on one
+      entity can matter more than one high alert on its own.
+    look_for:
+      - Other alerts for the same entity in the last 48 to 72 hours
+      - The same alert firing on other users or hosts right now
+      - How often this rule has fired and been closed as benign recently
+    kql:
+      - title: Other alerts for the same entity (72h)
+        platform: sentinel
+        query: |
+          let entity = "{{entity}}";
+          SecurityAlert
+          | where TimeGenerated > ago(72h)
+          | where Entities has entity or CompromisedEntity has entity
+          | summarize Alerts = count(), Names = make_set(AlertName, 20), Severities = make_set(AlertSeverity) by ProductName
+      - title: How often this rule fires and on how many entities (30d)
+        platform: sentinel
+        query: |
+          SecurityAlert
+          | where TimeGenerated > ago(30d)
+          | where AlertName == "{{alert}}"
+          | summarize Alerts = count(), Entities = dcount(CompromisedEntity), LastFired = max(TimeGenerated) by bin(TimeGenerated, 1d)
+          | order by TimeGenerated desc
+    note: I checked for related alerts on {{entity}} and for recent firings of the same rule.
+    next: ch-route
+
+  ch-route:
+    type: choice
+    text: Which alert type is this?
+    why: A dedicated tree asks the questions that matter for that alert type. Use the generic path only if none fits.
+    options:
+      - { label: "Email: phishing or suspicious email", next: l-phishing }
+      - { label: "Identity: unfamiliar or impossible-travel sign-in", next: l-signin }
+      - { label: "Identity: password spray or brute force", next: l-spray }
+      - { label: "Identity: token theft or AiTM", next: l-aitm }
+      - { label: "Identity: OAuth app consent", next: l-oauth }
+      - { label: "Mailbox: inbox rule or forwarding", next: l-inbox }
+      - { label: "Endpoint: malware or EDR detection", next: l-edr }
+      - { label: "Endpoint: suspicious PowerShell or LOLBin", next: l-powershell }
+      - { label: "Network: IDS, firewall or network anomaly", next: l-network }
+      - { label: "Cloud: Azure or AWS control-plane action", next: l-cloud }
+      - { label: "None of these: use the generic flow", next: q-obviously-benign }
+
+  l-phishing: { type: link, text: Continue in the phishing tree, tree: phishing-email }
+  l-signin: { type: link, text: Continue in the sign-in tree, tree: atypical-signin }
+  l-spray: { type: link, text: Continue in the password spray tree, tree: password-spray }
+  l-aitm: { type: link, text: Continue in the token theft tree, tree: aitm-token-theft }
+  l-oauth: { type: link, text: Continue in the OAuth consent tree, tree: oauth-consent-grant }
+  l-inbox: { type: link, text: Continue in the inbox rule tree, tree: inbox-rule-forwarding }
+  l-edr: { type: link, text: Continue in the EDR tree, tree: edr-malware-detection }
+  l-powershell: { type: link, text: Continue in the PowerShell tree, tree: suspicious-powershell }
+  l-network: { type: link, text: Continue in the network tree, tree: network-ids-alert }
+  l-cloud: { type: link, text: Continue in the cloud tree, tree: cloud-control-plane }
+
+  q-obviously-benign:
+    type: question
+    text: Does the activity match documented expected behaviour (change ticket, known automation, approved tool, confirmed by the owner)?
+    why: >-
+      Benign true positives are real detections of real activity that is allowed. They are
+      not errors in the rule, and they are the best candidates for a scoped exclusion.
+    yes: o-benign
+    no: q-malicious-signs
+    unknown: q-malicious-signs
+    notes:
+      yes: I matched the activity to documented expected behaviour for {{entity}}.
+      no: I found no change record, automation or owner confirmation that explains the activity.
+      unknown: I could not yet confirm whether the activity is expected for {{entity}}.
+
+  q-malicious-signs:
+    type: question
+    text: Are there signs of malicious activity (IoC match, known-bad behaviour, corroborating alerts)?
+    yes: o-true-positive
+    no: q-detection-error
+    unknown: q-detection-error
+    notes:
+      yes: I found malicious indicators tied to {{entity}}.
+      no: I found no IoC matches or malicious behaviour tied to {{entity}}.
+      unknown: Threat intelligence and behaviour checks for {{entity}} were not conclusive.
+
+  q-detection-error:
+    type: question
+    text: Did the rule misfire (wrong field matched, parsing error, test data, logic too broad for this environment)?
+    why: A false positive is a detection error. Say what was wrong with the logic so it can be fixed.
+    yes: o-false-positive
+    no: o-inconclusive
+    notes:
+      yes: The detection matched on data that does not represent the behaviour it was written to catch.
+      no: The detection logic matched as designed, so the activity still needs an explanation.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Benign true positive
+    anchor: The activity that triggered {{alert}} is expected for {{entity}} and was confirmed through the evidence below.
+    risk: The risk here is malicious activity hiding behind an expected pattern; it doesn't apply given the documented source of this activity.
+    actions: [Close with the confirmation source referenced, Record the pattern for tuning if it recurs]
+    tuning: Propose a narrowly scoped exclusion (entity plus behaviour), never a blanket suppression of the rule.
+
+  o-false-positive:
+    type: outcome
+    verdict: false_positive
+    title: False positive
+    anchor: '{{alert}} matched on data that does not represent the behaviour it was written to detect.'
+    risk: The risk here is a real event being masked by noise from this rule; it doesn't apply to this instance given the logic error identified.
+    actions: [Close and raise a tuning request with the logic issue described]
+    tuning: Fix the logic at the source (field, threshold or parser) and back-test against the last 30 days.
+
+  o-true-positive:
+    type: outcome
+    verdict: true_positive
+    title: True positive
+    anchor: '{{alert}} reflects malicious activity involving {{entity}}.'
+    risk: The risk here is follow-on compromise from {{entity}}; containment and escalation are required.
+    actions: [Contain per client RACI, Raise an incident ticket, Escalate to the customer or IR]
+    escalate: true
+    monitor: I will monitor {{entity}} for further activity while the incident is worked.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Inconclusive, needs more data
+    anchor: I could not establish whether the activity behind {{alert}} is authorised for {{entity}}.
+    risk: The risk here is unauthorised activity on {{entity}} remaining open while the gap below is unresolved.
+    actions: [Pull more logs or ask the owner, Escalate to a senior analyst if it cannot be resolved within SLA]
+    monitor: I will monitor {{entity}} for recurrence or related alerts until this is resolved.

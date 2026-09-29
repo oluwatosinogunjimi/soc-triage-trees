@@ -1,0 +1,685 @@
+<title>Triage Trees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: operator console. Library rail left, one investigation card centre, case file right. */
+:root {
+  --bg: #eef0ec;
+  --surface: #ffffff;
+  --surface-2: #f6f7f4;
+  --ink: #1a2026;
+  --muted: #5a646d;
+  --line: #d6dbd4;
+  --accent: #1f47c7;
+  --accent-soft: #e4e9fb;
+  --code-bg: #f2f4f7;
+  --fp: #56657a;      --fp-soft: #e8ecf1;
+  --btp: #1f7a4d;     --btp-soft: #e2f2e9;
+  --tp: #b42323;      --tp-soft: #fbe6e4;
+  --inc: #9a6200;     --inc-soft: #fbf0d9;
+  --focus: #1f47c7;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121519; --surface: #1a1f25; --surface-2: #20262d; --ink: #e6e9ec; --muted: #9aa4ae;
+    --line: #2d353e; --accent: #8aa6ff; --accent-soft: #232d4a; --code-bg: #14181d;
+    --fp: #a3b1c4; --fp-soft: #262d37; --btp: #5fcf93; --btp-soft: #1b3127;
+    --tp: #ff8a80; --tp-soft: #3a2020; --inc: #f0b64a; --inc-soft: #3a2f17; --focus: #8aa6ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121519; --surface: #1a1f25; --surface-2: #20262d; --ink: #e6e9ec; --muted: #9aa4ae;
+  --line: #2d353e; --accent: #8aa6ff; --accent-soft: #232d4a; --code-bg: #14181d;
+  --fp: #a3b1c4; --fp-soft: #262d37; --btp: #5fcf93; --btp-soft: #1b3127;
+  --tp: #ff8a80; --tp-soft: #3a2020; --inc: #f0b64a; --inc-soft: #3a2f17; --focus: #8aa6ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+::placeholder { color: var(--muted); opacity: .6; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.55; margin: 0; }
+button, input, textarea, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+code, pre, .mono { font-family: var(--font-mono); }
+
+.topbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-block: 12px; padding-inline: 16px;
+  border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .01em; }
+.brand small { font-family: var(--font-body); font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 8px; }
+.topbar .spacer { flex: 1; }
+
+.app {
+  display: grid; gap: 16px;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  padding-block: 16px; padding-inline: 16px;
+  max-width: 1500px; margin: 0 auto; align-items: start;
+}
+@media (max-width: 1150px) { .app { grid-template-columns: 240px minmax(0, 1fr); } .case { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .app { grid-template-columns: minmax(0, 1fr); } .library { order: 2; } .case { order: 1; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.panel-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+.panel-head h2 { font-size: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.panel-body { padding: 14px; display: grid; gap: 12px; }
+
+/* Library */
+.search { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.cat { display: grid; gap: 2px; }
+.cat-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 6px 0 2px; }
+.tree-btn {
+  display: grid; gap: 1px; text-align: left; width: 100%; padding: 7px 9px; border: 0; border-radius: 4px;
+  background: transparent; cursor: pointer;
+}
+.tree-btn:hover { background: var(--surface-2); }
+.tree-btn[aria-current="true"] { background: var(--accent-soft); }
+.tree-btn .t { font-weight: 500; font-size: 14px; }
+.tree-btn .m { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+
+/* Main */
+.main { display: grid; gap: 16px; min-width: 0; }
+.tree-head { padding: 16px 18px; display: grid; gap: 8px; }
+.tree-head h1 { font-size: 26px; font-weight: 700; }
+.tree-head p { margin: 0; color: var(--muted); max-width: 72ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--line); font-family: var(--font-mono); font-size: 12px; color: var(--ink);
+  background: var(--surface-2); text-decoration: none;
+}
+a.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding-inline: 12px; overflow-x: auto; }
+.tab {
+  border: 0; background: none; padding: 10px 12px; cursor: pointer; font-weight: 500; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+.view { padding: 18px; display: grid; gap: 16px; min-width: 0; }
+
+.node-kind { font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.node-kind .step { color: var(--accent); }
+.node-text { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.3; max-width: 60ch; }
+.why { border-left: 3px solid var(--line); padding: 2px 0 2px 12px; color: var(--muted); max-width: 72ch; margin: 0; }
+.look-for { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 72ch; }
+
+details.kql { border: 1px solid var(--line); border-radius: var(--radius); background: var(--code-bg); min-width: 0; }
+details.kql > summary { cursor: pointer; padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; list-style: none; }
+details.kql > summary::-webkit-details-marker { display: none; }
+details.kql > summary::before { content: "\25B8"; color: var(--muted); transition: transform .15s; }
+details.kql[open] > summary::before { transform: rotate(90deg); }
+.plat { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 3px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+.kql-title { font-weight: 500; font-size: 14px; flex: 1; min-width: 0; }
+pre.code { margin: 0; padding: 12px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; border-top: 1px solid var(--line); white-space: pre; }
+pre.code .ph-empty { color: var(--inc); font-weight: 500; }
+pre.code .ph-set { color: var(--accent); }
+
+.evidence label { font-weight: 500; font-size: 14px; display: block; margin-bottom: 4px; }
+.evidence .hint { font-size: 12px; color: var(--muted); }
+textarea, input.field {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2);
+  padding: 8px 10px; min-width: 0;
+}
+textarea { resize: vertical; min-height: 64px; }
+
+.answers { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); padding: 9px 16px; border-radius: var(--radius);
+  cursor: pointer; font-weight: 500;
+}
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.yes:hover { border-color: var(--btp); color: var(--btp); }
+.btn.no:hover { border-color: var(--tp); color: var(--tp); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); }
+.option-list { display: grid; gap: 6px; }
+.option-list .btn { text-align: left; }
+
+.verdict {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+}
+.v-false_positive { color: var(--fp); background: var(--fp-soft); }
+.v-benign_positive { color: var(--btp); background: var(--btp-soft); }
+.v-true_positive { color: var(--tp); background: var(--tp-soft); }
+.v-inconclusive { color: var(--inc); background: var(--inc-soft); }
+.outcome-card { border-left: 4px solid var(--line); padding-left: 14px; display: grid; gap: 10px; }
+.outcome-card.v-bar-false_positive { border-color: var(--fp); }
+.outcome-card.v-bar-benign_positive { border-color: var(--btp); }
+.outcome-card.v-bar-true_positive { border-color: var(--tp); }
+.outcome-card.v-bar-inconclusive { border-color: var(--inc); }
+.outcome-card h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-family: var(--font-body); font-weight: 600; }
+.outcome-card ol, .outcome-card ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.outcome-card p { margin: 0; max-width: 72ch; }
+.flag { font-size: 13px; padding: 8px 12px; border-radius: var(--radius); background: var(--tp-soft); color: var(--tp); font-weight: 500; }
+
+/* Case file */
+.case { display: grid; gap: 16px; min-width: 0; }
+.entity-row { display: grid; gap: 3px; }
+.entity-row label { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.entity-row label code { color: var(--muted); }
+.entity-row input { font-family: var(--font-mono); font-size: 13px; padding: 6px 8px; }
+.entity-row input:placeholder-shown { border-style: dashed; }
+
+.trail { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: s; }
+.trail li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+.trail li:last-child { border-bottom: 0; }
+.trail .n { font-family: var(--font-mono); color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.trail button { all: unset; cursor: pointer; display: grid; gap: 1px; min-width: 0; }
+.trail button:hover .q { color: var(--accent); }
+.trail button:focus-visible { outline: 2px solid var(--focus); border-radius: 3px; }
+.trail .q { overflow-wrap: anywhere; }
+.trail .a { font-family: var(--font-mono); font-size: 12px; }
+.a-yes { color: var(--btp); } .a-no { color: var(--tp); } .a-unknown { color: var(--inc); } .a-other { color: var(--accent); }
+.empty { color: var(--muted); font-size: 13px; margin: 0; }
+
+/* Map */
+.map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); padding: 12px; }
+.map-wrap svg { height: auto; display: block; margin: 0 auto; }
+.map-wrap.fit svg { max-width: 100% !important; }
+.map-wrap:not(.fit) svg { max-width: none !important; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); align-items: center; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--line); }
+
+/* Note */
+.note-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.note-controls label { font-size: 12px; color: var(--muted); display: grid; gap: 3px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; }
+.toggles label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+#note-out { font-family: var(--font-body); font-size: 14px; min-height: 360px; line-height: 1.6; background: var(--surface); }
+.warn { font-size: 13px; padding: 8px 12px; border-radius: var(--radius); background: var(--inc-soft); color: var(--inc); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toast { font-size: 13px; color: var(--btp); }
+.banner { padding: 10px 14px; background: var(--accent-soft); border-radius: var(--radius); font-size: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+footer.foot { padding-block: 8px 24px; padding-inline: 16px; text-align: center; color: var(--muted); font-size: 12px; }
+footer.foot a { color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="topbar">
+  <div class="brand">Triage Trees <small>Question-driven SOC investigation playbooks</small></div>
+  <div class="spacer"></div>
+  <button class="btn small" id="new-case" type="button">New case</button>
+</header>
+
+<div class="app">
+  <nav class="panel library" aria-label="Playbook library">
+    <div class="panel-head"><h2>Playbooks</h2></div>
+    <div class="panel-body">
+      <input class="search" id="search" type="search" placeholder="Search alert name, MITRE ID..." aria-label="Search playbooks">
+      <div id="lib"></div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div id="banner" hidden></div>
+    <section class="panel">
+      <div class="tree-head" id="tree-head"></div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-walk" aria-selected="true" type="button">Walkthrough</button>
+        <button class="tab" role="tab" id="tab-map" aria-selected="false" type="button">Map</button>
+        <button class="tab" role="tab" id="tab-note" aria-selected="false" type="button">Closure note</button>
+      </div>
+      <div class="view" id="view-walk" role="tabpanel"></div>
+      <div class="view" id="view-map" role="tabpanel" hidden></div>
+      <div class="view" id="view-note" role="tabpanel" hidden></div>
+    </section>
+  </main>
+
+  <aside class="case">
+    <section class="panel">
+      <div class="panel-head"><h2>Case entities</h2></div>
+      <div class="panel-body" id="entities"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Investigation path</h2></div>
+      <div class="panel-body"><ol class="trail" id="trail"></ol></div>
+    </section>
+  </aside>
+</div>
+<footer class="foot">Trees are YAML in the repository and validated in CI. Edit a tree, open a pull request, and the site rebuilds.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+const EMBEDDED = /*__TREE_DATA__*/null;
+
+(async function () {
+  "use strict";
+
+  // ---------- data ----------
+  let bundle = EMBEDDED;
+  if (!bundle) {
+    try { bundle = await (await fetch("trees.json")).json(); }
+    catch (e) { document.getElementById("view-walk").textContent = "Could not load trees.json. Run python tools/build.py first."; return; }
+  }
+  const TREES = {};
+  bundle.trees.forEach(t => { TREES[t.id] = t; });
+  const CATS = { triage: "Start here", email: "Email", identity: "Identity", endpoint: "Endpoint", network: "Network", cloud: "Cloud" };
+  const VERDICT_LABEL = { false_positive: "False positive", benign_positive: "Benign true positive", true_positive: "True positive", inconclusive: "Inconclusive" };
+  const VERDICT_OPENER = {
+    false_positive: "This alert closes as a false positive.",
+    benign_positive: "This alert closes as a benign true positive.",
+    true_positive: "This alert is a true positive.",
+    inconclusive: "This alert closes as inconclusive."
+  };
+
+  // ---------- state ----------
+  const STORE_KEY = "triage-trees-case-v1";
+  const blank = () => ({ tree: bundle.trees[0].id, node: null, path: [], evidence: {}, entities: {}, ticket: "", signoff: "", incSteps: true, incActions: true });
+  let S = blank();
+  let previous = null;
+  try { const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); if (saved && TREES[saved.tree]) S = Object.assign(blank(), saved); } catch (e) {}
+  const hash = (location.hash || "").slice(1);
+  if (hash && TREES[hash] && hash !== S.tree && S.path.length === 0) { S.tree = hash; S.node = null; }
+  if (!S.node) S.node = TREES[S.tree].start;
+  const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} };
+
+  // ---------- helpers ----------
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+  const node = (tid, nid) => TREES[tid].nodes[nid];
+  const key = (tid, nid) => tid + ":" + nid;
+
+  function entityDefs() {
+    // Entities of every tree on the path, current tree first, de-duplicated by key.
+    const ids = [S.tree, ...S.path.map(p => p.tree).reverse()];
+    const seen = new Set(); const out = [];
+    ids.forEach(tid => (TREES[tid].entities || []).forEach(e => { if (!seen.has(e.key)) { seen.add(e.key); out.push(e); } }));
+    return out;
+  }
+  function labelFor(k) {
+    for (const t of bundle.trees) { const e = (t.entities || []).find(x => x.key === k); if (e) return e.label; }
+    return k;
+  }
+  function fill(text) {
+    return String(text || "").replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, k) => (S.entities[k] || "").trim() || "[" + labelFor(k) + "]");
+  }
+  function missingIn(text, bag) {
+    String(text || "").replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, k) => { if (!(S.entities[k] || "").trim()) bag.add(k); return ""; });
+  }
+  function codeWithPlaceholders(q) {
+    const pre = h("pre", { class: "code" });
+    const parts = q.split(/(\{\{\s*[a-z][a-z0-9_]*\s*\}\})/g);
+    parts.forEach(p => {
+      const m = p.match(/^\{\{\s*([a-z][a-z0-9_]*)\s*\}\}$/);
+      if (!m) { pre.append(p); return; }
+      const v = (S.entities[m[1]] || "").trim();
+      pre.append(h("span", { class: v ? "ph-set" : "ph-empty", title: labelFor(m[1]) }, v || "<" + m[1] + ">"));
+    });
+    return pre;
+  }
+  async function copy(text, btn) {
+    const old = btn.textContent;
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+    catch (e) { btn.textContent = "Select and copy"; }
+    setTimeout(() => { btn.textContent = old; }, 1400);
+  }
+  function answerLabel(step) {
+    if (step.answer === "yes") return "Yes"; if (step.answer === "no") return "No"; if (step.answer === "unknown") return "Unknown";
+    if (step.answer === "next") return "Done"; if (step.answer === "link") return "Continued"; return step.label || step.answer;
+  }
+
+  // ---------- navigation ----------
+  function go(answer, target, label) {
+    S.path.push({ tree: S.tree, node: S.node, answer, label: label || null });
+    S.node = target; save(); render();
+    document.getElementById("view-walk").scrollIntoView({ block: "nearest" });
+  }
+  function follow(link) {
+    S.path.push({ tree: S.tree, node: S.node, answer: "link", label: TREES[link.tree].title });
+    S.tree = link.tree; S.node = link.node || TREES[link.tree].start; save(); render();
+  }
+  function rewind(i) {
+    const step = S.path[i];
+    S.path = S.path.slice(0, i); S.tree = step.tree; S.node = step.node; save(); render();
+  }
+  function startTree(tid) {
+    if (S.path.length) previous = JSON.parse(JSON.stringify(S));
+    const keep = { entities: S.entities, ticket: "", signoff: S.signoff, incSteps: S.incSteps, incActions: S.incActions };
+    S = Object.assign(blank(), keep, { tree: tid, node: TREES[tid].start, evidence: {} });
+    try { history.replaceState(null, "", "#" + tid); } catch (e) {}
+    save(); render(); showBanner();
+  }
+  function showBanner() {
+    const b = document.getElementById("banner");
+    b.replaceChildren();
+    if (!previous) { b.hidden = true; return; }
+    b.className = "banner"; b.hidden = false;
+    b.append(h("span", {}, "Started a new case. Your previous path in " + TREES[previous.tree].title + " was set aside."),
+      h("button", { class: "btn small", type: "button", onclick: () => { S = previous; previous = null; save(); render(); showBanner(); } }, "Restore previous case"));
+  }
+
+  // ---------- library ----------
+  function renderLibrary() {
+    const q = document.getElementById("search").value.trim().toLowerCase();
+    const lib = document.getElementById("lib"); lib.replaceChildren();
+    Object.keys(CATS).forEach(cat => {
+      const items = bundle.trees.filter(t => t.category === cat).filter(t => {
+        if (!q) return true;
+        const hay = [t.title, t.summary, (t.applies_to || []).join(" "), (t.mitre || []).join(" "), t.id].join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+      if (!items.length) return;
+      const box = h("div", { class: "cat" }, h("div", { class: "cat-label" }, CATS[cat]));
+      items.forEach(t => box.append(h("button", {
+        class: "tree-btn", type: "button", "aria-current": String(t.id === S.tree),
+        onclick: () => startTree(t.id)
+      }, h("span", { class: "t" }, t.title), h("span", { class: "m" }, Object.keys(t.nodes).length + " nodes" + (t.mitre && t.mitre.length ? " · " + t.mitre.slice(0, 2).join(" ") : "")))));
+      lib.append(box);
+    });
+    if (!lib.children.length) lib.append(h("p", { class: "empty" }, "No playbook matches that search."));
+  }
+
+  // ---------- header ----------
+  function renderHead() {
+    const t = TREES[S.tree];
+    const head = document.getElementById("tree-head"); head.replaceChildren();
+    const meta = h("div", { class: "meta" });
+    (t.mitre || []).forEach(id => meta.append(h("a", { class: "chip", href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id)));
+    meta.append(h("span", {}, "v" + t.version + " · reviewed " + t.last_reviewed + " · " + t.authors.join(", ")));
+    head.append(h("h1", {}, t.title), h("p", {}, t.summary), meta);
+    if (t.sources && t.sources.length) {
+      const src = h("details", {}, h("summary", { class: "meta", style: "cursor:pointer" }, "Sources (" + t.sources.length + ")"),
+        h("ul", { class: "look-for", style: "margin-top:6px;font-size:13px" }, t.sources.map(s => h("li", {}, h("a", { href: s.url, target: "_blank", rel: "noopener" }, s.title)))));
+      head.append(src);
+    }
+  }
+
+  // ---------- walkthrough ----------
+  function renderKql(list) {
+    return (list || []).map((k, i) => {
+      const q = k.query.replace(/\s+$/, "");
+      const btn = h("button", { class: "btn small", type: "button", onclick: (e) => { e.preventDefault(); copy(fill(q), btn); } }, "Copy");
+      return h("details", { class: "kql", open: i === 0 ? true : null },
+        h("summary", {}, h("span", { class: "plat" }, k.platform === "xdr" ? "Defender XDR" : k.platform === "sentinel" ? "Sentinel" : "Sentinel + XDR"), h("span", { class: "kql-title" }, k.title), btn),
+        codeWithPlaceholders(q));
+    });
+  }
+  function renderWalk() {
+    const v = document.getElementById("view-walk"); v.replaceChildren();
+    const n = node(S.tree, S.node);
+    const stepNo = S.path.length + 1;
+    const kindName = { question: "Question", check: "Check", choice: "Route", outcome: "Outcome", link: "Continue" }[n.type];
+    v.append(h("div", { class: "node-kind" }, h("span", { class: "step" }, "Step " + stepNo), h("span", {}, kindName), h("span", {}, S.node)));
+
+    if (n.type === "outcome") { v.append(renderOutcome(n)); return; }
+
+    v.append(h("div", { class: "node-text" }, fill(n.text)));
+    if (n.why) v.append(h("p", { class: "why" }, fill(n.why)));
+    if (n.look_for) v.append(h("ul", { class: "look-for" }, n.look_for.map(x => h("li", {}, fill(x)))));
+    renderKql(n.kql).forEach(el => v.append(el));
+
+    if (n.type !== "link") {
+      const k = key(S.tree, S.node);
+      const ta = h("textarea", { id: "ev-" + S.tree + "-" + S.node, rows: 2, placeholder: "e.g. 42 sign-ins from 81.2.69.160 (AS2856) over 30 days, all compliant device" });
+      ta.value = S.evidence[k] || "";
+      ta.addEventListener("input", () => { S.evidence[k] = ta.value; save(); });
+      v.append(h("div", { class: "evidence" }, h("label", { for: ta.id }, "What you found"),
+        ta, h("div", { class: "hint" }, "Real values here are added to the finding in the closure note.")));
+    }
+
+    const answers = h("div", { class: "answers" });
+    if (n.type === "question") {
+      answers.append(h("button", { class: "btn yes", type: "button", onclick: () => go("yes", n.yes) }, "Yes"));
+      answers.append(h("button", { class: "btn no", type: "button", onclick: () => go("no", n.no) }, "No"));
+      if (n.unknown) answers.append(h("button", { class: "btn", type: "button", onclick: () => go("unknown", n.unknown) }, "Can't tell yet"));
+      v.append(answers);
+    } else if (n.type === "check") {
+      answers.append(h("button", { class: "btn primary", type: "button", onclick: () => go("next", n.next) }, "Done, next step"));
+      v.append(answers);
+    } else if (n.type === "choice") {
+      v.append(h("div", { class: "option-list" }, n.options.map(o => h("button", { class: "btn", type: "button", onclick: () => go("option", o.next, o.label) }, o.label))));
+    } else if (n.type === "link") {
+      const target = TREES[n.tree];
+      answers.append(h("button", { class: "btn primary", type: "button", onclick: () => follow(n) }, "Open " + target.title));
+      v.append(answers);
+    }
+    if (S.path.length) v.append(h("div", {}, h("button", { class: "btn ghost small", type: "button", onclick: () => rewind(S.path.length - 1) }, "Back one step")));
+  }
+  function renderOutcome(n) {
+    const card = h("div", { class: "outcome-card v-bar-" + n.verdict });
+    card.append(h("div", { class: "row" }, h("span", { class: "verdict v-" + n.verdict }, VERDICT_LABEL[n.verdict]), n.escalate ? h("span", { class: "verdict v-true_positive" }, "Escalate") : null));
+    card.append(h("div", { class: "node-text" }, n.title));
+    card.append(h("p", {}, fill(n.anchor)));
+    card.append(h("h3", {}, "Risk"), h("p", {}, fill(n.risk)));
+    card.append(h("h3", {}, "Recommended actions"), h("ol", {}, n.actions.map(a => h("li", {}, fill(a)))));
+    if (n.monitor) card.append(h("h3", {}, "Monitoring"), h("p", {}, fill(n.monitor)));
+    if (n.tuning) card.append(h("h3", {}, "Tuning"), h("p", {}, fill(n.tuning)));
+    card.append(h("div", { class: "row" },
+      h("button", { class: "btn primary", type: "button", onclick: () => selectTab("note") }, "Write closure note"),
+      h("button", { class: "btn ghost small", type: "button", onclick: () => rewind(S.path.length - 1) }, "Back one step")));
+    return card;
+  }
+
+  // ---------- case panel ----------
+  function renderEntities() {
+    const box = document.getElementById("entities"); box.replaceChildren();
+    const defs = entityDefs();
+    if (!defs.length) { box.append(h("p", { class: "empty" }, "This playbook has no entities.")); return; }
+    defs.forEach(e => {
+      const id = "ent-" + e.key;
+      const inp = h("input", { class: "field", id, type: "text", placeholder: e.example || "", spellcheck: "false", autocomplete: "off" });
+      inp.value = S.entities[e.key] || "";
+      inp.addEventListener("input", () => { S.entities[e.key] = inp.value; save(); refreshLive(); });
+      box.append(h("div", { class: "entity-row" }, h("label", { for: id }, h("span", {}, e.label), h("code", {}, e.key)), inp));
+    });
+    box.append(h("p", { class: "empty" }, "Values fill the queries and the closure note. Empty ones show as placeholders."));
+  }
+  function renderTrail() {
+    const ol = document.getElementById("trail"); ol.replaceChildren();
+    if (!S.path.length) { ol.append(h("li", {}, h("span", { class: "n" }, "·"), h("span", { class: "empty" }, "Your answers appear here. Click any step to go back to it."))); return; }
+    S.path.forEach((st, i) => {
+      const n = node(st.tree, st.node);
+      const text = n.type === "link" ? n.text : n.text;
+      const cls = { yes: "a-yes", no: "a-no", unknown: "a-unknown" }[st.answer] || "a-other";
+      ol.append(h("li", {}, h("span", { class: "n" }, String(i + 1).padStart(2, "0")),
+        h("button", { type: "button", title: "Go back to this step", onclick: () => rewind(i) },
+          h("span", { class: "q" }, fill(text)), h("span", { class: "a " + cls }, answerLabel(st)))));
+    });
+  }
+
+  // ---------- map ----------
+  let mapSeq = 0;
+  let mapFit = true;
+  function mermaidText(t) {
+    const id = s => s.replace(/[^a-zA-Z0-9]/g, "_");
+    const esc = s => String(s).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/g, "$1").replace(/"/g, "#quot;").replace(/[<>{}]/g, "");
+    const trim = s => { s = String(s); return s.length > 64 ? s.slice(0, 61) + "..." : s; };
+    const visited = new Set(S.path.filter(p => p.tree === t.id).map(p => p.node));
+    if (S.tree === t.id) visited.add(S.node);
+    const lines = ["flowchart TD"];
+    for (const [nid, n] of Object.entries(t.nodes)) {
+      const label = esc(trim(n.type === "outcome" ? VERDICT_LABEL[n.verdict] + ": " + n.title : n.type === "link" ? "Go to: " + TREES[n.tree].title : n.text));
+      const shape = { question: `{{"${label}"}}`, choice: `{{"${label}"}}`, check: `["${label}"]`, outcome: `(["${label}"])`, link: `[["${label}"]]` }[n.type];
+      lines.push(`  ${id(nid)}${shape}`);
+    }
+    for (const [nid, n] of Object.entries(t.nodes)) {
+      if (n.type === "question") { lines.push(`  ${id(nid)} -->|yes| ${id(n.yes)}`, `  ${id(nid)} -->|no| ${id(n.no)}`); if (n.unknown) lines.push(`  ${id(nid)} -.->|unknown| ${id(n.unknown)}`); }
+      if (n.type === "check") lines.push(`  ${id(nid)} --> ${id(n.next)}`);
+      if (n.type === "choice") n.options.forEach(o => lines.push(`  ${id(nid)} -->|"${esc(trim(o.label).slice(0, 28))}"| ${id(o.next)}`));
+    }
+    const css = getComputedStyle(document.documentElement);
+    const c = v => css.getPropertyValue(v).trim();
+    lines.push(`  classDef fp fill:${c("--fp-soft")},stroke:${c("--fp")},color:${c("--ink")}`);
+    lines.push(`  classDef btp fill:${c("--btp-soft")},stroke:${c("--btp")},color:${c("--ink")}`);
+    lines.push(`  classDef tp fill:${c("--tp-soft")},stroke:${c("--tp")},color:${c("--ink")}`);
+    lines.push(`  classDef inc fill:${c("--inc-soft")},stroke:${c("--inc")},color:${c("--ink")}`);
+    lines.push(`  classDef seen stroke:${c("--accent")},stroke-width:3px`);
+    const vmap = { false_positive: "fp", benign_positive: "btp", true_positive: "tp", inconclusive: "inc" };
+    for (const [nid, n] of Object.entries(t.nodes)) if (n.type === "outcome") lines.push(`  class ${id(nid)} ${vmap[n.verdict]}`);
+    if (visited.size) lines.push(`  class ${[...visited].map(id).join(",")} seen`);
+    return lines.join("\n");
+  }
+  async function renderMap() {
+    const v = document.getElementById("view-map"); v.replaceChildren();
+    const t = TREES[S.tree];
+    v.append(h("div", { class: "legend" },
+      h("span", {}, h("span", { class: "swatch", style: "background:var(--surface);border:2px solid var(--accent)" }), "On your path"),
+      h("span", {}, h("span", { class: "swatch", style: "background:var(--fp-soft)" }), "False positive"),
+      h("span", {}, h("span", { class: "swatch", style: "background:var(--btp-soft)" }), "Benign true positive"),
+      h("span", {}, h("span", { class: "swatch", style: "background:var(--tp-soft)" }), "True positive"),
+      h("span", {}, h("span", { class: "swatch", style: "background:var(--inc-soft)" }), "Inconclusive"),
+      h("span", {}, "Hexagon: question · Box: check · Pill: outcome")));
+    const wrap = h("div", { class: "map-wrap" + (mapFit ? " fit" : "") }, h("p", { class: "empty" }, "Drawing the map..."));
+    const fitBtn = h("button", { class: "btn small", type: "button", onclick: () => {
+      mapFit = !mapFit; wrap.classList.toggle("fit", mapFit); fitBtn.textContent = mapFit ? "Actual size" : "Fit to width";
+    } }, mapFit ? "Actual size" : "Fit to width");
+    v.append(h("div", { class: "row" }, fitBtn, h("span", { class: "empty" }, "Scroll sideways at actual size. Nodes on your path are outlined.")), wrap);
+    if (!window.mermaid) { wrap.replaceChildren(h("p", { class: "empty" }, "The diagram library did not load. The walkthrough still works.")); return; }
+    try {
+      const css = getComputedStyle(document.documentElement);
+      window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base",
+        flowchart: { htmlLabels: true, curve: "basis", useMaxWidth: true, nodeSpacing: 30, rankSpacing: 45 },
+        themeVariables: { fontFamily: "IBM Plex Sans, system-ui, sans-serif", fontSize: "13px",
+          primaryColor: css.getPropertyValue("--surface").trim(), primaryBorderColor: css.getPropertyValue("--line").trim(),
+          primaryTextColor: css.getPropertyValue("--ink").trim(), lineColor: css.getPropertyValue("--muted").trim(),
+          edgeLabelBackground: css.getPropertyValue("--surface-2").trim(), tertiaryColor: css.getPropertyValue("--surface-2").trim() } });
+      const { svg } = await window.mermaid.render("m" + (++mapSeq), mermaidText(t));
+      wrap.innerHTML = svg;
+    } catch (e) {
+      wrap.replaceChildren(h("p", { class: "empty" }, "Could not draw this map: " + e.message));
+    }
+  }
+
+  // ---------- closure note ----------
+  function findingFor(st) {
+    const n = node(st.tree, st.node);
+    let base = "";
+    if (n.type === "question") base = n.notes[st.answer] || "";
+    else if (n.type === "check") base = n.note || "";
+    else if (n.type === "choice") { const o = n.options.find(x => x.label === st.label); base = (o && o.note) || ""; }
+    else if (n.type === "link") base = n.note || "";
+    const ev = (S.evidence[key(st.tree, st.node)] || "").trim();
+    return { base, ev };
+  }
+  function buildNote() {
+    const out = node(S.tree, S.node);
+    const missing = new Set();
+    const lines = [];
+    missingIn(out.anchor, missing); missingIn(out.risk, missing); if (out.monitor) missingIn(out.monitor, missing);
+    lines.push(VERDICT_OPENER[out.verdict] + " " + fill(out.anchor));
+    lines.push("");
+    S.path.forEach(st => {
+      const f = findingFor(st);
+      if (!f.base && !f.ev) return;
+      missingIn(f.base, missing);
+      let s = fill(f.base);
+      if (f.ev) {
+        let ev = f.ev.replace(/\s+/g, " ");
+        if (!/[.!?]$/.test(ev)) ev += ".";
+        s = s ? s.replace(/\.?\s*$/, ". ") + ev : ev;
+      }
+      lines.push("- " + s.trim());
+    });
+    lines.push("");
+    lines.push(fill(out.risk));
+    const act = [];
+    if (out.escalate) act.push("I have escalated this for containment per the client RACI.");
+    if (S.ticket.trim()) act.push("This is tracked under " + S.ticket.trim() + ".");
+    if (act.length) { lines.push(""); lines.push(act.join(" ")); }
+    if (out.monitor) { lines.push(""); lines.push(fill(out.monitor)); }
+    if (S.incActions) { lines.push(""); lines.push("Recommended actions:"); out.actions.forEach((a, i) => lines.push((i + 1) + ". " + fill(a))); }
+    if (S.incSteps) {
+      lines.push(""); lines.push("Investigative steps:");
+      S.path.forEach(st => { const n = node(st.tree, st.node); if (n.type === "link") return; lines.push("- " + fill(n.text) + " " + answerLabel(st) + "."); });
+    }
+    if (S.signoff.trim()) { lines.push(""); lines.push(S.signoff.trim()); }
+    return { text: lines.join("\n").replace(/\n{3,}/g, "\n\n"), missing: [...missing] };
+  }
+  function renderNote() {
+    const v = document.getElementById("view-note"); v.replaceChildren();
+    const n = node(S.tree, S.node);
+    if (n.type !== "outcome") {
+      v.append(h("p", {}, "Reach an outcome in the walkthrough first. The note is written from the path you take and the evidence you record at each step."));
+      v.append(h("div", {}, h("button", { class: "btn primary", type: "button", onclick: () => selectTab("walk") }, "Back to walkthrough")));
+      return;
+    }
+    const ticket = h("input", { class: "field", id: "note-ticket", type: "text", placeholder: "e.g. INC0012345" }); ticket.value = S.ticket;
+    const sign = h("input", { class: "field", id: "note-sign", type: "text", placeholder: "e.g. Kind regards, Your name" }); sign.value = S.signoff;
+    const incA = h("input", { type: "checkbox", id: "note-actions" }); incA.checked = S.incActions;
+    const incS = h("input", { type: "checkbox", id: "note-steps" }); incS.checked = S.incSteps;
+    const warn = h("div", { class: "warn", hidden: true });
+    const out = h("textarea", { id: "note-out", spellcheck: "true" });
+    const copyBtn = h("button", { class: "btn primary", type: "button", onclick: () => copy(out.value, copyBtn) }, "Copy note");
+    const regen = () => {
+      const r = buildNote(); out.value = r.text;
+      if (r.missing.length) { warn.hidden = false; warn.textContent = "Missing values: " + r.missing.map(labelFor).join(", ") + ". Fill them in under Case entities so the note carries real values."; }
+      else warn.hidden = true;
+    };
+    ticket.addEventListener("input", () => { S.ticket = ticket.value; save(); regen(); });
+    sign.addEventListener("input", () => { S.signoff = sign.value; save(); regen(); });
+    incA.addEventListener("change", () => { S.incActions = incA.checked; save(); regen(); });
+    incS.addEventListener("change", () => { S.incSteps = incS.checked; save(); regen(); });
+    v.append(
+      h("div", { class: "row" }, h("span", { class: "verdict v-" + n.verdict }, VERDICT_LABEL[n.verdict]), h("strong", {}, n.title)),
+      h("div", { class: "note-controls" },
+        h("label", { for: "note-ticket" }, "Ticket reference", ticket),
+        h("label", { for: "note-sign" }, "Sign-off", sign)),
+      h("div", { class: "toggles" },
+        h("label", { for: "note-actions" }, incA, "Include recommended actions"),
+        h("label", { for: "note-steps" }, incS, "Include investigative steps")),
+      warn, out,
+      h("div", { class: "row" }, copyBtn, h("span", { class: "empty" }, "Edit freely before copying. Regenerating happens when you change the fields above.")));
+    regen();
+  }
+  let liveTimer = null;
+  function refreshLive() {
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => { renderWalk(); renderTrail(); if (current === "note") renderNote(); }, 250);
+  }
+
+  // ---------- tabs ----------
+  let current = "walk";
+  function selectTab(name) {
+    current = name;
+    ["walk", "map", "note"].forEach(t => {
+      document.getElementById("tab-" + t).setAttribute("aria-selected", String(t === name));
+      document.getElementById("view-" + t).hidden = t !== name;
+    });
+    if (name === "map") renderMap();
+    if (name === "note") renderNote();
+  }
+  ["walk", "map", "note"].forEach(t => document.getElementById("tab-" + t).addEventListener("click", () => selectTab(t)));
+
+  function render() {
+    renderLibrary(); renderHead(); renderWalk(); renderEntities(); renderTrail();
+    if (current === "map") renderMap();
+    if (current === "note") renderNote();
+  }
+
+  document.getElementById("search").addEventListener("input", renderLibrary);
+  document.getElementById("new-case").addEventListener("click", () => {
+    if (S.path.length) previous = JSON.parse(JSON.stringify(S));
+    const tid = S.tree; S = blank(); S.tree = "universal-triage" in TREES ? "universal-triage" : tid; S.node = TREES[S.tree].start;
+    save(); render(); showBanner();
+  });
+  window.addEventListener("hashchange", () => { const id = location.hash.slice(1); if (TREES[id] && id !== S.tree) startTree(id); });
+
+  render();
+})();
+</script>

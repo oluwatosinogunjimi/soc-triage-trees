@@ -1,0 +1,303 @@
+id: network-ids-alert
+title: Network, IDS or Firewall Alert
+category: network
+summary: >-
+  IDS signatures, firewall anomalies and suspicious connections. Direction decides the
+  path: inbound means blocked-or-succeeded and is-the-target-vulnerable, outbound means
+  bad-destination and which-process, internal means expected-or-lateral.
+applies_to:
+  - IDS/IPS signature match
+  - Connection to known malicious IP or domain
+  - Possible exploitation attempt
+  - Port scan or internal reconnaissance
+  - Beaconing detected
+mitre: [T1190, T1071, T1021, T1046]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "Lessons from the SOC (Network/Device Activity Alerts section)"
+    url: https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7
+  - title: "MITRE ATT&CK T1190 Exploit Public-Facing Application"
+    url: https://attack.mitre.org/techniques/T1190/
+  - title: "MITRE ATT&CK T1071 Application Layer Protocol"
+    url: https://attack.mitre.org/techniques/T1071/
+entities:
+  - { key: src_ip, label: Source IP, example: "10.20.4.18" }
+  - { key: dst_ip, label: Destination IP, example: "193.42.33.12" }
+  - { key: host, label: Internal host name, example: "WEB-DMZ-02" }
+  - { key: cve, label: CVE referenced by the signature, example: "CVE-2025-12345" }
+start: c-alert
+nodes:
+  c-alert:
+    type: check
+    text: Read the signature and the traffic.
+    look_for:
+      - Signature or rule name and what it detects
+      - Direction, ports, protocol and the device action (allowed, dropped, reset)
+      - Request details (URL, user agent, payload excerpt) if logged
+      - Criticality and role of the internal asset
+    kql:
+      - title: Firewall and IDS events between the two IPs (24h)
+        platform: sentinel
+        query: |
+          CommonSecurityLog
+          | where TimeGenerated > ago(24h)
+          | where (SourceIP == "{{src_ip}}" and DestinationIP == "{{dst_ip}}")
+             or (SourceIP == "{{dst_ip}}" and DestinationIP == "{{src_ip}}")
+          | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, DeviceAction, SourceIP, SourcePort,
+                    DestinationIP, DestinationPort, Protocol, RequestURL, LogSeverity
+          | order by TimeGenerated asc
+    note: I reviewed the signature and traffic between {{src_ip}} and {{dst_ip}} involving {{host}}.
+    next: ch-direction
+
+  ch-direction:
+    type: choice
+    text: Which direction is the traffic?
+    options:
+      - { label: "Inbound: internet to internal asset", next: q-blocked-in, note: "The traffic is inbound from the internet to {{host}}." }
+      - { label: "Outbound: internal host to internet", next: q-dest-bad, note: "The traffic is outbound from {{host}} to {{dst_ip}}." }
+      - { label: "Internal: host to host", next: q-internal-expected, note: "The traffic is internal, from {{src_ip}} to {{dst_ip}}." }
+
+  q-blocked-in:
+    type: question
+    text: Was the inbound traffic blocked or dropped by the firewall or IPS?
+    yes: q-target-vulnerable
+    no: q-exploit-success
+    notes:
+      yes: The inbound traffic from {{src_ip}} was blocked by the perimeter.
+      no: The inbound traffic from {{src_ip}} was allowed through to {{host}}.
+
+  q-exploit-success:
+    type: question
+    text: Is there evidence the exploit worked on the target?
+    why: >-
+      Look for the service process (w3wp, java, httpd, sqlservr) spawning shells or recon
+      tools, new script files in web directories, application errors or unusual responses
+      at the alert time, and new outbound connections from the target.
+    kql:
+      - title: Shells or recon tools spawned by server processes (24h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{host}}"
+          | where InitiatingProcessFileName in~ ("w3wp.exe", "httpd.exe", "nginx.exe", "java.exe", "tomcat.exe",
+                                                 "sqlservr.exe", "php-cgi.exe", "node.exe")
+          | where FileName in~ ("cmd.exe", "powershell.exe", "pwsh.exe", "whoami.exe", "net.exe", "nltest.exe",
+                                "certutil.exe", "bitsadmin.exe", "curl.exe", "bash", "sh")
+          | project Timestamp, InitiatingProcessFileName, FileName, ProcessCommandLine, AccountName
+      - title: New script files in web directories (24h)
+        platform: xdr
+        query: |
+          DeviceFileEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{host}}"
+          | where FolderPath has_any ("wwwroot", "inetpub", "htdocs", "webapps")
+          | where FileName has_any (".aspx", ".ashx", ".asmx", ".jsp", ".jspx", ".php")
+          | project Timestamp, ActionType, FolderPath, InitiatingProcessFileName, SHA256
+    yes: o-tp-exploited
+    no: q-target-vulnerable
+    unknown: o-inconclusive
+    notes:
+      yes: "{{host}} shows post-exploitation activity following the traffic from {{src_ip}}."
+      no: "{{host}} shows no process, file or network activity consistent with successful exploitation."
+      unknown: I could not confirm whether the exploit attempt against {{host}} succeeded.
+
+  q-target-vulnerable:
+    type: question
+    text: Is the targeted asset vulnerable to what the signature describes (unpatched, exposed service, matching software)?
+    kql:
+      - title: Is the host exposed to the CVE
+        platform: xdr
+        query: |
+          DeviceTvmSoftwareVulnerabilities
+          | where DeviceName =~ "{{host}}"
+          | where CveId == "{{cve}}"
+          | project DeviceName, SoftwareName, SoftwareVersion, CveId, VulnerabilitySeverityLevel, RecommendedSecurityUpdate
+    yes: o-blocked-but-vulnerable
+    no: o-blocked-noise
+    unknown: o-blocked-but-vulnerable
+    notes:
+      yes: "{{host}} is vulnerable to {{cve}}."
+      no: "{{host}} is not vulnerable to {{cve}}."
+      unknown: I could not confirm the patch status of {{host}} for {{cve}}.
+
+  q-dest-bad:
+    type: question
+    text: Is the destination known-bad or suspicious (threat intel match, newly registered domain, DGA-like name, dynamic DNS, hosting ASN, odd port)?
+    kql:
+      - title: Threat intelligence match for the destination
+        platform: sentinel
+        query: |
+          ThreatIntelIndicators
+          | where ObservableValue == "{{dst_ip}}"
+          | where IsActive == true
+          | project TimeGenerated, ObservableKey, ObservableValue, Confidence, Pattern, ValidUntil
+      - title: Who else talks to the destination (7d)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(7d)
+          | where RemoteIP == "{{dst_ip}}"
+          | summarize Devices = dcount(DeviceName), Connections = count(),
+                      Processes = make_set(InitiatingProcessFileName, 10), First = min(Timestamp)
+    yes: q-process
+    no: o-fp-benign-dest
+    unknown: q-process
+    notes:
+      yes: "{{dst_ip}} is malicious or suspicious based on threat intelligence and infrastructure."
+      no: "{{dst_ip}} is a benign destination (CDN, update service or known SaaS)."
+      unknown: The reputation of {{dst_ip}} was not conclusive.
+
+  q-process:
+    type: question
+    text: Is the connection made by a suspicious process (unsigned, running from Temp or AppData, a script host or LOLBin) or with a beacon-like pattern?
+    why: A browser visiting a flagged site is a user event. A process from AppData connecting every 60 seconds is a foothold.
+    kql:
+      - title: Process behind the connection (7d)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{host}}" and RemoteIP == "{{dst_ip}}"
+          | summarize Connections = count(), First = min(Timestamp), Last = max(Timestamp)
+                    by InitiatingProcessFileName, InitiatingProcessFolderPath, InitiatingProcessSHA256, InitiatingProcessAccountName
+      - title: Beacon interval check (24h)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{host}}" and RemoteIP == "{{dst_ip}}"
+          | order by Timestamp asc
+          | extend Delta = datetime_diff("second", Timestamp, prev(Timestamp))
+          | summarize Connections = count(), AvgSeconds = avg(Delta), StdevSeconds = stdev(Delta)
+    yes: o-tp-c2
+    no: o-benign-user-browse
+    notes:
+      yes: The connection to {{dst_ip}} comes from a suspicious process on {{host}} or follows a beacon pattern.
+      no: The connection to {{dst_ip}} comes from a browser or legitimate application with no beacon pattern.
+
+  q-internal-expected:
+    type: question
+    text: Is the internal traffic expected (vulnerability scanner, backup, management tool, domain controller traffic, approved pen test)?
+    yes: o-fp-scanner
+    no: q-lateral
+    notes:
+      yes: "{{src_ip}} is a known scanner or management system and the traffic matches its role."
+      no: "{{src_ip}} has no known role that explains this traffic."
+
+  q-lateral:
+    type: question
+    text: Does the source show lateral movement or recon (SMB, RDP, WinRM or WMI to many hosts, remote service creation, port sweeps)?
+    kql:
+      - title: Remote-admin ports from the source (24h)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(24h)
+          | where LocalIP == "{{src_ip}}"
+          | where RemotePort in (445, 135, 3389, 5985, 5986, 22)
+          | summarize Targets = dcount(RemoteIP), Ports = make_set(RemotePort), SampleTargets = make_set(RemoteIP, 20)
+                    by DeviceName, InitiatingProcessFileName
+    yes: o-tp-lateral
+    no: o-inconclusive
+    notes:
+      yes: "{{src_ip}} shows lateral movement or reconnaissance across multiple internal hosts."
+      no: "{{src_ip}} shows no wider lateral movement or scanning pattern."
+
+  o-blocked-noise:
+    type: outcome
+    verdict: benign_positive
+    title: Blocked internet noise
+    anchor: The inbound traffic from {{src_ip}} was blocked and {{host}} is not vulnerable to {{cve}}.
+    risk: The risk here is exploitation of {{host}}; it doesn't apply as the traffic was blocked and the target is patched.
+    actions: [Close, "Block {{src_ip}} if it keeps probing"]
+    tuning: If this signature fires constantly on blocked traffic to patched assets, lower its priority for dropped events.
+
+  o-blocked-but-vulnerable:
+    type: outcome
+    verdict: true_positive
+    title: Blocked attempt against a vulnerable asset
+    anchor: The exploit attempt from {{src_ip}} did not succeed, but {{host}} is or may be vulnerable to {{cve}}.
+    risk: The risk here is exploitation of {{host}} through {{cve}} by the next attempt, which stays open until the asset is patched.
+    actions:
+      - Notify the customer to patch or mitigate {{cve}} on {{host}}
+      - Block {{src_ip}}
+    monitor: I will monitor {{host}} for further attempts and any post-exploitation activity until it is patched.
+
+  o-tp-exploited:
+    type: outcome
+    verdict: true_positive
+    title: Successful exploitation
+    anchor: "{{host}} was exploited through the traffic from {{src_ip}} and shows post-exploitation activity."
+    risk: The risk here is an attacker foothold on a server, often internet-facing, leading to lateral movement; containment is required now.
+    actions:
+      - Isolate {{host}} per client RACI
+      - Preserve web and application logs and any web shells found
+      - Block {{src_ip}} and hunt for the same activity on similar servers
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{host}} and {{src_ip}} for further activity across the estate.
+
+  o-fp-benign-dest:
+    type: outcome
+    verdict: false_positive
+    title: Benign destination
+    anchor: The signature matched traffic from {{host}} to {{dst_ip}}, which is a benign destination.
+    risk: The risk here is command-and-control over this channel; it doesn't apply as {{dst_ip}} is legitimate infrastructure.
+    actions: [Close, Raise a tuning request with the destination and signature]
+
+  o-benign-user-browse:
+    type: outcome
+    verdict: benign_positive
+    title: User browsing to a flagged site
+    anchor: The connection from {{host}} to {{dst_ip}} came from a browser session with no beacon pattern and no payload.
+    risk: The risk here is a drive-by download from the flagged site; it doesn't apply as no file or process followed the visit.
+    actions: ["Block {{dst_ip}} or its domain at the proxy"]
+
+  o-tp-c2:
+    type: outcome
+    verdict: true_positive
+    title: Probable command and control
+    anchor: "{{host}} is connecting to {{dst_ip}} from a suspicious process, consistent with command and control."
+    risk: The risk here is remote attacker control of {{host}}; containment is required now.
+    actions:
+      - Isolate {{host}} per client RACI
+      - Run the EDR tree on the process behind the connection
+      - Block {{dst_ip}} and related infrastructure
+      - Hunt for other hosts talking to {{dst_ip}}
+    escalate: true
+    monitor: I will monitor the estate for connections to {{dst_ip}} and related infrastructure.
+
+  o-fp-scanner:
+    type: outcome
+    verdict: benign_positive
+    title: Expected internal traffic
+    anchor: The traffic from {{src_ip}} matches its known role as a scanner or management system.
+    risk: The risk here is internal reconnaissance; it doesn't apply as {{src_ip}} is an approved system doing its job.
+    actions: [Close]
+    tuning: Exclude the scanner's IP for this signature, scoped to its scan window if possible.
+
+  o-tp-lateral:
+    type: outcome
+    verdict: true_positive
+    title: Lateral movement
+    anchor: "{{src_ip}} is moving laterally or scanning across internal hosts with no legitimate role that explains it."
+    risk: The risk here is an attacker spreading from a compromised host toward high-value systems; containment is required now.
+    actions:
+      - Isolate the source host per client RACI
+      - Identify the account and process used
+      - Check every target host for remote service creation and logons
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the targets and the account used for further logons.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Needs more data
+    anchor: I could not confirm whether the traffic between {{src_ip}} and {{dst_ip}} caused any impact.
+    risk: The risk here is an unconfirmed compromise of {{host}}, which stays open until host-level evidence is reviewed.
+    actions: [Request host logs or EDR coverage for the asset, Escalate to a senior analyst if not resolved within SLA]
+    monitor: I will monitor {{host}} and {{src_ip}} for further alerts until this is resolved.

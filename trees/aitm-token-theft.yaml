@@ -1,0 +1,228 @@
+id: aitm-token-theft
+title: Token Theft or AiTM Phishing
+category: identity
+summary: >-
+  Adversary-in-the-middle phishing and session token replay. MFA was completed, so the
+  usual "MFA passed" reassurance does not hold. Look for session reuse from new
+  infrastructure, then for persistence, then contain by revoking sessions, not only by
+  resetting the password.
+applies_to:
+  - Anomalous token
+  - Token issuer anomaly
+  - Possible AiTM phishing attempt
+  - Stolen session cookie was used
+  - Suspicious sign-in after a phishing click
+mitre: [T1557, T1539, T1550.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Token theft playbook
+    url: https://learn.microsoft.com/en-us/security/operations/token-theft-playbook
+  - title: "Invictus IR: Responding to adversary-in-the-middle attacks"
+    url: https://www.invictus-ir.com/news/responding-to-adversary-in-the-middle-attacks
+  - title: "MITRE ATT&CK T1539 Steal Web Session Cookie"
+    url: https://attack.mitre.org/techniques/T1539/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+  - { key: ip, label: Suspected attacker IP, example: "45.137.21.9" }
+start: c-timeline
+nodes:
+  c-timeline:
+    type: check
+    text: Build the sign-in timeline across interactive and non-interactive logs.
+    why: >-
+      The theft happens in an interactive sign-in through the proxy. The replay usually shows
+      up in non-interactive sign-ins from the attacker's infrastructure, which many analysts
+      never look at.
+    kql:
+      - title: Interactive and non-interactive sign-ins (7d)
+        platform: sentinel
+        query: |
+          // DeviceDetail and LocationDetails are dynamic in one table and string in the other,
+          // so parse them inside each leg before the union.
+          let upn = "{{user}}";
+          union
+            (SigninLogs
+              | where TimeGenerated > ago(7d) and UserPrincipalName =~ upn
+              | extend DeviceId = tostring(DeviceDetail.deviceId), Country = tostring(LocationDetails.countryOrRegion)
+              | project TimeGenerated, Source = "Interactive", ResultType, AppDisplayName, IPAddress,
+                        AutonomousSystemNumber, Country, DeviceId, UserAgent, SessionId, AuthenticationRequirement),
+            (AADNonInteractiveUserSignInLogs
+              | where TimeGenerated > ago(7d) and UserPrincipalName =~ upn
+              | extend DeviceId = tostring(parse_json(DeviceDetail).deviceId),
+                       Country = tostring(parse_json(LocationDetails).countryOrRegion)
+              | project TimeGenerated, Source = "NonInteractive", ResultType, AppDisplayName, IPAddress,
+                        AutonomousSystemNumber, Country, DeviceId, UserAgent, SessionId, AuthenticationRequirement)
+          | order by TimeGenerated asc
+    note: I built the interactive and non-interactive sign-in timeline for {{user}}.
+    next: q-session-hop
+
+  q-session-hop:
+    type: question
+    text: Does the same SessionId appear from a second IP or ASN within a short window, especially a hosting or VPS provider?
+    kql:
+      - title: Sessions used from multiple IPs (7d)
+        platform: sentinel
+        query: |
+          union
+            (SigninLogs | project TimeGenerated, UserPrincipalName, ResultType, SessionId, IPAddress, AutonomousSystemNumber, UserAgent),
+            (AADNonInteractiveUserSignInLogs | project TimeGenerated, UserPrincipalName, ResultType, SessionId, IPAddress, AutonomousSystemNumber, UserAgent)
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{user}}" and ResultType == "0" and isnotempty(SessionId)
+          | summarize IPs = make_set(IPAddress), ASNs = make_set(AutonomousSystemNumber), UAs = make_set(UserAgent, 5),
+                      First = min(TimeGenerated), Last = max(TimeGenerated) by SessionId
+          | where array_length(IPs) > 1
+    yes: c-lure
+    no: q-unmanaged-officehome
+    notes:
+      yes: The same session for {{user}} was used from more than one IP, including {{ip}}.
+      no: No session for {{user}} was reused across IPs.
+
+  q-unmanaged-officehome:
+    type: question
+    text: Is there a successful, MFA-satisfied sign-in (often to OfficeHome) from an unfamiliar IP with no device ID and a user agent unlike the user's normal one?
+    why: AiTM kits proxy the Microsoft login page, so the sign-in completes MFA but carries no device ID and the proxy's user agent.
+    kql:
+      - title: Successful sign-ins with no device ID (7d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{user}}" and ResultType == "0"
+          | where isempty(tostring(DeviceDetail.deviceId))
+          | project TimeGenerated, AppDisplayName, IPAddress, AutonomousSystemNumber,
+                    Country = tostring(LocationDetails.countryOrRegion), UserAgent, AuthenticationRequirement, MfaDetail
+    yes: c-lure
+    no: q-risk-detections
+    notes:
+      yes: "{{user}} had an MFA-satisfied sign-in from {{ip}} with no device ID and an unfamiliar user agent."
+      no: All MFA-satisfied sign-ins for {{user}} came from known devices.
+
+  q-risk-detections:
+    type: question
+    text: Did Entra ID Protection raise an anomalous token, token issuer anomaly or attacker-in-the-middle detection for this user?
+    kql:
+      - title: Token-related risk detections (14d)
+        platform: sentinel
+        query: |
+          AADUserRiskEvents
+          | where TimeGenerated > ago(14d)
+          | where UserPrincipalName =~ "{{user}}"
+          | where RiskEventType in ("anomalousToken", "tokenIssuerAnomaly", "attackerinTheMiddle", "unfamiliarFeatures", "suspiciousBrowser")
+          | project TimeGenerated, RiskEventType, RiskLevel, RiskState, IpAddress, DetectionTimingType, Source
+    yes: c-lure
+    no: o-fp-no-token-indicators
+    notes:
+      yes: Entra ID Protection raised token-related risk detections for {{user}}.
+      no: Entra ID Protection raised no token-related risk detections for {{user}}.
+
+  c-lure:
+    type: check
+    text: Tie it to the lure. Look for a URL click in the minutes before the suspicious sign-in.
+    why: Finding the phishing email lets you purge it and check every other recipient who clicked.
+    kql:
+      - title: URL clicks by the user (7d)
+        platform: xdr
+        query: |
+          UrlClickEvents
+          | where Timestamp > ago(7d)
+          | where AccountUpn =~ "{{user}}"
+          | project Timestamp, Url, ActionType, IsClickedThrough, NetworkMessageId, IPAddress
+          | order by Timestamp desc
+      - title: Other users signing in from the attacker IP (7d)
+        platform: sentinel
+        query: |
+          union SigninLogs, AADNonInteractiveUserSignInLogs
+          | where TimeGenerated > ago(7d)
+          | where IPAddress == "{{ip}}" and ResultType == "0"
+          | summarize SignIns = count(), First = min(TimeGenerated) by UserPrincipalName
+    note: I looked for the phishing lure and for other users signing in from {{ip}}.
+    next: q-persistence
+
+  q-persistence:
+    type: question
+    text: Did the attacker establish persistence (new MFA method, inbox rule, OAuth consent, device registration, mail sent from the account)?
+    kql:
+      - title: Security info, device and consent changes (7d)
+        platform: sentinel
+        query: |
+          let upn = "{{user}}";
+          AuditLogs
+          | where TimeGenerated > ago(7d)
+          | where tostring(InitiatedBy.user.userPrincipalName) =~ upn or tostring(TargetResources[0].userPrincipalName) =~ upn
+          | where OperationName has_any ("security info", "Register device", "Add registered owner to device",
+                                         "Consent to application", "Update user")
+          | project TimeGenerated, OperationName, Result, ActorIP = tostring(InitiatedBy.user.ipAddress)
+      - title: Inbox rules and sent mail (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Set-Mailbox", "Send", "SendAs")
+          | project TimeGenerated, Operation, ClientIP, Parameters
+    yes: o-tp-persistence
+    no: q-user-confirm
+    notes:
+      yes: The attacker established persistence on the account of {{user}}.
+      no: I found no new MFA methods, inbox rules, consents, devices or unusual sent mail for {{user}}.
+
+  q-user-confirm:
+    type: question
+    text: Did the user confirm the sign-in from the suspect IP was theirs?
+    why: With token indicators present, silence is not reassurance. Contain first if you cannot reach the user quickly.
+    yes: o-benign-user
+    no: o-tp-contained
+    unknown: o-tp-contained
+    notes:
+      yes: "{{user}} confirmed the sign-in from {{ip}} was theirs."
+      no: "{{user}} did not recognise the sign-in from {{ip}}."
+      unknown: I could not reach {{user}}, so I treated the session as compromised given the token indicators.
+
+  o-fp-no-token-indicators:
+    type: outcome
+    verdict: false_positive
+    title: No token theft indicators
+    anchor: I found no session reuse, device-less MFA sign-ins or token risk detections for {{user}}.
+    risk: The risk here is a replayed session token; it doesn't apply as every session for {{user}} stayed on known infrastructure.
+    actions: [Close, If the trigger was a sign-in anomaly, finish the sign-in tree checks]
+
+  o-benign-user:
+    type: outcome
+    verdict: benign_positive
+    title: User confirmed, no persistence
+    anchor: "{{user}} confirmed the activity from {{ip}}, and no persistence was found."
+    risk: The risk here is a stolen session token; it doesn't apply given the user confirmation and the clean persistence checks.
+    actions: [Close with the user confirmation quoted]
+    monitor: I will monitor {{user}} for session reuse from new infrastructure over the next 7 days.
+
+  o-tp-contained:
+    type: outcome
+    verdict: true_positive
+    title: Token theft, no persistence yet
+    anchor: The session for {{user}} was used from {{ip}}, consistent with token theft, and I found no persistence.
+    risk: The risk here is the attacker returning with the stolen session; revoking tokens removes that access.
+    actions:
+      - Revoke all sessions and refresh tokens (password reset alone does not invalidate stolen tokens)
+      - Reset the password and confirm the user as compromised in Entra ID Protection
+      - Purge the phishing email and check every other recipient who clicked
+      - Block {{ip}} and the phishing domain
+    escalate: true
+    monitor: I will monitor {{user}} for further sign-ins from {{ip}} or its ASN.
+
+  o-tp-persistence:
+    type: outcome
+    verdict: true_positive
+    title: Token theft with persistence
+    anchor: The session for {{user}} was used from {{ip}}, and the attacker established persistence on the account.
+    risk: The risk here is ongoing access and business email compromise through the persistence mechanisms, which survive a password reset until removed.
+    actions:
+      - Revoke all sessions and refresh tokens, then reset the password
+      - Remove attacker-registered MFA methods and devices
+      - Remove malicious inbox rules, forwarding and OAuth consents
+      - Review mail sent from the account and warn recipients if internal or vendor phishing went out
+      - Purge the lure, block {{ip}} and the phishing domain
+      - Consider phishing-resistant MFA and token protection for this user group
+    escalate: true
+    monitor: I will monitor {{user}} and {{ip}} for re-entry attempts and new persistence.

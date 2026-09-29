@@ -1,0 +1,164 @@
+id: suspicious-powershell
+title: Suspicious PowerShell or LOLBin Execution
+category: endpoint
+summary: >-
+  Encoded or obfuscated PowerShell, download cradles and living-off-the-land binaries.
+  Decode and read the command first, rule out known admin tooling by prevalence and
+  parent, then decide whether it was blocked or did something.
+applies_to:
+  - Suspicious PowerShell command line
+  - Encoded PowerShell execution
+  - Suspicious process executed via mshta, rundll32 or regsvr32
+  - Suspicious download using certutil or bitsadmin
+mitre: [T1059.001, T1027, T1105, T1218]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1059.001 Command and Scripting Interpreter: PowerShell"
+    url: https://attack.mitre.org/techniques/T1059/001/
+  - title: "MITRE ATT&CK T1218 System Binary Proxy Execution"
+    url: https://attack.mitre.org/techniques/T1218/
+  - title: LOLBAS project
+    url: https://lolbas-project.github.io/
+entities:
+  - { key: device, label: Device name, example: "WKS-HR-007" }
+  - { key: command, label: Distinctive part of the command line, example: "FromBase64String" }
+start: c-command
+nodes:
+  c-command:
+    type: check
+    text: Decode and read the full command line, and note the process chain.
+    look_for:
+      - The decoded command (-enc is Base64 of UTF-16LE text)
+      - Parent and grandparent process, and the user context
+      - Execution policy bypass, hidden window, no profile flags
+      - URLs, IPs, file paths and functions referenced
+    kql:
+      - title: PowerShell on the device with -enc decoded (24h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{device}}"
+          | where FileName in~ ("powershell.exe", "pwsh.exe", "powershell_ise.exe")
+          | extend B64 = extract(@"(?i)\s-e(?:nc(?:odedcommand)?)?\s+([A-Za-z0-9+/=]{16,})", 1, ProcessCommandLine)
+          | extend Decoded = iff(isnotempty(B64), replace_regex(base64_decode_tostring(B64), @"\x00", ""), "")
+          | project Timestamp, AccountName, InitiatingProcessFileName, InitiatingProcessParentFileName,
+                    ProcessCommandLine, Decoded
+          | order by Timestamp asc
+    note: I decoded and reviewed the command line on {{device}} along with its parent process chain.
+    next: q-known-admin
+
+  q-known-admin:
+    type: question
+    text: Is the command attributable to known tooling (SCCM, Intune, RMM agent, installer, IT script) by parent, signer, path and an identical history across the estate?
+    why: Identical command lines across many devices over weeks, launched by a management agent, are almost always tooling. A one-off on a single device from an Office parent is not.
+    kql:
+      - title: Prevalence of the command in the estate (30d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(30d)
+          | where ProcessCommandLine has "{{command}}"
+          | summarize Devices = dcount(DeviceName), Executions = count(), Parents = make_set(InitiatingProcessFileName, 10),
+                      Accounts = make_set(AccountName, 10), First = min(Timestamp), Last = max(Timestamp)
+    yes: o-fp-admin
+    no: q-offensive-traits
+    unknown: q-offensive-traits
+    notes:
+      yes: The command matches known administrative tooling seen consistently across the estate.
+      no: The command does not match any known tooling in the estate.
+      unknown: I could not attribute the command to known tooling.
+
+  q-offensive-traits:
+    type: question
+    text: Does it show offensive traits?
+    why: >-
+      Look for obfuscation (FromBase64String, char joins, string reversal), download cradles
+      (IEX, Net.WebClient, DownloadString, Invoke-WebRequest, bitsadmin, certutil -urlcache),
+      AMSI or Defender tampering (AmsiUtils, Set-MpPreference -Disable*), in-memory loading
+      (Reflection.Assembly::Load), or proxy execution through mshta, rundll32 or regsvr32
+      with a URL or script.
+    yes: q-succeeded
+    no: q-rare
+    notes:
+      yes: The command shows offensive traits such as obfuscation, a download cradle or security tool tampering.
+      no: The command shows no obfuscation, download or tampering behaviour.
+
+  q-rare:
+    type: question
+    text: Is it rare for this device, user and estate (first seen recently, very low prevalence)?
+    yes: q-succeeded
+    no: o-fp-admin
+    notes:
+      yes: The command is new and rare for {{device}} and the estate.
+      no: The command is established and routine for {{device}}.
+
+  q-succeeded:
+    type: question
+    text: Did it succeed (outbound connection, file written, child processes, payload run) rather than being blocked by AMSI, ASR or the EDR?
+    kql:
+      - title: Network and file activity from script hosts and LOLBins (24h)
+        platform: xdr
+        query: |
+          let lolbins = dynamic(["powershell.exe", "pwsh.exe", "mshta.exe", "rundll32.exe", "regsvr32.exe",
+                                 "certutil.exe", "bitsadmin.exe", "wscript.exe", "cscript.exe"]);
+          union
+            (DeviceNetworkEvents | where RemoteIPType == "Public"
+               | project Timestamp, DeviceName, InitiatingProcessFileName, Kind = "Network",
+                         Detail = strcat(RemoteUrl, " ", RemoteIP, ":", RemotePort)),
+            (DeviceFileEvents | where ActionType == "FileCreated"
+               | project Timestamp, DeviceName, InitiatingProcessFileName, Kind = "FileWrite", Detail = FolderPath)
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{device}}" and InitiatingProcessFileName in~ (lolbins)
+          | order by Timestamp asc
+      - title: AMSI, ASR and AV blocks on the device (24h)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{device}}"
+          | where ActionType in ("AntivirusDetection", "AmsiScriptDetection") or ActionType startswith "Asr"
+          | project Timestamp, ActionType, FileName, InitiatingProcessCommandLine, AdditionalFields
+    yes: o-tp-executed
+    no: o-tp-blocked
+    notes:
+      yes: The command ran successfully on {{device}} and produced follow-on network, file or process activity.
+      no: The command was blocked on {{device}} before producing any follow-on activity.
+
+  o-fp-admin:
+    type: outcome
+    verdict: false_positive
+    title: Known administrative tooling
+    anchor: The command on {{device}} belongs to known administrative tooling, launched by its usual parent and seen consistently across the estate.
+    risk: The risk here is attacker tradecraft hiding in admin scripts; it doesn't apply as this exact command is established tooling with no offensive traits.
+    actions: [Close, Raise a tuning request with the parent process and command pattern]
+    tuning: Exclude on parent process plus a command-line pattern, not on powershell.exe alone.
+
+  o-tp-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Malicious script, blocked
+    anchor: The command on {{device}} is malicious, and AMSI, ASR or the EDR blocked it before it produced any activity.
+    risk: The risk here is a payload download or execution from the script; it doesn't apply as the block stopped it, but whatever launched it still needs finding.
+    actions:
+      - Identify what launched the command (document, email, scheduled task, user)
+      - Block the URLs and domains referenced
+      - Run a full scan on {{device}}
+    monitor: I will monitor {{device}} for further script execution from the same parent.
+
+  o-tp-executed:
+    type: outcome
+    verdict: true_positive
+    title: Malicious script executed
+    anchor: The command on {{device}} is malicious and ran successfully, producing follow-on activity.
+    risk: The risk here is an attacker foothold on {{device}} through the downloaded or executed payload; containment is required now.
+    actions:
+      - Isolate {{device}} per client RACI
+      - Identify and hash any payload written, then run the EDR tree on it
+      - Block referenced URLs, domains and IPs
+      - Reset credentials for the account that ran it
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{device}} and the referenced infrastructure for further activity.

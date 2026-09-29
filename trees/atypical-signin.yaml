@@ -1,0 +1,317 @@
+id: atypical-signin
+title: Unfamiliar or Impossible-Travel Sign-in
+category: identity
+summary: >-
+  Impossible travel, atypical location, unfamiliar sign-in properties or a risky sign-in.
+  Separate the explained (VPN, travel, new phone) from real account takeover by checking
+  the baseline, the device, token indicators and what happened after the sign-in.
+applies_to:
+  - Impossible travel activity
+  - Atypical travel
+  - Unfamiliar sign-in properties
+  - Sign-in from an unusual location or anonymous IP
+  - Risky sign-in (Entra ID Protection)
+mitre: [T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft incident response playbook, Phishing investigation (sign-in and device checks)
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing
+  - title: Microsoft Entra sign-in error codes reference
+    url: https://login.microsoftonline.com/error
+  - title: "MITRE ATT&CK T1078.004 Valid Accounts: Cloud Accounts"
+    url: https://attack.mitre.org/techniques/T1078/004/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+  - { key: ip, label: Flagged IP address, example: "185.220.101.44" }
+start: c-signin
+nodes:
+  c-signin:
+    type: check
+    text: Identify the exact sign-in that triggered the alert.
+    look_for:
+      - Result (ResultType), application and client app
+      - IP, ASN, country and city
+      - Device ID, join type and compliance, operating system, browser and user agent
+      - Authentication requirement, MFA detail and Conditional Access result
+      - Risk level and risk event types during sign-in
+    kql:
+      - title: Sign-ins from the flagged IP for this user (7d)
+        platform: sentinel
+        query: |
+          let upn = "{{user}}";
+          let ip = "{{ip}}";
+          SigninLogs
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ upn and IPAddress == ip
+          | project TimeGenerated, ResultType, ResultDescription, AppDisplayName, ClientAppUsed,
+                    IPAddress, AutonomousSystemNumber,
+                    Country = tostring(LocationDetails.countryOrRegion), City = tostring(LocationDetails.city),
+                    DeviceId = tostring(DeviceDetail.deviceId), TrustType = tostring(DeviceDetail.trustType),
+                    IsCompliant = tostring(DeviceDetail.isCompliant), OS = tostring(DeviceDetail.operatingSystem),
+                    UserAgent, AuthenticationRequirement, MfaDetail, ConditionalAccessStatus,
+                    RiskLevelDuringSignIn, RiskEventTypes_V2, SessionId, CorrelationId
+          | order by TimeGenerated asc
+    note: I identified the flagged sign-in for {{user}} from {{ip}}.
+    next: q-success
+
+  q-success:
+    type: question
+    text: Did the flagged sign-in succeed (ResultType 0)?
+    yes: q-baseline
+    no: q-password-valid
+    notes:
+      yes: The sign-in from {{ip}} succeeded.
+      no: The sign-in from {{ip}} failed.
+
+  q-password-valid:
+    type: question
+    text: Did the failure happen after the password was accepted?
+    why: >-
+      Codes 50074 and 50076 (MFA required), 500121 (MFA failed or denied) and 53003 (blocked
+      by Conditional Access) all mean the first factor was correct. 50126 (bad password) and
+      50053 (smart lockout) mean it was not.
+    kql:
+      - title: Result codes from the flagged IP
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{user}}" and IPAddress == "{{ip}}"
+          | summarize Attempts = count(), First = min(TimeGenerated), Last = max(TimeGenerated)
+                    by ResultType, ResultDescription, AppDisplayName, ClientAppUsed
+    yes: o-password-known
+    no: q-failed-pattern
+    notes:
+      yes: The failures from {{ip}} occurred after the password was accepted, at the MFA or Conditional Access stage.
+      no: The failures from {{ip}} were bad password or lockout results, so the password was not accepted.
+
+  q-failed-pattern:
+    type: question
+    text: Are the failures part of a spray or brute-force pattern (many users or many attempts from the same IP)?
+    kql:
+      - title: Activity from the IP across the tenant (24h)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(24h)
+          | where IPAddress == "{{ip}}"
+          | summarize Attempts = count(), Users = dcount(UserPrincipalName),
+                      Failures = countif(ResultType != "0"), Codes = make_set(ResultType)
+    yes: l-spray
+    no: o-failed-benign
+    notes:
+      yes: "{{ip}} is failing sign-ins against multiple accounts, consistent with password spray or brute force."
+      no: The failures are isolated to {{user}} with no wider pattern from {{ip}}.
+
+  l-spray:
+    type: link
+    text: Continue in the password spray tree.
+    tree: password-spray
+
+  q-baseline:
+    type: question
+    text: Has this user signed in successfully from this IP, ASN or country, with this device and browser, in the last 30 days?
+    why: A location the user has used repeatedly before is the single strongest benign signal. Check ASN as well as IP because mobile and home IPs rotate.
+    kql:
+      - title: The user's sign-in baseline (30d, excluding today)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated between (ago(30d) .. ago(1d))
+          | where UserPrincipalName =~ "{{user}}" and ResultType == "0"
+          | summarize SignIns = count(), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)
+                    by IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion),
+                       OS = tostring(DeviceDetail.operatingSystem), Browser = tostring(DeviceDetail.browser)
+          | extend IsFlaggedIP = IPAddress == "{{ip}}"
+          | order by SignIns desc
+    yes: q-other-alerts
+    no: q-explained
+    notes:
+      yes: "{{user}} has an established history of successful sign-ins from this network and device in the last 30 days."
+      no: "{{ip}} and its network are new for {{user}} compared with the last 30 days."
+
+  q-other-alerts:
+    type: question
+    text: Are there other alerts or risk detections for this user in the last 48 hours?
+    kql:
+      - title: Alerts and risk events for the user (48h)
+        platform: sentinel
+        query: |
+          union
+            (SecurityAlert | where TimeGenerated > ago(48h) | where Entities has "{{user}}" | project TimeGenerated, Source = "Alert", Detail = AlertName),
+            (AADUserRiskEvents | where TimeGenerated > ago(48h) | where UserPrincipalName =~ "{{user}}" | project TimeGenerated, Source = "Risk", Detail = RiskEventType)
+          | order by TimeGenerated desc
+    yes: c-device-auth
+    no: o-fp-baseline
+    notes:
+      yes: There are other alerts or risk detections for {{user}} in the last 48 hours.
+      no: There are no other alerts or risk detections for {{user}} in the last 48 hours.
+
+  q-explained:
+    type: question
+    text: Is the new location explained (corporate VPN or proxy egress, confirmed travel, mobile carrier, a cloud service the user legitimately uses)?
+    why: >-
+      If many colleagues sign in from the same IP it is almost certainly a corporate egress
+      or VPN. A hosting or VPS ASN with no other users is the opposite signal.
+    kql:
+      - title: Who else uses this IP (30d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(30d)
+          | where IPAddress == "{{ip}}"
+          | summarize Users = dcount(UserPrincipalName), SampleUsers = make_set(UserPrincipalName, 10),
+                      Apps = make_set(AppDisplayName, 10), Success = countif(ResultType == "0"),
+                      Failure = countif(ResultType != "0")
+    yes: q-other-alerts
+    no: c-device-auth
+    unknown: c-device-auth
+    notes:
+      yes: The new location is explained by known infrastructure or confirmed travel.
+      no: The new location is not explained by corporate infrastructure, travel or a known service.
+      unknown: I could not confirm an explanation for the new location.
+
+  c-device-auth:
+    type: check
+    text: Look at the device and how the user authenticated.
+    why: A compliant, joined device with interactive MFA is hard to fake. An unmanaged device, a new user agent or MFA satisfied only by a token claim deserves more attention.
+    look_for:
+      - Device ID present, join type and compliance
+      - Browser and OS compared with the baseline
+      - Whether MFA was performed interactively or satisfied by a claim in the token
+      - New MFA method registered shortly before or after
+    note: I reviewed the device, user agent and MFA detail for the sign-in from {{ip}}.
+    next: q-token-indicators
+
+  q-token-indicators:
+    type: question
+    text: Are there token theft indicators (same SessionId from two IPs or ASNs, no device ID on OfficeHome after a phishing click, non-interactive sign-ins from the IP with no interactive one)?
+    kql:
+      - title: Sessions seen from more than one IP (7d)
+        platform: sentinel
+        query: |
+          union
+            (SigninLogs | project TimeGenerated, UserPrincipalName, ResultType, SessionId, IPAddress, UserAgent, AppDisplayName, Source = "Interactive"),
+            (AADNonInteractiveUserSignInLogs | project TimeGenerated, UserPrincipalName, ResultType, SessionId, IPAddress, UserAgent, AppDisplayName, Source = "NonInteractive")
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{user}}" and ResultType == "0" and isnotempty(SessionId)
+          | summarize IPs = make_set(IPAddress), Sources = make_set(Source), UAs = make_set(UserAgent, 5),
+                      First = min(TimeGenerated), Last = max(TimeGenerated) by SessionId
+          | where array_length(IPs) > 1
+    yes: l-aitm
+    no: q-post-auth
+    notes:
+      yes: The session for {{user}} shows token theft indicators, including reuse from {{ip}}.
+      no: I found no session reuse across IPs or other token theft indicators for {{user}}.
+
+  l-aitm:
+    type: link
+    text: Continue in the token theft tree.
+    tree: aitm-token-theft
+
+  q-post-auth:
+    type: question
+    text: Is there suspicious activity after the sign-in (inbox rules or forwarding, MFA registration, OAuth consent, mass download, unusual mail sent, role changes)?
+    why: Post-authentication activity is what turns a suspicious sign-in into a confirmed compromise.
+    kql:
+      - title: Directory changes by or to the user (7d)
+        platform: sentinel
+        query: |
+          let upn = "{{user}}";
+          AuditLogs
+          | where TimeGenerated > ago(7d)
+          | where tostring(InitiatedBy.user.userPrincipalName) =~ upn or tostring(TargetResources[0].userPrincipalName) =~ upn
+          | where OperationName has_any ("security info", "Consent to application", "Add app role assignment",
+                                         "Add member to role", "Update user", "Reset password", "Register device")
+          | project TimeGenerated, OperationName, Result,
+                    Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                    ActorIP = tostring(InitiatedBy.user.ipAddress)
+      - title: Mailbox and file activity (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Set-Mailbox",
+                                 "Add-MailboxPermission", "FileDownloaded", "FileSyncDownloadedFull",
+                                 "Send", "SendAs", "HardDelete")
+          | summarize Count = count(), First = min(TimeGenerated), IPs = make_set(ClientIP, 10) by Operation, OfficeWorkload
+    yes: o-compromised
+    no: q-user-confirm
+    notes:
+      yes: I found suspicious post-authentication activity on the account of {{user}}.
+      no: I found no suspicious post-authentication activity (no inbox rules, MFA changes, consents or unusual downloads).
+
+  q-user-confirm:
+    type: question
+    text: Has the user or their manager confirmed the sign-in was theirs?
+    yes: o-benign-confirmed
+    no: o-compromised
+    unknown: o-inconclusive
+    notes:
+      yes: "{{user}} confirmed the sign-in from {{ip}} was theirs."
+      no: "{{user}} did not recognise the sign-in from {{ip}}."
+      unknown: I have not yet received confirmation from {{user}} about the sign-in.
+
+  o-fp-baseline:
+    type: outcome
+    verdict: false_positive
+    title: Known location, no other signals
+    anchor: The sign-in from {{ip}} matches the established baseline for {{user}}, with no other alerts or risk detections.
+    risk: The risk here is account takeover from a new location; it doesn't apply as the location and device are part of the user's normal pattern.
+    actions: [Close referencing the baseline]
+    tuning: If this recurs for known corporate egress IPs, add them as trusted named locations.
+
+  o-benign-confirmed:
+    type: outcome
+    verdict: benign_positive
+    title: New location confirmed by the user
+    anchor: "{{user}} confirmed the sign-in from {{ip}}, and no suspicious activity followed it."
+    risk: The risk here is account takeover from a new location; it doesn't apply given the user confirmation and clean post-authentication activity.
+    actions: [Close with the user confirmation quoted]
+
+  o-compromised:
+    type: outcome
+    verdict: true_positive
+    title: Account compromise
+    anchor: The account of {{user}} was accessed from {{ip}} without authorisation.
+    risk: The risk here is data theft, internal phishing and persistence through the compromised account; containment is required now.
+    actions:
+      - Revoke all sessions and refresh tokens, then reset the password
+      - Remove any attacker-added MFA methods, inbox rules, OAuth consents and devices
+      - Confirm the user as compromised in Entra ID Protection
+      - Block {{ip}} in Conditional Access named locations
+      - Raise an incident and escalate per client RACI
+    escalate: true
+    monitor: I will monitor {{user}} and {{ip}} for further sign-ins and persistence attempts.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Awaiting user confirmation
+    anchor: I could not confirm whether the sign-in from {{ip}} was made by {{user}}.
+    risk: The risk here is an attacker holding a valid session for {{user}} while confirmation is outstanding.
+    actions: [Chase the user or manager for confirmation, Consider revoking sessions as a precaution]
+    monitor: I will monitor {{user}} for further sign-ins from {{ip}} and for inbox rules or MFA changes.
+
+  o-password-known:
+    type: outcome
+    verdict: true_positive
+    title: Password known to attacker, access blocked
+    anchor: The password for {{user}} was accepted from {{ip}}, but MFA or Conditional Access stopped the sign-in.
+    risk: The risk here is account takeover using the valid password; it has not happened yet because the second factor held, but the password must be treated as compromised.
+    actions:
+      - Reset the password and revoke sessions
+      - Check whether the user approved or received unexpected MFA prompts
+      - Block {{ip}} and review other accounts it targeted
+    monitor: I will monitor {{user}} for MFA fatigue attempts and further sign-ins from new infrastructure.
+
+  o-failed-benign:
+    type: outcome
+    verdict: false_positive
+    title: Isolated failed sign-in
+    anchor: The failed sign-ins from {{ip}} were rejected at the password stage and show no wider pattern.
+    risk: The risk here is credential guessing against {{user}}; it doesn't apply as the attempts were isolated and never passed the first factor.
+    actions: [Close, "Block {{ip}} if it has a bad reputation"]

@@ -1,0 +1,222 @@
+id: oauth-consent-grant
+title: OAuth App Consent Grant
+category: identity
+summary: >-
+  A user or admin consented to an application. Decide whether the app is known, whether
+  its permissions are dangerous, whether it shows the marks of consent phishing, and
+  whether it has already used its access. Password resets do not remove an app's access.
+applies_to:
+  - Suspicious OAuth app consent
+  - Risky application consent detected
+  - Unusual addition of credentials to an OAuth app
+  - App with suspicious OAuth scopes
+mitre: [T1528, T1550.001, T1098.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft incident response playbook, App consent grant investigation
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-app-consent
+  - title: Microsoft incident response playbook, Compromised and malicious applications
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-compromised-malicious-app
+  - title: "MITRE ATT&CK T1528 Steal Application Access Token"
+    url: https://attack.mitre.org/techniques/T1528/
+entities:
+  - { key: user, label: Consenting user, example: "jdoe@contoso.com" }
+  - { key: app, label: Application display name, example: "Docs Viewer" }
+  - { key: app_id, label: Application (client) ID, example: "00001111-aaaa-2222-bbbb-3333cccc4444" }
+start: c-consent
+nodes:
+  c-consent:
+    type: check
+    text: Pull the consent event and the exact permissions granted.
+    look_for:
+      - Who consented, from which IP, and when
+      - Admin consent (tenant-wide, AllPrincipals) versus user consent (Principal)
+      - Delegated versus application permissions
+      - Every scope granted, especially offline_access paired with data scopes
+    kql:
+      - title: Consent and grant events (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where OperationName in ("Consent to application", "Add delegated permission grant",
+                                    "Add app role assignment to service principal", "Add service principal")
+          | extend Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                   AppName = tostring(TargetResources[0].displayName)
+          | where Actor =~ "{{user}}" or AppName =~ "{{app}}"
+          | mv-apply Prop = TargetResources[0].modifiedProperties on (
+                summarize Props = make_bag(bag_pack(tostring(Prop.displayName), tostring(Prop.newValue))))
+          | project TimeGenerated, OperationName, Actor, ActorIP = tostring(InitiatedBy.user.ipAddress), AppName,
+                    IsAdminConsent = tostring(Props["ConsentContext.IsAdminConsent"]),
+                    Permissions = tostring(Props["ConsentAction.Permissions"]), Props
+    note: I pulled the consent by {{user}} to {{app}} ({{app_id}}) and the permissions it granted.
+    next: q-known-app
+
+  q-known-app:
+    type: question
+    text: Is the app a known, sanctioned application (in the approved app list, owned by IT, or a first-party Microsoft app requested through the normal process)?
+    yes: o-fp-sanctioned
+    no: q-red-flags
+    unknown: q-red-flags
+    notes:
+      yes: "{{app}} is a sanctioned application approved for use in the tenant."
+      no: "{{app}} is not in the approved application list."
+      unknown: I could not confirm whether {{app}} is sanctioned.
+
+  q-red-flags:
+    type: question
+    text: Does the app show consent-phishing red flags?
+    why: >-
+      Check the Enterprise application and App registration pages in Entra for the publisher
+      and reply URLs. Consent phishing apps are usually unverified, new, registered in another
+      tenant, and named to look like something familiar.
+    kql:
+      - title: How many users consented to this app, and since when (90d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(90d)
+          | where OperationName == "Consent to application"
+          | where tostring(TargetResources[0].displayName) =~ "{{app}}"
+          | summarize Consents = count(), Users = make_set(tostring(InitiatedBy.user.userPrincipalName), 50),
+                      First = min(TimeGenerated), Last = max(TimeGenerated)
+    yes: c-consent-context
+    no: q-high-risk-perms
+    notes:
+      yes: "{{app}} shows consent phishing red flags: unverified publisher, recent creation, a lookalike or generic name, or a suspicious reply URL."
+      no: "{{app}} has a verified publisher, a legitimate reply URL and an established presence."
+
+  q-high-risk-perms:
+    type: question
+    text: Does it hold high-risk permissions?
+    why: >-
+      Microsoft sees Mail.*, Contacts.*, MailboxSettings.*, People.*, Files.* and Notes.* in
+      almost all consent phishing. Also high risk: Directory.AccessAsUser.All,
+      user_impersonation, any *.ReadWrite.All, RoleManagement.ReadWrite.Directory,
+      Application.ReadWrite.All and any application (app-only) permission.
+      Low risk: User.Read, openid, email, profile, offline_access on its own.
+    yes: q-business-need
+    no: o-benign-low-risk
+    notes:
+      yes: "{{app}} holds high-risk permissions that give it access to mail, files or directory data."
+      no: "{{app}} holds only low-risk sign-in and profile permissions."
+
+  q-business-need:
+    type: question
+    text: Has the user or app owner given a business justification that IT accepts?
+    yes: o-benign-approved
+    no: o-unsanctioned
+    notes:
+      yes: The consent has a business justification accepted by IT.
+      no: No accepted business justification exists for the consent.
+
+  c-consent-context:
+    type: check
+    text: Establish how consent was obtained.
+    look_for:
+      - A URL click or phishing email shortly before the consent
+      - A suspicious sign-in for the consenting user before the consent
+      - Other users who consented to the same app (campaign)
+      - Whether consent came from an admin account (tenant-wide exposure)
+    kql:
+      - title: URL clicks before the consent (7d)
+        platform: xdr
+        query: |
+          UrlClickEvents
+          | where Timestamp > ago(7d)
+          | where AccountUpn =~ "{{user}}"
+          | project Timestamp, Url, ActionType, NetworkMessageId
+          | order by Timestamp desc
+    note: I reviewed how {{user}} came to consent to {{app}}, including preceding clicks and sign-ins.
+    next: q-app-used
+
+  q-app-used:
+    type: question
+    text: Has the app used its access (service principal sign-ins, mail or file access through the app ID)?
+    kql:
+      - title: Service principal and delegated sign-ins for the app (30d)
+        platform: sentinel
+        query: |
+          union
+            (AADServicePrincipalSignInLogs | where TimeGenerated > ago(30d) | where AppId == "{{app_id}}"
+               | project TimeGenerated, Kind = "ServicePrincipal", IPAddress, ResourceDisplayName),
+            (AADNonInteractiveUserSignInLogs | where TimeGenerated > ago(30d) | where AppId == "{{app_id}}"
+               | project TimeGenerated, Kind = strcat("Delegated:", UserPrincipalName), IPAddress, ResourceDisplayName)
+          | summarize SignIns = count(), IPs = make_set(IPAddress, 20), Resources = make_set(ResourceDisplayName, 10),
+                      First = min(TimeGenerated), Last = max(TimeGenerated) by Kind
+      - title: Mailbox and file activity by the app (30d)
+        platform: xdr
+        query: |
+          CloudAppEvents
+          | where Timestamp > ago(30d)
+          | where tostring(RawEventData.AppId) == "{{app_id}}" or tostring(RawEventData.ClientAppId) == "{{app_id}}"
+          | summarize Events = count(), Accounts = make_set(AccountDisplayName, 20), First = min(Timestamp) by ActionType
+    yes: o-tp-active
+    no: o-tp-unused
+    notes:
+      yes: "{{app}} has already used its access to read or act on data."
+      no: "{{app}} has not signed in or accessed data since the consent."
+
+  o-fp-sanctioned:
+    type: outcome
+    verdict: false_positive
+    title: Sanctioned application
+    anchor: "{{app}} is a sanctioned application and the consent by {{user}} followed the approved process."
+    risk: The risk here is illicit consent granting data access to an attacker; it doesn't apply as {{app}} is approved and owned by IT.
+    actions: [Close referencing the approved app record]
+    tuning: Add the app ID to the rule's allowlist if consents to it recur.
+
+  o-benign-low-risk:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate app with low-risk permissions
+    anchor: "{{app}} has a verified publisher and holds only low-risk sign-in permissions."
+    risk: The risk here is data access through an illicit consent; it doesn't apply as the permissions granted cannot read mail, files or directory data.
+    actions: [Close, Recommend restricting user consent to verified publishers and low-risk permissions]
+
+  o-benign-approved:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate app, justified
+    anchor: "{{app}} is legitimate and the consent by {{user}} has an accepted business justification."
+    risk: The risk here is broad data access through a third-party app; it is accepted by the business and the app shows no signs of abuse.
+    actions: [Close with the justification recorded, Recommend an admin consent workflow so future requests are reviewed first]
+
+  o-unsanctioned:
+    type: outcome
+    verdict: benign_positive
+    title: Unsanctioned app, policy violation
+    anchor: "{{app}} is legitimate but unsanctioned, and holds high-risk permissions with no accepted business need."
+    risk: The risk here is data exposure through an unapproved third party; removing the grant closes it.
+    actions: [Revoke the grant per policy, Recommend restricting user consent to verified publishers]
+
+  o-tp-unused:
+    type: outcome
+    verdict: true_positive
+    title: Illicit consent, not yet used
+    anchor: "{{user}} granted consent to {{app}}, a consent phishing application, and the app has not yet used its access."
+    risk: The risk here is persistent data access that survives password resets; disabling the app and revoking the grant removes it before use.
+    actions:
+      - Disable the application (disable rather than delete so it cannot be re-consented)
+      - Revoke the delegated grants and app role assignments
+      - Revoke sessions for {{user}} and check for other consenting users
+      - Purge the lure and report the app to Microsoft
+    escalate: true
+    monitor: I will monitor for new consents to {{app}} or apps from the same publisher.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Illicit consent, app active
+    anchor: "{{app}} obtained consent from {{user}} through consent phishing and has already accessed data."
+    risk: The risk here is ongoing mailbox and file theft through the app token, which a password reset does not stop.
+    actions:
+      - Disable the application immediately and revoke all grants
+      - Scope what the app accessed (mail items, files, sent mail) and for which users
+      - Revoke sessions for every consenting user
+      - Escalate to the customer for data exposure assessment
+      - Restrict user consent to verified publishers and enable the admin consent workflow
+    escalate: true
+    monitor: I will monitor for new consents to {{app}} and any further activity from its app ID.

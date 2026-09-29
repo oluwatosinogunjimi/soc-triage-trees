@@ -1,0 +1,398 @@
+id: phishing-email
+title: Phishing or Suspicious Email
+category: email
+summary: >-
+  User-reported or detected phishing. Establish delivery, sender legitimacy, payload,
+  campaign scope and, most importantly, whether anyone interacted with it.
+applies_to:
+  - Email messages containing malicious URL removed after delivery
+  - User reported phishing
+  - Email reported by user as malware or phish
+  - Suspicious email sending patterns
+mitre: [T1566.001, T1566.002, T1204.001, T1204.002, T1534]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft incident response playbook, Phishing investigation
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing
+  - title: "MITRE ATT&CK T1566 Phishing"
+    url: https://attack.mitre.org/techniques/T1566/
+  - title: "Lessons from the SOC (Email Threat Alerts section)"
+    url: https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7
+entities:
+  - { key: network_message_id, label: NetworkMessageId, example: "2f3c1a9e-...-08dd" }
+  - { key: sender, label: Sender (From address), example: "billing@micros0ft-support.com" }
+  - { key: recipient, label: Recipient UPN, example: "jdoe@contoso.com" }
+  - { key: subject, label: Subject, example: "Action required: invoice overdue" }
+start: c-pull
+nodes:
+  c-pull:
+    type: check
+    text: Pull the message and its metadata.
+    look_for:
+      - From vs MailFrom (envelope) address and display name
+      - All recipients, delivery action and delivery location
+      - Threat types and detection methods already assigned
+      - Any post-delivery actions (ZAP, admin remediation, user moved it)
+    kql:
+      - title: The message
+        platform: xdr
+        query: |
+          let nmid = "{{network_message_id}}";
+          EmailEvents
+          | where Timestamp > ago(30d)
+          | where NetworkMessageId == nmid
+          | project Timestamp, SenderFromAddress, SenderMailFromAddress, SenderDisplayName, SenderIPv4,
+                    RecipientEmailAddress, Subject, DeliveryAction, DeliveryLocation, ThreatTypes,
+                    DetectionMethods, EmailDirection, AuthenticationDetails
+      - title: Post-delivery actions (ZAP, manual remediation)
+        platform: xdr
+        query: |
+          EmailPostDeliveryEvents
+          | where Timestamp > ago(30d)
+          | where NetworkMessageId == "{{network_message_id}}"
+          | project Timestamp, RecipientEmailAddress, Action, ActionType, ActionTrigger, ActionResult, DeliveryLocation
+    note: I pulled message {{network_message_id}} from {{sender}} to {{recipient}} with subject "{{subject}}".
+    next: q-simulation
+
+  q-simulation:
+    type: question
+    text: Is this an authorised phishing simulation (Attack Simulation Training, KnowBe4 or similar)?
+    why: >-
+      Simulation traffic is often allowlisted through advanced delivery. Check the simulation
+      platform or the advanced delivery policy before spending time on it.
+    yes: o-simulation
+    no: q-delivered
+    notes:
+      yes: The message matches an authorised phishing simulation campaign.
+      no: The message is not part of any authorised simulation.
+
+  q-delivered:
+    type: question
+    text: Did the email reach a mailbox (Inbox or another user-accessible folder)?
+    why: Blocked or quarantined mail limits exposure, but a campaign may still have landed elsewhere.
+    yes: c-sender
+    no: q-released
+    notes:
+      yes: The message was delivered to the mailbox of {{recipient}}.
+      no: The message was blocked or quarantined before delivery.
+
+  q-released:
+    type: question
+    text: Was it released from quarantine, or did the user retrieve it from Junk?
+    yes: c-sender
+    no: c-campaign-blocked
+    notes:
+      yes: The message was released or moved back into the inbox after initial filtering.
+      no: The message stayed in quarantine and was never released.
+
+  c-campaign-blocked:
+    type: check
+    text: Confirm no copies of the same campaign were delivered to other users.
+    kql:
+      - title: Other copies by sender or subject (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where SenderFromAddress =~ "{{sender}}" or Subject == "{{subject}}"
+          | summarize Recipients = dcount(RecipientEmailAddress),
+                      Delivered = countif(DeliveryAction == "Delivered"),
+                      Blocked = countif(DeliveryAction != "Delivered") by SenderFromAddress, Subject
+    note: I checked for other copies of the campaign from {{sender}} across the tenant.
+    next: o-blocked
+
+  c-sender:
+    type: check
+    text: Assess the sender and headers.
+    why: Authentication results and domain age give confidence quickly, but a clean SPF pass only proves the domain sent it, not that the domain is legitimate.
+    look_for:
+      - SPF, DKIM, DMARC and composite authentication results
+      - Lookalike domain (micros0ft.com), newly registered domain, free-mail impersonating a business
+      - Reply-To or MailFrom that differs from From
+      - Display name impersonating an internal user or executive
+      - Prior mail history between this sender and the organisation
+    kql:
+      - title: Authentication results
+        platform: xdr
+        query: |
+          EmailEvents
+          | where NetworkMessageId == "{{network_message_id}}"
+          | extend Auth = parse_json(AuthenticationDetails)
+          | project SenderFromAddress, SenderMailFromAddress, SenderIPv4,
+                    SPF = tostring(Auth.SPF), DKIM = tostring(Auth.DKIM),
+                    DMARC = tostring(Auth.DMARC), CompAuth = tostring(Auth.CompAuth)
+          | take 1
+      - title: Sender history with the organisation (90d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(90d)
+          | where SenderFromAddress =~ "{{sender}}"
+          | summarize FirstSeen = min(Timestamp), Messages = count(), Recipients = dcount(RecipientEmailAddress)
+    note: I reviewed the sender authentication results and mail history for {{sender}}.
+    next: c-campaign
+
+  c-campaign:
+    type: check
+    text: Scope the campaign. Who else received it?
+    why: If several users got it, you are working a campaign, not a single email. Every recipient needs the interaction checks below.
+    kql:
+      - title: Recipients of the same campaign (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where SenderFromAddress =~ "{{sender}}" or Subject == "{{subject}}"
+          | summarize Recipients = dcount(RecipientEmailAddress),
+                      Delivered = countif(DeliveryAction == "Delivered"),
+                      RecipientList = make_set(RecipientEmailAddress, 100) by SenderFromAddress, Subject
+    note: I scoped the campaign from {{sender}} across all recipients.
+    next: ch-payload
+
+  ch-payload:
+    type: choice
+    text: What does the email carry?
+    options:
+      - { label: A link, next: q-url-malicious, note: "The email carries a URL." }
+      - { label: An attachment, next: q-attachment-malicious, note: "The email carries an attachment." }
+      - { label: "No payload: a request (payment, bank change, gift cards, callback number)", next: q-bec-request, note: "The email carries no link or attachment, only a request." }
+
+  q-url-malicious:
+    type: question
+    text: Is the URL malicious or credential-harvesting (threat intel verdict, detonation result, lookalike login page, newly registered domain)?
+    kql:
+      - title: URLs in the message
+        platform: xdr
+        query: |
+          EmailUrlInfo
+          | where NetworkMessageId == "{{network_message_id}}"
+          | project Url, UrlDomain, UrlLocation
+    yes: q-clicked
+    no: q-sender-risky
+    unknown: q-clicked
+    notes:
+      yes: The URL in the message is malicious based on threat intelligence and detonation results.
+      no: The URL returned clean across threat intelligence and detonation.
+      unknown: The URL verdict was not conclusive, so I treated it as suspicious.
+
+  q-attachment-malicious:
+    type: question
+    text: Is the attachment malicious (sandbox verdict, AV detection, macro or script content, HTML smuggling, password-protected archive)?
+    kql:
+      - title: Attachments in the message
+        platform: xdr
+        query: |
+          EmailAttachmentInfo
+          | where NetworkMessageId == "{{network_message_id}}"
+          | project FileName, FileType, SHA256, ThreatTypes, DetectionMethods, RecipientEmailAddress
+    yes: q-opened
+    no: q-sender-risky
+    unknown: q-opened
+    notes:
+      yes: The attachment is malicious based on sandbox and AV results.
+      no: The attachment returned clean in sandbox and AV analysis.
+      unknown: The attachment verdict was not conclusive, so I treated it as suspicious.
+
+  q-bec-request:
+    type: question
+    text: Does it ask for payment, a bank detail change, gift cards, credentials or a callback, with urgency or authority pressure?
+    why: Business email compromise often has no payload at all. The request is the payload.
+    yes: q-replied
+    no: q-sender-risky
+    notes:
+      yes: The message is a social engineering request for payment or sensitive action.
+      no: The message content carries no fraudulent request.
+
+  q-sender-risky:
+    type: question
+    text: Do the sender checks still point to phishing or impersonation (authentication failure, lookalike domain, Reply-To mismatch)?
+    yes: o-phish-no-interaction
+    no: o-fp-legit
+    notes:
+      yes: The sender checks indicate impersonation even though no malicious payload was confirmed.
+      no: The sender is legitimate and the message is consistent with normal correspondence.
+
+  q-clicked:
+    type: question
+    text: Did any recipient click the link (click allowed, or clicked through a warning)?
+    kql:
+      - title: Clicks on URLs from this message
+        platform: xdr
+        query: |
+          UrlClickEvents
+          | where Timestamp > ago(30d)
+          | where NetworkMessageId == "{{network_message_id}}"
+          | project Timestamp, AccountUpn, Url, ActionType, IsClickedThrough, IPAddress
+    yes: q-credentials
+    no: o-phish-no-interaction
+    notes:
+      yes: At least one recipient clicked the link, including {{recipient}}.
+      no: No recipient clicked the link according to Safe Links click data.
+
+  q-credentials:
+    type: question
+    text: After the click, is there evidence credentials or a session were captured (sign-in from a new IP/ASN shortly after, MFA method changes)?
+    why: >-
+      A credential-harvesting page is only the first stage. The proof of compromise is a
+      successful sign-in from attacker infrastructure, usually within minutes.
+    kql:
+      - title: Sign-ins for the recipient after the click (7d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{recipient}}"
+          | summarize FirstSeen = min(TimeGenerated), SignIns = count(), Results = make_set(ResultType)
+                    by IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion), AppDisplayName
+          | order by FirstSeen desc
+    yes: l-aitm
+    no: q-download
+    unknown: o-clicked-inconclusive
+    notes:
+      yes: Sign-in activity for {{recipient}} after the click shows access from new infrastructure.
+      no: Sign-ins for {{recipient}} after the click all come from known IPs and devices.
+      unknown: I could not rule out credential capture from the sign-in data available.
+
+  q-download:
+    type: question
+    text: Did the click lead to a file download or process execution on the endpoint?
+    kql:
+      - title: Files downloaded around the click
+        platform: xdr
+        query: |
+          DeviceFileEvents
+          | where Timestamp > ago(7d)
+          | where InitiatingProcessAccountUpn =~ "{{recipient}}" or RequestAccountName =~ tostring(split("{{recipient}}", "@")[0])
+          | where isnotempty(FileOriginUrl)
+          | project Timestamp, DeviceName, FileName, FolderPath, SHA256, FileOriginUrl, InitiatingProcessFileName
+    yes: l-edr
+    no: o-clicked-no-compromise
+    notes:
+      yes: The click resulted in a file download on the endpoint of {{recipient}}.
+      no: No file download or execution followed the click.
+
+  q-opened:
+    type: question
+    text: Did any recipient open the attachment, or did it spawn a process?
+    kql:
+      - title: Processes spawned by Outlook or from the attachment
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(7d)
+          | where InitiatingProcessFileName =~ "outlook.exe"
+             or ProcessCommandLine has @"\Content.Outlook\"
+             or ProcessCommandLine has @"\INetCache\"
+          | where AccountUpn =~ "{{recipient}}" or InitiatingProcessAccountUpn =~ "{{recipient}}"
+          | project Timestamp, DeviceName, FileName, ProcessCommandLine, InitiatingProcessFileName
+    yes: l-edr
+    no: o-phish-no-interaction
+    notes:
+      yes: The attachment was opened and spawned a process on the endpoint of {{recipient}}.
+      no: No recipient opened the attachment or executed its content.
+
+  q-replied:
+    type: question
+    text: Did the recipient reply or act on the request (mail sent to the sender or Reply-To, payment raised)?
+    kql:
+      - title: Replies from the recipient to the sender's domain (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where EmailDirection == "Outbound"
+          | where SenderFromAddress =~ "{{recipient}}"
+          | where RecipientEmailAddress endswith tostring(split("{{sender}}", "@")[1])
+          | project Timestamp, RecipientEmailAddress, Subject
+    yes: o-bec-engaged
+    no: o-phish-no-interaction
+    notes:
+      yes: "{{recipient}} replied to or acted on the request."
+      no: "{{recipient}} did not reply to or act on the request."
+
+  l-aitm:
+    type: link
+    text: Credentials or session may be captured. Continue in the token theft tree.
+    tree: aitm-token-theft
+
+  l-edr:
+    type: link
+    text: Something ran on the endpoint. Continue in the EDR tree.
+    tree: edr-malware-detection
+
+  o-simulation:
+    type: outcome
+    verdict: benign_positive
+    title: Authorised phishing simulation
+    anchor: Message {{network_message_id}} belongs to an authorised phishing simulation campaign.
+    risk: The risk here is a real phish disguised as simulation traffic; it doesn't apply as the sender infrastructure matches the simulation platform.
+    actions: [Close referencing the simulation campaign]
+    tuning: Confirm the simulation is configured in advanced delivery so it stops alerting.
+
+  o-blocked:
+    type: outcome
+    verdict: benign_positive
+    title: Blocked before delivery
+    anchor: The message from {{sender}} was blocked before reaching any mailbox and no copies were delivered.
+    risk: The risk here is a campaign landing in other inboxes; it doesn't apply given no delivered copies were found.
+    actions: [Close as blocked by email security, Add the sender or domain to the block list if it keeps retrying]
+
+  o-fp-legit:
+    type: outcome
+    verdict: false_positive
+    title: Legitimate email
+    anchor: The message from {{sender}} is legitimate, with passing authentication, established mail history and clean content.
+    risk: The risk here is a compromised trusted sender; it doesn't apply as nothing in the content or links deviates from normal correspondence.
+    actions: [Close and, for user reports, let the user know the email is safe]
+
+  o-phish-no-interaction:
+    type: outcome
+    verdict: true_positive
+    title: Phishing delivered, no interaction
+    anchor: The message from {{sender}} is phishing, and no recipient clicked, opened or replied to it.
+    risk: The risk here is credential theft or malware through the lure; it doesn't apply as no recipient interacted before remediation.
+    actions:
+      - Soft-delete or purge all copies of the campaign
+      - Block the sender, domain and URLs or hashes
+      - Report the message to Microsoft or the email vendor
+    tuning: If the gateway missed it, submit it as a false negative so filtering improves.
+
+  o-clicked-no-compromise:
+    type: outcome
+    verdict: true_positive
+    title: Clicked, no compromise found
+    anchor: "{{recipient}} clicked a malicious link from {{sender}}, but no credential use or download followed."
+    risk: Due to the click on a credential-harvesting link, we will continue to monitor {{recipient}} for sign-ins from new infrastructure.
+    actions:
+      - Purge the campaign and block the URL and domain
+      - Reset the password and revoke sessions as a precaution if credentials may have been entered
+      - Brief the user on the lure
+    monitor: I will monitor {{recipient}} for sign-ins from unfamiliar IPs and MFA method changes over the next 7 days.
+
+  o-clicked-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Clicked, credential capture not ruled out
+    anchor: "{{recipient}} clicked a suspicious link from {{sender}} and I could not rule out that credentials were entered."
+    risk: The risk here is an attacker holding valid credentials or a session for {{recipient}}, which stays open until the user confirms or sessions are revoked.
+    actions:
+      - Ask the user whether they entered credentials
+      - Revoke sessions and reset the password if the user cannot confirm
+      - Purge the campaign and block the URL
+    monitor: I will monitor {{recipient}} for sign-ins from unfamiliar IPs, inbox rule creation and MFA changes.
+
+  o-bec-engaged:
+    type: outcome
+    verdict: true_positive
+    title: BEC request acted on
+    anchor: "{{recipient}} engaged with a fraudulent request from {{sender}}."
+    risk: The risk here is financial loss or data disclosure through the request; the recipient has already engaged so the business must act now.
+    actions:
+      - Escalate urgently to the customer, including finance if payment is involved
+      - Advise contacting the bank immediately if a payment was sent
+      - Purge the campaign and block the sender
+      - Check whether a vendor account is compromised (vendor email compromise)
+    escalate: true
+    monitor: I will monitor for further messages from {{sender}} or its domain to any recipient.
