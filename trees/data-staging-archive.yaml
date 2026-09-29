@@ -1,0 +1,105 @@
+id: data-staging-archive
+title: Data Staging in Archives
+category: endpoint
+summary: >-
+  7-Zip, WinRAR, tar or PowerShell compressed a large amount of data, often
+  password-protected, into a temp or public folder. Ransomware crews do this before
+  exfiltration. Backups and users do it too.
+applies_to:
+  - Suspicious archive creation
+  - Data compressed with password (7z -p / rar -hp)
+  - Large archive created in staging directory
+mitre: [T1560.001, T1074.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1560.001 Archive via Utility"
+    url: https://attack.mitre.org/techniques/T1560/001/
+  - title: "MITRE ATT&CK T1074.001 Local Data Staging"
+    url: https://attack.mitre.org/techniques/T1074/001/
+entities:
+  - { key: device, label: Device name, example: "SRV-FS01" }
+  - { key: account, label: Account, example: "svc-sql" }
+start: c-archive
+nodes:
+  c-archive:
+    type: check
+    text: See what was archived, how, and where the archive went.
+    kql:
+      - title: Archiving commands and resulting files (48h)
+        platform: xdr
+        query: |
+          union
+            (DeviceProcessEvents | where FileName in~ ("7z.exe", "7za.exe", "rar.exe", "winrar.exe", "tar.exe", "makecab.exe")
+                 or ProcessCommandLine has_any ("Compress-Archive", " a -p", " -hp", " -mhe=on")
+               | project Timestamp, DeviceName, Kind = "Command", Detail = ProcessCommandLine, Account = AccountName),
+            (DeviceFileEvents | where FileName has_any (".7z", ".rar", ".zip", ".tar", ".gz") and ActionType == "FileCreated"
+               | where FileSize > 104857600
+               | project Timestamp, DeviceName, Kind = "Archive", Detail = strcat(FolderPath, " (", tostring(round(FileSize / 1048576.0, 0)), " MB)"), Account = InitiatingProcessAccountName)
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+    note: I reviewed the archiving by {{account}} on {{device}} and the archives created.
+    next: q-routine
+
+  q-routine:
+    type: question
+    text: Is it a routine job (backup, log rotation, a user zipping their own project) by the expected account?
+    yes: o-benign
+    no: q-signals
+    notes:
+      yes: The archiving on {{device}} is a routine job by the expected account.
+      no: The archiving on {{device}} does not match any routine job.
+
+  q-signals:
+    type: question
+    text: Are there staging signals (password-protected, file shares or many users' data, a temp or public folder, followed by uploads with rclone, WinSCP or a browser)?
+    kql:
+      - title: Exfiltration tools and large uploads after archiving (48h)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}" and RemoteIPType == "Public"
+          | where InitiatingProcessFileName has_any ("rclone", "winscp", "megasync", "filezilla", "curl", "restic", "pscp")
+          | summarize Connections = count() by InitiatingProcessFileName, RemoteUrl, RemoteIP
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: The archives show staging signals and were followed by uploads.
+      no: The archives show no upload afterwards.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Routine archiving
+    anchor: The archiving on {{device}} was a routine job by {{account}}.
+    risk: The risk here is data staged for theft; it doesn't apply given the routine job and expected account.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unexplained archive, no upload
+    anchor: "{{account}} created archives on {{device}} that no routine job explains, with no upload seen."
+    risk: The risk here is data staged for theft that has not left yet, which stays open until the owner explains it.
+    actions:
+      - Ask the account owner about the archive
+      - Check whether the archive still exists and what it contains
+    monitor: I will monitor {{device}} for uploads and transfer tools over the next 7 days.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Data staged and exfiltrated
+    anchor: Data on {{device}} was archived and uploaded by {{account}}, consistent with exfiltration.
+    risk: The risk here is data theft ahead of extortion, often before ransomware; containment is required now.
+    actions:
+      - Isolate {{device}} and disable {{account}}
+      - Block the upload destinations
+      - Scope what data was in the archives
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same tools and destinations.

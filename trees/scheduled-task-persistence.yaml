@@ -1,0 +1,105 @@
+id: scheduled-task-persistence
+title: Suspicious Scheduled Task
+category: endpoint
+summary: >-
+  A scheduled task was created or changed to run something unusual: a script from a user
+  or temp folder, an encoded command, a LOLBin, or a binary with a random name. Read the
+  task action, then trace who created it.
+applies_to:
+  - Suspicious scheduled task
+  - Scheduled task created by unusual process
+  - Persistence via scheduled task (Event 4698)
+mitre: [T1053.005]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1053.005 Scheduled Task"
+    url: https://attack.mitre.org/techniques/T1053/005/
+entities:
+  - { key: device, label: Device name, example: "WKS-HR-007" }
+  - { key: task, label: Task name, example: "\\Microsoft\\Windows\\UpdateCheck" }
+start: c-task
+nodes:
+  c-task:
+    type: check
+    text: Read the task definition and who created it.
+    kql:
+      - title: Task creation and updates on the device (7d)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where ActionType in ("ScheduledTaskCreated", "ScheduledTaskUpdated")
+          | extend AF = parse_json(AdditionalFields)
+          | project Timestamp, TaskName = tostring(AF.TaskName), TaskContent = tostring(AF.TaskContent),
+                    InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessAccountName
+    note: I read task "{{task}}" on {{device}} and the process that created it.
+    next: q-known-software
+
+  q-known-software:
+    type: question
+    text: Does the task belong to known software (updater, management agent, backup) with a signed binary in Program Files or System32?
+    yes: o-fp
+    no: q-action-suspicious
+    notes:
+      yes: Task "{{task}}" belongs to known software with a signed binary.
+      no: Task "{{task}}" does not belong to any known software.
+
+  q-action-suspicious:
+    type: question
+    text: Does the action run a script host, encoded command, LOLBin, or a binary from a user-writable path?
+    yes: q-executed
+    no: o-inconclusive
+    notes:
+      yes: Task "{{task}}" runs a script, LOLBin or binary from a user-writable path.
+      no: Task "{{task}}" runs an unknown but not obviously malicious binary.
+
+  q-executed:
+    type: question
+    text: Has the task run, and did its payload do anything (network connections, child processes)?
+    yes: l-edr
+    no: o-tp-not-run
+    notes:
+      yes: Task "{{task}}" has run and its payload was active.
+      no: Task "{{task}}" has not run yet.
+
+  l-edr:
+    type: link
+    text: The payload ran. Continue in the EDR tree.
+    tree: edr-malware-detection
+    node: q-behaviour
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known software task
+    anchor: Task "{{task}}" on {{device}} belongs to known software with a signed binary.
+    risk: The risk here is persistence through a scheduled task; it doesn't apply given the signed, expected action.
+    actions:
+      - Close
+    tuning: Exclude by task path plus signer of the action binary.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unknown task, not obviously malicious
+    anchor: Task "{{task}}" on {{device}} runs an unknown binary that I could not attribute.
+    risk: The risk here is persistence for unknown software, which stays open until the owner of the device identifies it.
+    actions:
+      - Ask the device owner or IT to identify the software
+      - Submit the binary for analysis
+    monitor: I will monitor {{device}} for the task's execution and any network activity from its binary.
+
+  o-tp-not-run:
+    type: outcome
+    verdict: true_positive
+    title: Malicious task, not yet run
+    anchor: Task "{{task}}" on {{device}} was created to run a malicious payload and has not run yet.
+    risk: The risk here is the payload running at the next trigger; removing the task and payload closes it.
+    actions:
+      - Delete the task and quarantine its payload
+      - Investigate the process and account that created it
+    escalate: true
+    monitor: I will monitor {{device}} for re-creation of the task.

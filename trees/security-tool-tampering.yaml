@@ -1,0 +1,97 @@
+id: security-tool-tampering
+title: Antivirus or EDR Tampering
+category: endpoint
+summary: >-
+  Defender real-time protection disabled, exclusions added, the EDR service stopped or
+  uninstalled, or a sensor going silent. Attackers do this just before the payload. IT
+  also does it while troubleshooting, so a ticket settles many of these.
+applies_to:
+  - Attempt to turn off Microsoft Defender Antivirus protection
+  - Suspicious Microsoft Defender Antivirus exclusion
+  - Tamper protection blocked a change
+  - EDR agent uninstalled or sensor offline unexpectedly
+mitre: [T1562.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1562.001 Impair Defenses: Disable or Modify Tools"
+    url: https://attack.mitre.org/techniques/T1562/001/
+entities:
+  - { key: device, label: Device name, example: "WKS-FIN-023" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: See exactly what was changed and by what.
+    kql:
+      - title: Defender changes, exclusions and tamper events (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceProcessEvents | where ProcessCommandLine has_any ("Set-MpPreference", "Add-MpPreference", "DisableRealtimeMonitoring",
+                                    "ExclusionPath", "ExclusionProcess", "sc stop", "sc delete", "WinDefend", "MsMpEng", "sense", "uninstall")
+               | project Timestamp, DeviceName, Kind = "Command", Detail = ProcessCommandLine, By = InitiatingProcessFileName, Account = AccountName),
+            (DeviceRegistryEvents | where RegistryKey has @"\Windows Defender\" and ActionType == "RegistryValueSet"
+               | project Timestamp, DeviceName, Kind = "Registry", Detail = strcat(RegistryKey, "\\", RegistryValueName, "=", RegistryValueData), By = InitiatingProcessFileName, Account = InitiatingProcessAccountName),
+            (DeviceEvents | where ActionType == "TamperingAttempt"
+               | project Timestamp, DeviceName, Kind = "Tamper", Detail = tostring(AdditionalFields), By = InitiatingProcessFileName, Account = InitiatingProcessAccountName)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+    note: I reviewed the security tool changes on {{device}} and the process that made them.
+    next: q-it
+
+  q-it:
+    type: question
+    text: Is it an IT change with a ticket (troubleshooting, a documented exclusion for an application, a planned agent migration)?
+    yes: o-benign
+    no: q-blocked
+    notes:
+      yes: The change on {{device}} was an approved IT change.
+      no: No IT change explains the tampering on {{device}}.
+
+  q-blocked:
+    type: question
+    text: Did tamper protection block the change, leaving protection intact?
+    yes: o-tp-blocked
+    no: o-tp
+    notes:
+      yes: Tamper protection blocked the change and protection on {{device}} is intact.
+      no: The change succeeded and protection on {{device}} is weakened or off.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved IT change
+    anchor: The security tool change on {{device}} was an approved IT action.
+    risk: The risk here is protection being disabled ahead of an attack; it doesn't apply given the ticket, though exclusions should stay narrow.
+    actions:
+      - Close referencing the ticket
+      - Confirm protection is restored if the change was temporary
+
+  o-tp-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Tampering attempt blocked
+    anchor: Something on {{device}} tried to disable or weaken security tools and tamper protection blocked it.
+    risk: The risk here is an attacker preparing to run a payload; the block held, but whoever tried is on the host.
+    actions:
+      - Investigate the process and account behind the attempt
+      - Isolate {{device}} if the process is not explained quickly
+    escalate: true
+    monitor: I will monitor {{device}} for further tampering and new executables.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Security tools disabled by an attacker
+    anchor: Security tools on {{device}} were disabled or weakened without authorisation.
+    risk: The risk here is an attacker operating on {{device}} without detection, often right before ransomware; containment is required now.
+    actions:
+      - Isolate {{device}} (network isolation may still work through the platform)
+      - Restore protection and remove rogue exclusions
+      - Look for what the attacker ran after the change
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same tampering commands.

@@ -1,0 +1,86 @@
+id: web-shell
+title: Web Shell on a Server
+category: endpoint
+summary: >-
+  A script file appeared in a web directory, or the web server process started shells or
+  recon commands. A confirmed web shell means the server was exploited and the attacker
+  can come back at will.
+applies_to:
+  - Possible web shell installation
+  - Suspicious process launched by web server (w3wp.exe spawning cmd)
+  - Web shell detected (Backdoor:ASP/Webshell)
+mitre: [T1505.003, T1190]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1505.003 Server Software Component: Web Shell"
+    url: https://attack.mitre.org/techniques/T1505/003/
+  - title: NSA and ASD, detect and prevent web shell malware
+    url: https://media.defense.gov/2020/Jun/09/2002313081/-1/-1/0/CSI-DETECT-AND-PREVENT-WEB-SHELL-MALWARE-20200422.PDF
+entities:
+  - { key: device, label: Server name, example: "SRV-WEB03" }
+  - { key: file, label: Suspicious script file, example: "errorpage.aspx" }
+start: c-evidence
+nodes:
+  c-evidence:
+    type: check
+    text: Gather the file and the web server's child processes.
+    kql:
+      - title: New script files in web roots and web server child processes (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceFileEvents | where FolderPath has_any ("inetpub", "wwwroot", "htdocs", "webapps", "/var/www", "Exchange Server\\V15\\FrontEnd")
+               | where FileName has_any (".aspx", ".ashx", ".asmx", ".asp", ".jsp", ".jspx", ".php", ".cfm")
+               | project Timestamp, DeviceName, Kind = ActionType, Detail = FolderPath, By = InitiatingProcessFileName),
+            (DeviceProcessEvents | where InitiatingProcessFileName in~ ("w3wp.exe", "httpd.exe", "nginx.exe", "tomcat.exe", "java.exe", "php-cgi.exe", "UMWorkerProcess.exe")
+               | where FileName in~ ("cmd.exe", "powershell.exe", "whoami.exe", "net.exe", "nltest.exe", "certutil.exe", "sh", "bash")
+               | project Timestamp, DeviceName, Kind = "ChildProcess", Detail = ProcessCommandLine, By = InitiatingProcessFileName)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+    note: I gathered the new script files and web server child processes on {{device}}, including {{file}}.
+    next: q-deployment
+
+  q-deployment:
+    type: question
+    text: Did the file arrive through a legitimate deployment (release pipeline, change window, developer confirms)?
+    yes: q-shell-behaviour
+    no: q-shell-behaviour
+    notes:
+      yes: "{{file}} arrived through a legitimate deployment."
+      no: "{{file}} did not arrive through any deployment."
+
+  q-shell-behaviour:
+    type: question
+    text: Does the web server process spawn shells or recon commands, or does the file contain command execution code (eval, Process.Start, cmd /c)?
+    yes: o-tp
+    no: o-fp
+    notes:
+      yes: The web server runs commands or {{file}} contains command execution code.
+      no: The web server shows no command execution and {{file}} contains normal application code.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Normal application file
+    anchor: "{{file}} on {{device}} is normal application code and the web server runs no commands."
+    risk: The risk here is a backdoor on a web server; it doesn't apply as the file has no command execution capability.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Web shell
+    anchor: A web shell is present on {{device}} and the web server is executing commands.
+    risk: The risk here is persistent remote access to an often internet-facing server and a route into the internal network; containment is required now.
+    actions:
+      - Isolate {{device}} or take it out of the load balancer
+      - Preserve the web shell and web logs, then remove it
+      - Identify the exploited vulnerability from web logs around the file's creation, and patch it
+      - Check for further shells and accounts created
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{device}} for new script files and web server child processes.

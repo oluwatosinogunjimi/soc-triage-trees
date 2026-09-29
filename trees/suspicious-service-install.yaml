@@ -1,0 +1,124 @@
+id: suspicious-service-install
+title: Suspicious Service Installation
+category: endpoint
+summary: >-
+  A new Windows service was installed with an unusual binary or command line, often
+  PsExec-style remote execution, Impacket, or a persistence mechanism. Check where the
+  install came from: locally or from another host over the network.
+applies_to:
+  - Suspicious remote service installation
+  - Suspicious service creation (Event 7045 / 4697)
+  - PsExec service installed
+mitre: [T1543.003, T1569.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1543.003 Windows Service"
+    url: https://attack.mitre.org/techniques/T1543/003/
+  - title: "MITRE ATT&CK T1569.002 Service Execution"
+    url: https://attack.mitre.org/techniques/T1569/002/
+entities:
+  - { key: device, label: Device name, example: "SRV-APP02" }
+  - { key: service, label: Service name, example: "BTOBTO" }
+start: c-service
+nodes:
+  c-service:
+    type: check
+    text: Read the service binary path and the install context.
+    kql:
+      - title: Service installs on the device (7d)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and ActionType == "ServiceInstalled"
+          | extend AF = parse_json(AdditionalFields)
+          | project Timestamp, ServiceName = tostring(AF.ServiceName), ServiceFileName = tostring(AF.ServiceFileName),
+                    ServiceStartType = tostring(AF.ServiceStartType), ServiceAccount = tostring(AF.ServiceAccount),
+                    InitiatingProcessFileName, InitiatingProcessAccountName
+      - title: Remote logons just before the install (7d)
+        platform: xdr
+        query: |
+          DeviceLogonEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and LogonType == "Network" and ActionType == "LogonSuccess"
+          | project Timestamp, AccountName, RemoteIP, RemoteDeviceName, Protocol
+    note: I read service "{{service}}" on {{device}} and its install context.
+    next: q-known
+
+  q-known:
+    type: question
+    text: Is it a known product service (signed binary in Program Files or System32, deployed by IT or an installer)?
+    yes: o-fp
+    no: q-remote
+    notes:
+      yes: Service "{{service}}" belongs to a known product.
+      no: Service "{{service}}" does not belong to any known product.
+
+  q-remote:
+    type: question
+    text: Was it installed remotely (network logon then install, random service name, cmd /c or powershell in the binary path, ADMIN$ writes)?
+    yes: q-admin-tooling
+    no: q-binary
+    notes:
+      yes: Service "{{service}}" was installed remotely in a pattern matching PsExec or Impacket.
+      no: Service "{{service}}" was installed locally.
+
+  q-admin-tooling:
+    type: question
+    text: Is the remote install explained by an admin's normal remote tooling from their usual host, with a ticket?
+    yes: o-benign-admin
+    no: l-lateral
+    notes:
+      yes: The remote install came from normal admin tooling from a known admin host.
+      no: The remote install has no admin explanation.
+
+  q-binary:
+    type: question
+    text: Is the service binary malicious or unknown and unsigned from a user-writable path?
+    yes: l-edr
+    no: o-inconclusive
+    notes:
+      yes: The binary for "{{service}}" is malicious or unsigned from a user-writable path.
+      no: The binary for "{{service}}" is unknown but not obviously malicious.
+
+  l-lateral:
+    type: link
+    text: This is lateral movement. Continue in the remote execution tree.
+    tree: remote-execution-lateral
+
+  l-edr:
+    type: link
+    text: Continue in the EDR tree for the service binary.
+    tree: edr-malware-detection
+    node: q-executed
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known product service
+    anchor: Service "{{service}}" on {{device}} belongs to a known product with a signed binary.
+    risk: The risk here is persistence or remote execution through a service; it doesn't apply given the known product.
+    actions:
+      - Close
+
+  o-benign-admin:
+    type: outcome
+    verdict: benign_positive
+    title: Admin remote execution
+    anchor: Service "{{service}}" was installed on {{device}} by an admin's normal remote tooling.
+    risk: The risk here is attacker lateral movement using the same technique; it doesn't apply given the known admin host and ticket.
+    actions:
+      - Close referencing the ticket
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unknown local service
+    anchor: Service "{{service}}" on {{device}} runs an unknown binary that I could not attribute.
+    risk: The risk here is persistence for unidentified software, which stays open until it is identified.
+    actions:
+      - Ask IT or the device owner to identify the software
+      - Submit the binary for analysis
+    monitor: I will monitor {{device}} for activity from the service binary.

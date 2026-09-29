@@ -1,0 +1,108 @@
+id: qr-code-phishing
+title: QR Code Phishing (Quishing)
+category: email
+summary: >-
+  An email with a QR code, usually for "MFA re-enrolment" or a document, that leads to a
+  credential harvesting page. Users scan it on their phone, which is often unmanaged and
+  outside Safe Links and EDR, so click telemetry may be missing.
+applies_to:
+  - Email with QR code URL detected
+  - Phish detected, URL in QR code
+  - User reported QR code phishing
+mitre: [T1566.002, T1204.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Office 365, QR code phishing protection
+    url: https://techcommunity.microsoft.com/blog/microsoftdefenderforoffice365blog/protecting-customers-from-modern-qr-code-phishing-attacks/3971524
+  - title: "MITRE ATT&CK T1566.002 Spearphishing Link"
+    url: https://attack.mitre.org/techniques/T1566/002/
+entities:
+  - { key: network_message_id, label: NetworkMessageId, example: "2f3c1a9e-...-08dd" }
+  - { key: recipient, label: Recipient UPN, example: "jdoe@contoso.com" }
+start: c-message
+nodes:
+  c-message:
+    type: check
+    text: Pull the message, the decoded QR URL and every recipient.
+    kql:
+      - title: QR code URLs and recipients
+        platform: xdr
+        query: |
+          EmailUrlInfo
+          | where Timestamp > ago(30d)
+          | where UrlLocation == "QRCode"
+          | where NetworkMessageId == "{{network_message_id}}"
+          | join kind=inner (EmailEvents | project NetworkMessageId, RecipientEmailAddress, SenderFromAddress, Subject, DeliveryAction) on NetworkMessageId
+          | project Url, UrlDomain, RecipientEmailAddress, SenderFromAddress, Subject, DeliveryAction
+    note: I pulled message {{network_message_id}}, the decoded QR code URL and every recipient.
+    next: q-delivered
+
+  q-delivered:
+    type: question
+    text: Did the message reach inboxes?
+    yes: q-scanned
+    no: o-blocked
+    notes:
+      yes: The QR code message was delivered to inboxes, including {{recipient}}.
+      no: The QR code message was blocked before delivery.
+
+  q-scanned:
+    type: question
+    text: Is there evidence a recipient scanned it (sign-in soon after from a mobile IP or new device, user admits scanning)?
+    why: Phone scans bypass Safe Links, so look at sign-ins. An AiTM sign-in from a mobile carrier IP or unusual user agent a few minutes after delivery is the tell.
+    kql:
+      - title: Sign-ins for the recipient after delivery (48h)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(48h)
+          | where UserPrincipalName =~ "{{recipient}}"
+          | project TimeGenerated, ResultType, AppDisplayName, IPAddress, AutonomousSystemNumber,
+                    OS = tostring(DeviceDetail.operatingSystem), DeviceId = tostring(DeviceDetail.deviceId), UserAgent
+          | order by TimeGenerated asc
+    yes: l-aitm
+    no: o-purged
+    unknown: o-inconclusive
+    notes:
+      yes: "{{recipient}} scanned the code, and a sign-in from new infrastructure followed."
+      no: I found no sign-in or admission that {{recipient}} scanned the code.
+      unknown: I could not confirm whether {{recipient}} scanned the code.
+
+  l-aitm:
+    type: link
+    text: Continue in the token theft tree.
+    tree: aitm-token-theft
+
+  o-blocked:
+    type: outcome
+    verdict: true_positive
+    title: QR phishing blocked
+    anchor: The QR code phishing message {{network_message_id}} was blocked before delivery.
+    risk: The risk here is credential theft through an unmanaged phone; it doesn't apply as the message never reached an inbox.
+    actions:
+      - Block the decoded URL and domain
+
+  o-purged:
+    type: outcome
+    verdict: true_positive
+    title: QR phishing delivered, no scan found
+    anchor: The QR code phishing message {{network_message_id}} was delivered, and I found no sign that anyone scanned it.
+    risk: The risk here is credential theft through a scan on an unmanaged phone that telemetry cannot see; purging the message closes further exposure.
+    actions:
+      - Purge the message from all mailboxes
+      - Block the decoded URL and domain
+      - Remind recipients that IT never asks for MFA re-enrolment by QR code
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Scan not ruled out
+    anchor: The QR code phishing message reached {{recipient}}, and I could not rule out a scan.
+    risk: The risk here is an attacker holding a session for {{recipient}} captured through the phone, which stays open until confirmed.
+    actions:
+      - Ask the recipient whether they scanned the code and entered credentials
+      - Revoke sessions as a precaution
+      - Purge the message and block the URL
+    monitor: I will monitor {{recipient}} for sign-ins from new infrastructure over the next 7 days.

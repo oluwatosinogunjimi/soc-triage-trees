@@ -1,0 +1,146 @@
+id: ransomware-behaviour
+title: Ransomware Behaviour
+category: endpoint
+summary: >-
+  Mass file renames or encryption, ransom notes, shadow copy deletion or backup tampering.
+  Speed matters more than completeness here. Contain first, then scope.
+applies_to:
+  - Ransomware behavior detected in the file system
+  - Possible ransomware activity based on a known malicious extension
+  - File backups were deleted (vssadmin, wbadmin)
+  - Ransom note detected
+mitre: [T1486, T1490]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1486 Data Encrypted for Impact"
+    url: https://attack.mitre.org/techniques/T1486/
+  - title: "MITRE ATT&CK T1490 Inhibit System Recovery"
+    url: https://attack.mitre.org/techniques/T1490/
+  - title: CISA StopRansomware guide
+    url: https://www.cisa.gov/stopransomware/ransomware-guide
+entities:
+  - { key: device, label: Device name, example: "SRV-FS01" }
+  - { key: account, label: Account running the process, example: "svc-backup" }
+start: q-active-now
+nodes:
+  q-active-now:
+    type: question
+    text: Is encryption or mass modification happening right now (files changing in the last minutes)?
+    why: If it is live, isolate before investigating. Every minute costs files, and the process may be spreading over SMB.
+    kql:
+      - title: File modification and rename rate on the device (last 2h)
+        platform: xdr
+        query: |
+          DeviceFileEvents
+          | where Timestamp > ago(2h)
+          | where DeviceName =~ "{{device}}"
+          | where ActionType in ("FileModified", "FileRenamed", "FileCreated")
+          | summarize Files = count(), Extensions = make_set(tostring(split(FileName, ".")[-1]), 20)
+                    by bin(Timestamp, 5m), InitiatingProcessFileName, InitiatingProcessAccountName
+          | order by Files desc
+    yes: o-tp-live
+    no: c-indicators
+    notes:
+      yes: Mass file modification was in progress on {{device}} when I checked.
+      no: No mass file modification is in progress on {{device}}.
+
+  c-indicators:
+    type: check
+    text: Collect the ransomware indicators on the device.
+    look_for:
+      - New extensions and ransom notes (README, HOW_TO_DECRYPT, .txt or .hta in many folders)
+      - vssadmin, wbadmin, bcdedit or wmic shadowcopy commands
+      - The process and account responsible, and remote writes over SMB from another host
+    kql:
+      - title: Recovery inhibition commands (24h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{device}}"
+          | where ProcessCommandLine has_any ("delete shadows", "shadowcopy delete", "resize shadowstorage", "wbadmin delete",
+                                              "bcdedit", "recoveryenabled no", "ignoreallfailures", "Win32_ShadowCopy")
+          | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
+    note: I collected ransomware indicators on {{device}} for {{account}}.
+    next: q-legit-backup
+
+  q-legit-backup:
+    type: question
+    text: Is it explained by legitimate software (backup product pruning shadows, encryption or archiving tool, a rename script run by IT)?
+    yes: o-fp
+    no: q-spread
+    notes:
+      yes: The activity on {{device}} is explained by legitimate backup or archiving software.
+      no: No legitimate software explains the activity on {{device}}.
+
+  q-spread:
+    type: question
+    text: Are other devices affected, or was {{device}} encrypted remotely by another host over SMB?
+    kql:
+      - title: Devices with ransomware alerts or recovery inhibition (24h)
+        platform: xdr
+        query: |
+          AlertInfo
+          | where Timestamp > ago(24h)
+          | where Title has_any ("ransomware", "shadow", "backup", "encrypt")
+          | join kind=inner (AlertEvidence | where EntityType == "Machine") on AlertId
+          | summarize Alerts = count(), Titles = make_set(Title, 10) by DeviceName
+    yes: o-tp-spread
+    no: o-tp-single
+    notes:
+      yes: Other devices show ransomware activity, or {{device}} was encrypted from another host.
+      no: The activity is limited to {{device}}.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Legitimate backup or archiving
+    anchor: The activity on {{device}} comes from legitimate backup or archiving software.
+    risk: The risk here is data encryption and loss of recovery points; it doesn't apply as the software and account are expected.
+    actions:
+      - Close
+    tuning: Exclude the specific backup process and account, not the command line pattern.
+
+  o-tp-live:
+    type: outcome
+    verdict: true_positive
+    title: Ransomware encrypting now
+    anchor: "{{device}} is actively being encrypted."
+    risk: The risk here is estate-wide encryption and data theft; immediate containment is required.
+    actions:
+      - Isolate {{device}} now and call the customer on the P1 path
+      - Disable {{account}} and any account seen writing encrypted files
+      - Identify the source host if encryption comes over SMB and isolate it
+      - Protect backups (take them offline) and engage incident response
+    escalate: true
+    monitor: I will monitor the estate for encryption behaviour and recovery inhibition on other hosts.
+
+  o-tp-single:
+    type: outcome
+    verdict: true_positive
+    title: Ransomware on one device
+    anchor: Ransomware indicators on {{device}} are real and limited to that device so far.
+    risk: The risk here is the operator moving to further hosts; the precursor activity (access, credentials) must be found.
+    actions:
+      - Isolate {{device}} and disable {{account}}
+      - Find the initial access and lateral movement that led here
+      - Check backups and restore points
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same process, account and commands.
+
+  o-tp-spread:
+    type: outcome
+    verdict: true_positive
+    title: Ransomware across multiple devices
+    anchor: Ransomware activity is present on {{device}} and other devices.
+    risk: The risk here is organisation-wide outage; this is a major incident.
+    actions:
+      - Invoke the customer's major incident process and engage incident response
+      - Isolate every affected device and consider segmenting the network
+      - Disable compromised accounts, including domain admins if used
+      - Protect and verify backups
+    escalate: true
+    monitor: I will monitor for new devices showing encryption or recovery inhibition.

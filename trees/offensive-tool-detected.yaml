@@ -1,0 +1,98 @@
+id: offensive-tool-detected
+title: Offensive Security Tool or C2 Framework
+category: endpoint
+summary: >-
+  Mimikatz, Cobalt Strike, Sliver, Brute Ratel, Impacket, Rubeus, SharpHound or similar
+  was detected on a host. Red teams use them too, so confirm authorisation first. If not
+  authorised, assume a human attacker is active.
+applies_to:
+  - Cobalt Strike command and control detected
+  - HackTool:Win32/Mimikatz
+  - An active 'Sliver' / 'BruteRatel' beacon was detected
+  - Impacket toolkit usage
+mitre: [T1588.002, T1071.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK S0154 Cobalt Strike"
+    url: https://attack.mitre.org/software/S0154/
+  - title: "MITRE ATT&CK T1588.002 Obtain Capabilities: Tool"
+    url: https://attack.mitre.org/techniques/T1588/002/
+entities:
+  - { key: device, label: Device name, example: "WKS-IT-004" }
+  - { key: tool, label: Tool or family detected, example: "Cobalt Strike" }
+start: q-authorised
+nodes:
+  q-authorised:
+    type: question
+    text: Is there an authorised red team or penetration test covering this host and time, confirmed with the customer's contact?
+    why: Confirm with the named contact in the rules of engagement, not with whoever is on the host.
+    yes: o-benign-test
+    no: c-execution
+    notes:
+      yes: The detection of {{tool}} on {{device}} is covered by an authorised test.
+      no: No authorised test covers {{tool}} on {{device}}.
+
+  c-execution:
+    type: check
+    text: Establish whether the tool ran, how it arrived and what it talked to.
+    kql:
+      - title: Alerts, process tree and network for the device (48h)
+        platform: xdr
+        query: |
+          union
+            (AlertInfo | join kind=inner (AlertEvidence | where DeviceName =~ "{{device}}") on AlertId
+               | where Timestamp > ago(48h) | project Timestamp, Kind = "Alert", Detail = Title),
+            (DeviceNetworkEvents | where Timestamp > ago(48h) | where DeviceName =~ "{{device}}" and RemoteIPType == "Public"
+               | summarize Timestamp = min(Timestamp), Count = count() by RemoteIP, RemoteUrl, InitiatingProcessFileName
+               | project Timestamp, Kind = "Network", Detail = strcat(InitiatingProcessFileName, " -> ", RemoteUrl, " ", RemoteIP, " x", Count))
+          | order by Timestamp asc
+    note: I reviewed execution, origin and network activity for {{tool}} on {{device}}.
+    next: q-blocked
+
+  q-blocked:
+    type: question
+    text: Was it quarantined on write and never executed?
+    yes: o-tp-blocked
+    no: o-tp-active
+    notes:
+      yes: "{{tool}} was quarantined on {{device}} before executing."
+      no: "{{tool}} executed on {{device}}."
+
+  o-benign-test:
+    type: outcome
+    verdict: benign_positive
+    title: Authorised offensive testing
+    anchor: The detection of {{tool}} on {{device}} is part of an authorised red team or penetration test.
+    risk: The risk here is a real attacker hiding behind test activity; it doesn't apply given confirmation from the named contact.
+    actions:
+      - Close referencing the rules of engagement
+      - Record the detection for the test's detection report
+
+  o-tp-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Offensive tool blocked on write
+    anchor: "{{tool}} was dropped on {{device}} and quarantined before it ran."
+    risk: The risk here is a hands-on attacker; the tool was stopped, but someone put it there.
+    actions:
+      - Find who or what dropped the tool and isolate {{device}} if that cannot be explained quickly
+      - Reset the account that dropped it
+    escalate: true
+    monitor: I will monitor {{device}} for further tool drops and suspicious logons.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Active offensive tooling
+    anchor: "{{tool}} executed on {{device}} without authorisation."
+    risk: The risk here is an active intrusion with credential theft and lateral movement capability; containment is required now.
+    actions:
+      - Isolate {{device}} and call the customer on the P1 path
+      - Block the C2 infrastructure
+      - Reset credentials used on the device
+      - Hunt for the same beacon or tool across the estate
+      - Engage incident response
+    escalate: true
+    monitor: I will monitor the estate for the C2 infrastructure and tool indicators.

@@ -1,0 +1,110 @@
+id: malicious-url-click
+title: User Clicked a Malicious URL
+category: email
+summary: >-
+  Safe Links or a proxy recorded a click on a URL later judged malicious, sometimes
+  through a warning page. What matters is what happened in the minutes after the click:
+  a credential prompt, a download, or nothing.
+applies_to:
+  - A potentially malicious URL click was detected
+  - User clicked through to a malicious URL
+  - Safe Links click allowed, URL later weaponized
+mitre: [T1204.001, T1566.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Office 365 Safe Links
+    url: https://learn.microsoft.com/en-us/defender-office-365/safe-links-about
+  - title: "MITRE ATT&CK T1204.001 User Execution: Malicious Link"
+    url: https://attack.mitre.org/techniques/T1204/001/
+entities:
+  - { key: user, label: User who clicked, example: "jdoe@contoso.com" }
+  - { key: url, label: URL clicked, example: "https://login-micros0ft.example/verify" }
+start: c-click
+nodes:
+  c-click:
+    type: check
+    text: Pull the click, the source message and the URL verdict.
+    kql:
+      - title: Clicks on the URL across the tenant (7d)
+        platform: xdr
+        query: |
+          UrlClickEvents
+          | where Timestamp > ago(7d)
+          | where Url has "{{url}}"
+          | project Timestamp, AccountUpn, ActionType, IsClickedThrough, NetworkMessageId, Workload, IPAddress
+    note: I pulled the click on {{url}} by {{user}} and the message it came from.
+    next: q-malicious
+
+  q-malicious:
+    type: question
+    text: Is the URL confirmed malicious (credential harvesting, malware delivery) rather than a false detection?
+    yes: q-clickthrough
+    no: o-fp
+    unknown: q-clickthrough
+    notes:
+      yes: "{{url}} is confirmed malicious."
+      no: "{{url}} is benign on review; the detection was wrong."
+      unknown: The verdict on {{url}} is not conclusive, so I treated it as suspicious.
+
+  q-clickthrough:
+    type: question
+    text: Did the click reach the page (ClickAllowed or clicked through the warning), rather than being blocked?
+    yes: ch-page
+    no: o-blocked
+    notes:
+      yes: The click by {{user}} reached the page at {{url}}.
+      no: Safe Links blocked the click before the page loaded.
+
+  ch-page:
+    type: choice
+    text: What kind of page was it?
+    options:
+      - { label: Credential harvesting or fake login page, next: l-aitm, note: "The page was a credential harvesting login page." }
+      - { label: File download or malware delivery, next: l-edr, note: "The page delivered a file download." }
+      - { label: "Unclear, page gone or not reproducible", next: o-inconclusive, note: "The page could no longer be reproduced." }
+
+  l-aitm:
+    type: link
+    text: Check whether credentials or a session were captured.
+    tree: aitm-token-theft
+
+  l-edr:
+    type: link
+    text: Check the downloaded file.
+    tree: edr-malware-detection
+    node: c-origin
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Benign URL
+    anchor: "{{url}} is benign on review and the detection was wrong."
+    risk: The risk here is credential or malware delivery through the link; it doesn't apply given the clean review.
+    actions:
+      - Close
+      - Submit the URL to Microsoft as a false positive
+
+  o-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Malicious click blocked
+    anchor: "{{user}} clicked {{url}}, which is malicious, and Safe Links blocked it before the page loaded."
+    risk: The risk here is credential theft or malware from the page; it doesn't apply as the page never loaded.
+    actions:
+      - Purge the message from all mailboxes
+      - Block the URL and domain
+      - Check other recipients' clicks
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Click reached an unknown page
+    anchor: "{{user}} reached {{url}}, and I could not establish what the page did."
+    risk: The risk here is an unnoticed credential entry or download, which stays open until the user confirms what they saw.
+    actions:
+      - Ask the user whether they entered credentials or downloaded anything
+      - Revoke sessions as a precaution if they cannot say
+      - Block the URL and purge the message
+    monitor: I will monitor {{user}} for sign-ins from new infrastructure and new file executions over the next 7 days.

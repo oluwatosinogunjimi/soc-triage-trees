@@ -1,0 +1,118 @@
+id: html-smuggling
+title: HTML Smuggling Attachment
+category: email
+summary: >-
+  An HTML or SVG attachment that builds a file (ZIP, ISO, JS) in the browser when opened,
+  bypassing gateway scanning, or that renders a local fake login page. Check whether it
+  was opened and whether a file was assembled and run.
+applies_to:
+  - Suspicious HTML attachment
+  - HTML smuggling detected
+  - Malicious SVG attachment
+mitre: [T1027.006, T1566.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1027.006 HTML Smuggling"
+    url: https://attack.mitre.org/techniques/T1027/006/
+  - title: Microsoft Threat Intelligence, HTML smuggling surges
+    url: https://www.microsoft.com/en-us/security/blog/2021/11/11/html-smuggling-surges-highly-evasive-loader-technique-increasingly-used-in-banking-malware-targeted-attacks/
+entities:
+  - { key: network_message_id, label: NetworkMessageId, example: "2f3c1a9e-...-08dd" }
+  - { key: recipient, label: Recipient UPN, example: "jdoe@contoso.com" }
+  - { key: device, label: Recipient device, example: "WKS-FIN-023" }
+start: c-attachment
+nodes:
+  c-attachment:
+    type: check
+    text: Pull the attachment and its analysis.
+    kql:
+      - title: HTML and SVG attachments on the message
+        platform: xdr
+        query: |
+          EmailAttachmentInfo
+          | where NetworkMessageId == "{{network_message_id}}"
+          | where FileType in~ ("html", "htm", "svg", "shtml") or FileName has_any (".htm", ".svg")
+          | project FileName, FileType, SHA256, ThreatTypes, DetectionMethods, RecipientEmailAddress
+    note: I pulled the HTML or SVG attachment on message {{network_message_id}} to {{recipient}}.
+    next: q-opened
+
+  q-opened:
+    type: question
+    text: Did the recipient open the attachment in a browser?
+    kql:
+      - title: Browser opening an HTML file from Outlook temp (7d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where FileName in~ ("msedge.exe", "chrome.exe", "firefox.exe")
+          | where ProcessCommandLine has_any (".htm", ".svg") and ProcessCommandLine has_any ("Content.Outlook", "INetCache", "Temp")
+          | project Timestamp, AccountName, ProcessCommandLine
+    yes: q-dropped
+    no: o-not-opened
+    notes:
+      yes: "{{recipient}} opened the attachment in a browser on {{device}}."
+      no: "{{recipient}} did not open the attachment."
+
+  q-dropped:
+    type: question
+    text: Did the browser save an assembled file (ZIP, ISO, IMG, JS, LNK) or show a login page?
+    kql:
+      - title: Files written by the browser after opening (7d)
+        platform: xdr
+        query: |
+          DeviceFileEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where InitiatingProcessFileName in~ ("msedge.exe", "chrome.exe", "firefox.exe")
+          | where FileName has_any (".zip", ".iso", ".img", ".js", ".lnk", ".vhd", ".hta", ".exe")
+          | project Timestamp, FileName, FolderPath, SHA256, FileOriginUrl
+    yes: l-edr
+    no: q-login-page
+    notes:
+      yes: The browser assembled and saved a file on {{device}}.
+      no: No file was assembled on {{device}}.
+
+  q-login-page:
+    type: question
+    text: Was the attachment a local fake login page, and did the user submit credentials?
+    yes: l-aitm
+    no: o-opened-nothing
+    notes:
+      yes: The attachment rendered a fake login page and {{recipient}} submitted credentials.
+      no: The attachment neither dropped a file nor captured credentials.
+
+  l-edr:
+    type: link
+    text: A file was assembled. Continue in the EDR tree.
+    tree: edr-malware-detection
+    node: q-executed
+
+  l-aitm:
+    type: link
+    text: Credentials were entered. Continue with account takeover checks.
+    tree: aitm-token-theft
+
+  o-not-opened:
+    type: outcome
+    verdict: true_positive
+    title: Smuggling attachment not opened
+    anchor: The HTML smuggling attachment on {{network_message_id}} was delivered to {{recipient}} but never opened.
+    risk: The risk here is a payload assembled in the browser past the gateway; it doesn't apply as the file was never opened.
+    actions:
+      - Purge the message from all mailboxes
+      - Block the sender and attachment hash
+
+  o-opened-nothing:
+    type: outcome
+    verdict: true_positive
+    title: Opened, no payload or credential capture
+    anchor: "{{recipient}} opened the HTML smuggling attachment, but it assembled no file and captured no credentials."
+    risk: The risk here is a payload or credential capture from the attachment; it doesn't apply as nothing was produced.
+    actions:
+      - Purge the message and block the sender and hash
+      - Brief the user
+    monitor: I will monitor {{device}} for new executable files from the browser over the next 7 days.

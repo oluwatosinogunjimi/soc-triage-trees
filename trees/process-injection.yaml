@@ -1,0 +1,93 @@
+id: process-injection
+title: Process Injection or Hollowing
+category: endpoint
+summary: >-
+  A process wrote into or created a thread in another process, or a legitimate binary is
+  running code that is not its own. Security products and some accessibility or game
+  tools inject legitimately. Malware injects to hide in trusted processes.
+applies_to:
+  - Suspicious process injection observed
+  - Process hollowing detected
+  - A process was injected with potentially malicious code
+mitre: [T1055, T1055.012]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1055 Process Injection"
+    url: https://attack.mitre.org/techniques/T1055/
+entities:
+  - { key: device, label: Device name, example: "WKS-FIN-023" }
+  - { key: source, label: Injecting process, example: "rundll32.exe" }
+  - { key: target, label: Target process, example: "explorer.exe" }
+start: c-injection
+nodes:
+  c-injection:
+    type: check
+    text: Identify the injecting process, the target and what the target did after.
+    kql:
+      - title: Remote thread and memory API calls (48h)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}"
+          | where ActionType in ("CreateRemoteThreadApiCall", "QueueUserApcRemoteApiCall", "SetThreadContextRemoteApiCall", "NtAllocateVirtualMemoryRemoteApiCall", "NtMapViewOfSectionRemoteApiCall")
+          | project Timestamp, ActionType, InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessSHA256, FileName, ProcessId
+      - title: Network activity from the target after injection (48h)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}" and InitiatingProcessFileName =~ "{{target}}" and RemoteIPType == "Public"
+          | summarize Connections = count() by RemoteIP, RemoteUrl, RemotePort
+    note: I reviewed injection from {{source}} into {{target}} on {{device}}.
+    next: q-known
+
+  q-known:
+    type: question
+    text: Is the injecting process a known, signed security, accessibility or management product that routinely injects?
+    yes: o-fp
+    no: q-target-behaviour
+    notes:
+      yes: "{{source}} is a known signed product that routinely injects."
+      no: "{{source}} is not a known product that injects."
+
+  q-target-behaviour:
+    type: question
+    text: Did the target process then do something out of character (network beacons, spawning shells, touching LSASS)?
+    yes: o-tp
+    no: l-edr
+    notes:
+      yes: "{{target}} behaved out of character after the injection."
+      no: "{{target}} showed no abnormal behaviour after the injection."
+
+  l-edr:
+    type: link
+    text: Assess the injecting binary in the EDR tree.
+    tree: edr-malware-detection
+    node: q-legit
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known product injection
+    anchor: "{{source}} on {{device}} is a known signed product that injects into {{target}} as part of normal operation."
+    risk: The risk here is malware hiding inside a trusted process; it doesn't apply given the known product.
+    actions:
+      - Close
+    tuning: Exclude the specific signer and source path for this detection.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Malicious injection
+    anchor: "{{source}} injected code into {{target}} on {{device}}, which then behaved maliciously."
+    risk: The risk here is an implant hiding in a trusted process with network and credential access; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Collect memory or an investigation package before remediation
+      - Identify how {{source}} arrived and block its hash
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the injecting binary and the C2 destinations.

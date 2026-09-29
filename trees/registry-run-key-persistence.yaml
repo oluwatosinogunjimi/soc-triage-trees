@@ -1,0 +1,84 @@
+id: registry-run-key-persistence
+title: Registry Run Key or Startup Folder Persistence
+category: endpoint
+summary: >-
+  A Run, RunOnce, Winlogon or Startup folder entry now launches something at logon. Most
+  are installers; malware prefers user-writable paths, script hosts and random names.
+applies_to:
+  - Anomaly detected in ASEP registry
+  - Suspicious Run key modification
+  - File dropped in Startup folder
+mitre: [T1547.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1547.001 Registry Run Keys / Startup Folder"
+    url: https://attack.mitre.org/techniques/T1547/001/
+entities:
+  - { key: device, label: Device name, example: "WKS-MKT-019" }
+  - { key: value, label: Registry value or startup file, example: "OneDriveUpdater" }
+start: c-entry
+nodes:
+  c-entry:
+    type: check
+    text: Read the entry and the process that wrote it.
+    kql:
+      - title: Autostart registry and startup folder writes (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceRegistryEvents | where ActionType == "RegistryValueSet"
+               | where RegistryKey has_any (@"\CurrentVersion\Run", @"\CurrentVersion\RunOnce", @"\Winlogon", @"\Explorer\Shell Folders", @"\Policies\Explorer\Run")
+               | project Timestamp, DeviceName, Where = strcat(RegistryKey, "\\", RegistryValueName), What = RegistryValueData,
+                         InitiatingProcessFileName, InitiatingProcessAccountName),
+            (DeviceFileEvents | where FolderPath has @"\Start Menu\Programs\Startup\" and ActionType == "FileCreated"
+               | project Timestamp, DeviceName, Where = FolderPath, What = FileName, InitiatingProcessFileName, InitiatingProcessAccountName)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+    note: I read the autostart entry "{{value}}" on {{device}} and the process that wrote it.
+    next: q-known
+
+  q-known:
+    type: question
+    text: Does it point to known, signed software in a standard install path, written by its installer?
+    yes: o-fp
+    no: q-suspicious-target
+    notes:
+      yes: Entry "{{value}}" points to known, signed software written by its installer.
+      no: Entry "{{value}}" does not point to known software.
+
+  q-suspicious-target:
+    type: question
+    text: Does it launch a script host, LOLBin, encoded command, or a binary in AppData, Temp, ProgramData or Public?
+    yes: l-edr
+    no: o-inconclusive
+    notes:
+      yes: Entry "{{value}}" launches a script or binary from a user-writable path.
+      no: Entry "{{value}}" launches an unknown binary from a standard path.
+
+  l-edr:
+    type: link
+    text: Continue in the EDR tree for the launched payload.
+    tree: edr-malware-detection
+    node: q-executed
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known software autostart
+    anchor: Autostart entry "{{value}}" on {{device}} belongs to known, signed software.
+    risk: The risk here is malware persistence at logon; it doesn't apply given the known software and installer.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unknown autostart
+    anchor: Autostart entry "{{value}}" on {{device}} launches software I could not attribute.
+    risk: The risk here is persistence for unidentified software, which stays open until it is identified.
+    actions:
+      - Ask the device owner or IT to identify it
+      - Submit the binary for analysis
+    monitor: I will monitor {{device}} for activity from the entry's binary.

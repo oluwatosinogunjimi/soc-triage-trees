@@ -1,0 +1,97 @@
+id: event-log-cleared
+title: Event Log Cleared
+category: endpoint
+summary: >-
+  The Security or another event log was cleared (Event 1102 or 104), or logging was
+  disabled. Attackers do it to erase tracks. Admins rarely do it on purpose. What
+  happened just before the clear matters most.
+applies_to:
+  - Event log was cleared (1102 / 104)
+  - wevtutil cl executed
+  - Audit policy changed
+mitre: [T1070.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1070.001 Clear Windows Event Logs"
+    url: https://attack.mitre.org/techniques/T1070/001/
+entities:
+  - { key: device, label: Device name, example: "SRV-DC02" }
+  - { key: account, label: Account that cleared the log, example: "adm-jdoe" }
+start: c-clear
+nodes:
+  c-clear:
+    type: check
+    text: Confirm the clear and what ran around it.
+    kql:
+      - title: Log clears and audit changes (7d)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(7d)
+          | where EventID in (1102, 4719)
+          | where Computer has "{{device}}"
+          | project TimeGenerated, Computer, EventID, Activity, SubjectUserName
+      - title: Clearing commands and surrounding processes (7d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where ProcessCommandLine has_any ("wevtutil cl", "Clear-EventLog", "Remove-EventLog", "auditpol /clear", "auditpol /set")
+          | project Timestamp, AccountName, ProcessCommandLine, InitiatingProcessFileName
+    note: I confirmed the log clear on {{device}} by {{account}} and reviewed what ran around it.
+    next: q-planned
+
+  q-planned:
+    type: question
+    text: Is it a documented maintenance action (image build, lab machine, a ticket for log reset)?
+    yes: o-benign
+    no: q-before
+    notes:
+      yes: The log clear on {{device}} was a documented maintenance action.
+      no: No maintenance explains the log clear on {{device}}.
+
+  q-before:
+    type: question
+    text: Is there other suspicious activity on the device in the hours before (new tools, logons from unusual hosts, other alerts)?
+    yes: o-tp
+    no: o-tp-isolated
+    notes:
+      yes: The clear followed other suspicious activity on {{device}}.
+      no: I found no other suspicious activity before the clear.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Planned log reset
+    anchor: The log on {{device}} was cleared as documented maintenance.
+    risk: The risk here is evidence destruction by an attacker; it doesn't apply given the maintenance record.
+    actions:
+      - Close referencing the ticket
+
+  o-tp-isolated:
+    type: outcome
+    verdict: true_positive
+    title: Unexplained log clear
+    anchor: "{{account}} cleared the log on {{device}} with no maintenance reason."
+    risk: The risk here is hidden attacker activity; the destroyed local logs mean other sources (EDR, SIEM copies) must be checked.
+    actions:
+      - Ask the account owner to explain the clear
+      - Review forwarded logs and EDR telemetry for the period before the clear
+    escalate: true
+    monitor: I will monitor {{device}} and {{account}} for further clears and suspicious logons.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Attacker covering tracks
+    anchor: The log on {{device}} was cleared by {{account}} after other suspicious activity.
+    risk: The risk here is an active intrusion hiding its footprint; containment is required now.
+    actions:
+      - Isolate {{device}} and reset {{account}}
+      - Rebuild the timeline from EDR and forwarded logs
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same account and commands.

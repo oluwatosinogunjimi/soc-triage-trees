@@ -1,0 +1,114 @@
+id: usb-data-transfer
+title: Large Copy to Removable Media
+category: endpoint
+summary: >-
+  A user copied a large volume or sensitive files to a USB drive, often shortly before
+  leaving. It is an insider risk question more than a malware one: the user, the data and
+  HR context matter.
+applies_to:
+  - Files copied to removable storage
+  - DLP removable media policy match
+  - USB mass storage device mounted (policy violation)
+mitre: [T1052.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1052.001 Exfiltration over USB"
+    url: https://attack.mitre.org/techniques/T1052/001/
+entities:
+  - { key: device, label: Device name, example: "WKS-ENG-031" }
+  - { key: user, label: User, example: "jdoe" }
+start: c-copy
+nodes:
+  c-copy:
+    type: check
+    text: Measure what was copied and to which device.
+    kql:
+      - title: USB mounts and files written to removable drives (7d)
+        platform: xdr
+        query: |
+          let mounts = DeviceEvents
+            | where Timestamp > ago(7d) and DeviceName =~ "{{device}}" and ActionType == "UsbDriveMounted"
+            | extend Drive = tostring(parse_json(AdditionalFields).DriveLetter), Product = tostring(parse_json(AdditionalFields).ProductName),
+                     Serial = tostring(parse_json(AdditionalFields).SerialNumber)
+            | project MountTime = Timestamp, Drive, Product, Serial;
+          DeviceFileEvents
+          | where Timestamp > ago(7d) and DeviceName =~ "{{device}}"
+          | where ActionType in ("FileCreated", "FileModified")
+          | extend Drive = substring(FolderPath, 0, 2)
+          | join kind=inner mounts on Drive
+          | summarize Files = count(), SizeMB = round(sum(FileSize) / 1048576.0, 1), Types = make_set(tostring(split(FileName, ".")[-1]), 20),
+                      Samples = make_set(FileName, 20) by Drive, Product, Serial, InitiatingProcessAccountName
+    note: I measured the files {{user}} copied to removable media on {{device}}.
+    next: q-business
+
+  q-business:
+    type: question
+    text: Is there a business reason (approved encrypted USB, field work, a documented handover) and is the data non-sensitive?
+    yes: o-benign
+    no: q-sensitive
+    notes:
+      yes: The copy by {{user}} had a business reason and involved non-sensitive data.
+      no: The copy by {{user}} has no business reason or involves sensitive data.
+
+  q-sensitive:
+    type: question
+    text: Does the copied data include sensitive material (customer data, source code, finance, labelled confidential)?
+    yes: q-hr-context
+    no: o-policy
+    notes:
+      yes: The copied data includes sensitive material.
+      no: The copied data is not sensitive.
+
+  q-hr-context:
+    type: question
+    text: Is the user leaving, on notice, or subject to an HR concern (check through the agreed contact only)?
+    yes: o-tp-insider
+    no: o-inconclusive
+    notes:
+      yes: HR confirmed that {{user}} is leaving or subject to an HR matter.
+      no: HR raised no concern about {{user}}.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved removable media use
+    anchor: "{{user}} copied non-sensitive data to removable media on {{device}} for a business reason."
+    risk: The risk here is data leaving the organisation on removable media; it doesn't apply given the reason and data type.
+    actions:
+      - Close
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Policy breach, low sensitivity
+    anchor: "{{user}} copied non-sensitive data to unapproved removable media on {{device}}."
+    risk: The risk here is data leakage through unmanaged media; the data is low sensitivity but the practice breaches policy.
+    actions:
+      - Inform the user's manager per policy
+      - Recommend device control to block unapproved USB storage
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Sensitive copy, intent unclear
+    anchor: "{{user}} copied sensitive data to removable media on {{device}} with no business reason on record."
+    risk: The risk here is loss of sensitive data, which stays open until the business confirms the purpose.
+    actions:
+      - Raise with the customer's data protection or security lead through the agreed channel
+      - Preserve the evidence (file list, device serial)
+    monitor: I will monitor {{user}} for further removable media and cloud upload activity.
+
+  o-tp-insider:
+    type: outcome
+    verdict: true_positive
+    title: Probable insider data theft
+    anchor: "{{user}}, who is leaving or under HR review, copied sensitive data to removable media on {{device}}."
+    risk: The risk here is theft of sensitive company data by a departing insider; the business needs to act quickly and carefully.
+    actions:
+      - Escalate to the customer's security lead, HR and legal through the agreed confidential channel
+      - Preserve evidence and do not alert the user
+      - Recommend blocking removable storage for the user
+    escalate: true
+    monitor: I will monitor {{user}} for further copying, printing and uploads to personal cloud storage.

@@ -1,0 +1,91 @@
+id: office-child-process
+title: Office Application Spawned a Suspicious Process
+category: endpoint
+summary: >-
+  Word, Excel, PowerPoint, Outlook or OneNote started cmd, PowerShell, a script host,
+  rundll32 or mshta. This is how malicious documents run their first stage. Some add-ins
+  and macros do it legitimately.
+applies_to:
+  - Suspicious process launched by Office application
+  - An Office application ran suspicious commands
+  - "ASR rule: Block Office applications from creating child processes"
+mitre: [T1204.002, T1566.001, T1059]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1204.002 User Execution: Malicious File"
+    url: https://attack.mitre.org/techniques/T1204/002/
+  - title: Microsoft attack surface reduction rules reference
+    url: https://learn.microsoft.com/en-us/defender-endpoint/attack-surface-reduction-rules-reference
+entities:
+  - { key: device, label: Device name, example: "WKS-HR-007" }
+  - { key: document, label: Document name, example: "Invoice_2291.docm" }
+start: c-chain
+nodes:
+  c-chain:
+    type: check
+    text: Read the process chain and the document that started it.
+    kql:
+      - title: Office child processes on the device (48h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}"
+          | where InitiatingProcessFileName in~ ("winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe", "onenote.exe", "mspub.exe", "msaccess.exe")
+          | project Timestamp, AccountName, InitiatingProcessFileName, InitiatingProcessCommandLine, FileName, ProcessCommandLine
+      - title: ASR blocks for Office on the device (48h)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}" and ActionType startswith "Asr" and ActionType has "Office"
+          | project Timestamp, ActionType, FileName, InitiatingProcessCommandLine
+    note: I read the process chain from {{document}} on {{device}}.
+    next: q-known-addin
+
+  q-known-addin:
+    type: question
+    text: Is it a known add-in or business macro (signed, seen across many devices, documented)?
+    yes: o-fp
+    no: q-blocked
+    notes:
+      yes: The child process comes from a known add-in or business macro.
+      no: No known add-in or business macro explains the child process.
+
+  q-blocked:
+    type: question
+    text: Did ASR or the EDR block the child process?
+    yes: o-tp-blocked
+    no: l-powershell
+    notes:
+      yes: The child process from {{document}} was blocked.
+      no: The child process from {{document}} ran.
+
+  l-powershell:
+    type: link
+    text: Something ran. Continue in the PowerShell and LOLBin tree.
+    tree: suspicious-powershell
+    node: q-offensive-traits
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known add-in or macro
+    anchor: The child process from {{document}} on {{device}} comes from a known business add-in or macro.
+    risk: The risk here is a malicious document running code; it doesn't apply given the known, widespread behaviour.
+    actions:
+      - Close
+    tuning: Add an ASR exclusion for the specific add-in path, not a blanket Office exclusion.
+
+  o-tp-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Malicious document blocked
+    anchor: "{{document}} tried to run code on {{device}} and it was blocked."
+    risk: The risk here is malware delivered through the document; it doesn't apply as the child process never ran.
+    actions:
+      - Find where the document came from (email, download) and purge or block it
+      - Delete the document from the device
+    monitor: I will monitor {{device}} for further Office child processes over the next 7 days.

@@ -1,0 +1,90 @@
+id: mailbox-delegation-added
+title: Mailbox Delegation or Send-As Permission Added
+category: email
+summary: >-
+  FullAccess, SendAs or SendOnBehalf rights were granted on a mailbox, or folder
+  permissions were changed. Attackers use delegation to read or send from a mailbox
+  without touching its password.
+applies_to:
+  - Add-MailboxPermission (FullAccess)
+  - Add-RecipientPermission (SendAs)
+  - Set-Mailbox GrantSendOnBehalfTo
+  - Add-MailboxFolderPermission
+mitre: [T1098.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1098.002 Additional Email Delegate Permissions"
+    url: https://attack.mitre.org/techniques/T1098/002/
+  - title: Microsoft phishing playbook (delegated access check)
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing
+entities:
+  - { key: mailbox, label: Mailbox changed, example: "cfo@contoso.com" }
+  - { key: delegate, label: Account granted access, example: "jdoe@contoso.com" }
+  - { key: actor, label: Who made the change, example: "exch-admin@contoso.com" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull the permission change.
+    kql:
+      - title: Mailbox permission changes (30d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(30d)
+          | where Operation in~ ("Add-MailboxPermission", "Add-RecipientPermission", "Set-Mailbox", "Add-MailboxFolderPermission", "Set-MailboxFolderPermission")
+          | where Parameters has "{{mailbox}}" or OfficeObjectId has "{{mailbox}}" or Parameters has "{{delegate}}"
+          | project TimeGenerated, Operation, UserId, ClientIP, Parameters
+    note: I pulled the delegation of {{mailbox}} to {{delegate}} by {{actor}}.
+    next: q-actor-clean
+
+  q-business:
+    type: question
+    text: Is there a business reason (assistant, shared team inbox, leaver handover) with a request?
+    yes: o-benign
+    no: o-policy
+    notes:
+      yes: The delegation of {{mailbox}} to {{delegate}} has a business reason and request.
+      no: I found no business reason or request for the delegation.
+
+  q-actor-clean:
+    type: question
+    text: Was the change made by an Exchange admin from their normal session, or by the mailbox owner from a normal session?
+    yes: q-business
+    no: o-tp
+    notes:
+      yes: "{{actor}} made the change from a normal session."
+      no: "{{actor}} made the change from an unusual or risky session."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved delegation
+    anchor: "{{actor}} delegated {{mailbox}} to {{delegate}} for a documented business reason."
+    risk: The risk here is covert mailbox access through delegation; it doesn't apply given the request and normal session.
+    actions:
+      - Close referencing the request
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Unjustified delegation
+    anchor: "{{actor}} delegated {{mailbox}} to {{delegate}} with no documented reason."
+    risk: The risk here is unreviewed access to a sensitive mailbox; removing it closes the exposure.
+    actions:
+      - Confirm with the mailbox owner and remove if not needed
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Rogue mailbox delegation
+    anchor: Delegation on {{mailbox}} to {{delegate}} was added from a compromised or unusual session.
+    risk: The risk here is covert reading and sending as {{mailbox}}, which survives the owner's password reset; containment is required now.
+    actions:
+      - Remove the delegation
+      - Revoke sessions and reset {{actor}}; investigate {{delegate}}
+      - Review mail read or sent through the delegation (MailItemsAccessed, SendAs)
+    escalate: true
+    monitor: I will monitor {{mailbox}} for further permission changes.

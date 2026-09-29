@@ -1,0 +1,88 @@
+id: mail-flow-rule-change
+title: Exchange Mail Flow (Transport) Rule Change
+category: email
+summary: >-
+  A tenant-wide mail flow rule was created or changed. A malicious rule can blind-copy
+  every finance email to an attacker, bypass spam filtering for their domain, or strip
+  warnings. Mail flow rules are few and should change rarely.
+applies_to:
+  - New-TransportRule
+  - Set-TransportRule
+  - Mail flow rule redirecting mail externally
+mitre: [T1114.003, T1562]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft phishing playbook (review mail flow rules)
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-phishing
+  - title: "MITRE ATT&CK T1114.003 Email Forwarding Rule"
+    url: https://attack.mitre.org/techniques/T1114/003/
+entities:
+  - { key: actor, label: Who changed the rule, example: "exch-admin@contoso.com" }
+  - { key: rule_name, label: Rule name, example: "Journal finance" }
+start: c-rule
+nodes:
+  c-rule:
+    type: check
+    text: Pull the rule's conditions and actions.
+    kql:
+      - title: Transport rule changes (90d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(90d)
+          | where Operation in~ ("New-TransportRule", "Set-TransportRule", "Enable-TransportRule", "Remove-TransportRule")
+          | project TimeGenerated, Operation, UserId, ClientIP, Parameters
+    note: I pulled mail flow rule "{{rule_name}}" changed by {{actor}}.
+    next: q-dangerous
+
+  q-dangerous:
+    type: question
+    text: Does the rule redirect, BCC or forward mail externally, set SCL -1 (bypass spam) for an external domain, or remove security headers or warnings?
+    yes: q-approved
+    no: o-benign
+    notes:
+      yes: Rule "{{rule_name}}" moves mail externally or weakens filtering.
+      no: Rule "{{rule_name}}" only applies disclaimers, routing or tagging internally.
+
+  q-approved:
+    type: question
+    text: Is it approved (journaling to an archive vendor, a third-party filter, a change ticket) and made from the admin's normal session?
+    yes: o-benign-approved
+    no: o-tp
+    notes:
+      yes: The rule is approved and was made from a normal admin session.
+      no: The rule has no approval or was made from an unusual session.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Low-risk rule change
+    anchor: Mail flow rule "{{rule_name}}" changed by {{actor}} does not move mail externally or weaken filtering.
+    risk: The risk here is tenant-wide mail interception; it doesn't apply given what the rule does.
+    actions:
+      - Close
+
+  o-benign-approved:
+    type: outcome
+    verdict: benign_positive
+    title: Approved external routing
+    anchor: Mail flow rule "{{rule_name}}" routes mail externally for an approved purpose.
+    risk: The risk here is tenant-wide mail interception; it is accepted by the business for the approved destination.
+    actions:
+      - Close referencing the approval
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Malicious mail flow rule
+    anchor: Mail flow rule "{{rule_name}}" was created by {{actor}} to intercept mail or weaken filtering without approval.
+    risk: The risk here is tenant-wide interception of mail, often finance traffic; containment is required now.
+    actions:
+      - Disable and remove the rule
+      - Revoke sessions and reset {{actor}}; review their other admin actions
+      - Scope the mail that matched the rule since creation
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for further transport rule changes.

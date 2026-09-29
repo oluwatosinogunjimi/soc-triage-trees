@@ -1,0 +1,104 @@
+id: vendor-email-compromise
+title: Vendor Email Compromise (Bank Detail Change)
+category: email
+summary: >-
+  A real supplier's mailbox, or a lookalike of it, asks to change bank details or pay an
+  urgent invoice. Authentication may pass because the vendor's own account is compromised.
+  Verification must happen outside email.
+applies_to:
+  - Request to change supplier bank details
+  - Invoice fraud from known vendor
+  - Suspicious email from trusted partner domain
+mitre: [T1566, T1656]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: FBI IC3 Business Email Compromise public service announcement
+    url: https://www.ic3.gov/PSA/2024/PSA240911
+  - title: "MITRE ATT&CK T1656 Impersonation"
+    url: https://attack.mitre.org/techniques/T1656/
+entities:
+  - { key: sender, label: Vendor sender, example: "accounts@supplier-co.com" }
+  - { key: recipient, label: Recipient UPN, example: "ap.clerk@contoso.com" }
+start: c-thread
+nodes:
+  c-thread:
+    type: check
+    text: Compare this message with the vendor's history.
+    look_for:
+      - Exact sender domain versus the vendor's real domain (lookalikes, new TLD)
+      - Reply-To, and whether SPF/DKIM/DMARC pass
+      - Thread hijacking (a real previous thread continued from a new address)
+    kql:
+      - title: Mail history with the vendor domain (180d)
+        platform: xdr
+        query: |
+          let dom = tostring(split("{{sender}}", "@")[1]);
+          EmailEvents
+          | where Timestamp > ago(180d)
+          | where SenderFromDomain =~ dom or RecipientEmailAddress endswith dom
+          | summarize Messages = count(), First = min(Timestamp), Last = max(Timestamp), Senders = make_set(SenderFromAddress, 10) by EmailDirection
+    note: I compared the message from {{sender}} with the vendor's mail history.
+    next: q-lookalike
+
+  q-lookalike:
+    type: question
+    text: Is the sender domain a lookalike of the real vendor domain?
+    yes: q-acted
+    no: q-verified
+    notes:
+      yes: "{{sender}} uses a lookalike of the real vendor domain."
+      no: "{{sender}} uses the vendor's real domain, so the vendor mailbox itself may be compromised."
+
+  q-verified:
+    type: question
+    text: Has someone confirmed the change by calling the vendor on a number already on file (not one from the email)?
+    yes: o-benign
+    no: q-acted
+    notes:
+      yes: The vendor confirmed the change by phone on a number on file.
+      no: The change has not been verified with the vendor through a known channel.
+
+  q-acted:
+    type: question
+    text: Did the recipient update bank details or pay anything?
+    yes: o-tp-loss
+    no: o-tp
+    notes:
+      yes: "{{recipient}} updated bank details or made a payment."
+      no: "{{recipient}} did not change anything or pay."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Genuine vendor change, verified
+    anchor: The request from {{sender}} was verified with the vendor through a known phone number.
+    risk: The risk here is payment redirection through a compromised or spoofed vendor; it doesn't apply given the out-of-band verification.
+    actions:
+      - Close referencing the verification
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Vendor fraud attempt, no payment
+    anchor: The request from {{sender}} to change payment details is fraudulent, and no change or payment was made.
+    risk: The risk here is payment redirection to an attacker account; it doesn't apply as finance did not act.
+    actions:
+      - Block the sender or lookalike domain
+      - Tell the real vendor their mailbox may be compromised (if their domain was used)
+      - Flag the supplier record in finance for extra verification
+
+  o-tp-loss:
+    type: outcome
+    verdict: true_positive
+    title: Vendor fraud, payment affected
+    anchor: "{{recipient}} acted on a fraudulent payment change request from {{sender}}."
+    risk: The risk here is direct financial loss; recovery depends on how fast the bank is contacted.
+    actions:
+      - Escalate urgently to the customer's finance lead
+      - Advise contacting the bank to recall the payment immediately and reporting to the authorities
+      - Revert the supplier bank details
+      - Notify the real vendor
+    escalate: true
+    monitor: I will monitor for further messages from the vendor domain and lookalikes.

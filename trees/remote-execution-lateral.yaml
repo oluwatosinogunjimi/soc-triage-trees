@@ -1,0 +1,114 @@
+id: remote-execution-lateral
+title: Remote Execution (PsExec, WMI, WinRM, RDP)
+category: endpoint
+summary: >-
+  Code was run on a host from another host: PsExec or Impacket services, WMI process
+  creation, WinRM, scheduled tasks created remotely, or RDP. Admins do all of these, so
+  compare the source, account and target to how IT really works.
+applies_to:
+  - Remote code execution attempt
+  - Suspicious WMI process creation (wmiprvse spawning cmd)
+  - Lateral movement using PsExec / Impacket
+  - Suspicious RDP session from unusual host
+mitre: [T1021.002, T1021.006, T1047, T1021.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK TA0008 Lateral Movement"
+    url: https://attack.mitre.org/tactics/TA0008/
+  - title: "MITRE ATT&CK T1047 Windows Management Instrumentation"
+    url: https://attack.mitre.org/techniques/T1047/
+entities:
+  - { key: device, label: Target device, example: "SRV-APP02" }
+  - { key: src_host, label: Source host or IP, example: "WKS-HR-011" }
+  - { key: account, label: Account used, example: "adm-jdoe" }
+start: c-exec
+nodes:
+  c-exec:
+    type: check
+    text: Establish the method, the source host and the account.
+    kql:
+      - title: Remote logons and processes started through remote channels (24h)
+        platform: xdr
+        query: |
+          union
+            (DeviceLogonEvents | where LogonType in ("Network", "RemoteInteractive") and ActionType == "LogonSuccess"
+               | project Timestamp, DeviceName, Kind = strcat("Logon ", LogonType), Detail = strcat(AccountName, " from ", RemoteDeviceName, " ", RemoteIP)),
+            (DeviceProcessEvents | where InitiatingProcessFileName in~ ("wmiprvse.exe", "wsmprovhost.exe", "services.exe", "psexesvc.exe")
+               | where FileName in~ ("cmd.exe", "powershell.exe", "pwsh.exe", "rundll32.exe", "mshta.exe")
+               | project Timestamp, DeviceName, Kind = strcat("Via ", InitiatingProcessFileName), Detail = strcat(AccountName, ": ", ProcessCommandLine))
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+    note: I established how {{account}} executed code on {{device}} from {{src_host}}.
+    next: q-admin-pattern
+
+  q-admin-pattern:
+    type: question
+    text: Is it an admin account from a known admin host or jump server, doing something that matches a ticket or routine task?
+    yes: o-benign
+    no: q-source-compromised
+    notes:
+      yes: The execution by {{account}} came from a known admin host for a routine task.
+      no: The execution by {{account}} from {{src_host}} does not match how IT works.
+
+  q-source-compromised:
+    type: question
+    text: Does {{src_host}} show signs of compromise (alerts, offensive tools, credential dumping) or is it unmanaged?
+    yes: o-tp
+    no: q-spread
+    notes:
+      yes: "{{src_host}} shows signs of compromise or is unmanaged."
+      no: "{{src_host}} shows no signs of compromise."
+
+  q-spread:
+    type: question
+    text: Did the same account execute on many hosts in a short time?
+    kql:
+      - title: Remote executions by the account across the estate (24h)
+        platform: xdr
+        query: |
+          DeviceLogonEvents
+          | where Timestamp > ago(24h)
+          | where AccountName =~ "{{account}}" and LogonType == "Network" and ActionType == "LogonSuccess"
+          | summarize Targets = dcount(DeviceName), TargetList = make_set(DeviceName, 50) by RemoteDeviceName, RemoteIP
+    yes: o-tp
+    no: o-inconclusive
+    notes:
+      yes: "{{account}} executed on many hosts in a short time."
+      no: "{{account}} executed only on {{device}}."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Routine administration
+    anchor: "{{account}} executed code on {{device}} from a known admin host for a routine task."
+    risk: The risk here is attacker lateral movement using admin tools; it doesn't apply given the known source and ticket.
+    actions:
+      - Close
+    tuning: Scope the detection to exclude the jump servers and admin accounts IT uses for this task.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unusual but contained remote execution
+    anchor: "{{account}} executed code on {{device}} from {{src_host}}, which is not a normal admin path, with no other signs of compromise."
+    risk: The risk here is early lateral movement, which stays open until the account owner explains it.
+    actions:
+      - Ask the account owner what they were doing
+    monitor: I will monitor {{account}} and {{src_host}} for further remote execution.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Lateral movement
+    anchor: "{{account}} was used to execute code on {{device}} from {{src_host}} as part of an intrusion."
+    risk: The risk here is an attacker spreading toward domain controllers and backups; containment is required now.
+    actions:
+      - Isolate {{src_host}} and {{device}}
+      - Reset {{account}} and investigate where its credential was stolen
+      - Check every host the account touched
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{account}} for logons anywhere in the estate.

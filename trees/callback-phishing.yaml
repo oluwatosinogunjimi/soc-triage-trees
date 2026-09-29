@@ -1,0 +1,90 @@
+id: callback-phishing
+title: Callback Phishing (TOAD)
+category: email
+summary: >-
+  An email with no link or attachment, just a fake invoice or subscription renewal and a
+  phone number. The victim calls and is talked into installing remote access software.
+  Gateways miss these, so the endpoint is where you find out if it worked.
+applies_to:
+  - Telephone-oriented attack delivery (TOAD)
+  - Fake subscription renewal or invoice with phone number
+  - User reported callback scam
+mitre: [T1566.004, T1219]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1566.004 Spearphishing Voice"
+    url: https://attack.mitre.org/techniques/T1566/004/
+  - title: "MITRE ATT&CK T1219 Remote Access Tools"
+    url: https://attack.mitre.org/techniques/T1219/
+entities:
+  - { key: network_message_id, label: NetworkMessageId, example: "2f3c1a9e-...-08dd" }
+  - { key: recipient, label: Recipient UPN, example: "jdoe@contoso.com" }
+  - { key: device, label: Recipient device, example: "WKS-FIN-023" }
+start: c-message
+nodes:
+  c-message:
+    type: check
+    text: Confirm the lure and scope the campaign.
+    look_for:
+      - Invoice or renewal theme (antivirus, streaming, courier) with a phone number and urgency
+      - The number repeated across other messages in the tenant
+    kql:
+      - title: Messages with the same subject or sender (7d)
+        platform: xdr
+        query: |
+          let m = EmailEvents | where NetworkMessageId == "{{network_message_id}}" | take 1;
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where Subject == toscalar(m | project Subject) or SenderFromAddress == toscalar(m | project SenderFromAddress)
+          | summarize Recipients = make_set(RecipientEmailAddress, 100), Delivered = countif(DeliveryAction == "Delivered") by Subject, SenderFromAddress
+    note: I confirmed the callback lure on message {{network_message_id}} and scoped the campaign.
+    next: q-called
+
+  q-called:
+    type: question
+    text: Did the recipient call the number (they say so, or remote access software appeared soon after)?
+    kql:
+      - title: Remote access tools and installers on the device (7d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where FileName has_any ("anydesk", "teamviewer", "screenconnect", "connectwise", "logmein", "splashtop", "quickassist",
+                                    "atera", "netsupport", "rustdesk", "zoho", "supremo")
+          | project Timestamp, AccountName, FileName, FolderPath, ProcessCommandLine, InitiatingProcessFileName
+    yes: l-rmm
+    no: o-no-call
+    unknown: o-inconclusive
+    notes:
+      yes: "{{recipient}} called the number and remote access software appeared on {{device}}."
+      no: "{{recipient}} did not call the number and no remote access software appeared."
+      unknown: I could not confirm whether {{recipient}} called the number.
+
+  l-rmm:
+    type: link
+    text: Remote access was installed. Continue in the RMM tree.
+    tree: rmm-tool-unauthorised
+
+  o-no-call:
+    type: outcome
+    verdict: true_positive
+    title: Callback lure, no engagement
+    anchor: Message {{network_message_id}} is a callback phishing lure and {{recipient}} did not call the number.
+    risk: The risk here is remote access fraud through a phone call; it doesn't apply as nobody engaged.
+    actions:
+      - Purge the campaign and block the sender
+      - Share the phone number with the customer as an indicator
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Engagement not confirmed
+    anchor: I could not confirm whether {{recipient}} called the number in message {{network_message_id}}.
+    risk: The risk here is an attacker with remote access to {{device}}, which stays open until the user confirms.
+    actions:
+      - Ask the recipient directly whether they called and installed anything
+      - Purge the campaign
+    monitor: I will monitor {{device}} for remote access tool installs over the next 7 days.

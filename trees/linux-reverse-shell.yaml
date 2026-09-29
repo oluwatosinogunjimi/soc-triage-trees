@@ -1,0 +1,115 @@
+id: linux-reverse-shell
+title: Linux Reverse Shell or Suspicious Shell Activity
+category: endpoint
+summary: >-
+  A Linux host ran a reverse shell (bash -i to /dev/tcp, nc -e, python pty), curl or wget
+  piped into a shell, or a web or database process spawned a shell. Usually the result of
+  an exploited service or stolen SSH credentials.
+applies_to:
+  - Reverse shell detected
+  - Suspicious bash command (curl | sh)
+  - Web server process spawned shell on Linux
+  - Unexpected SSH authorized_keys modification
+mitre: [T1059.004, T1098.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1059.004 Unix Shell"
+    url: https://attack.mitre.org/techniques/T1059/004/
+  - title: "MITRE ATT&CK T1098.004 SSH Authorized Keys"
+    url: https://attack.mitre.org/techniques/T1098/004/
+entities:
+  - { key: device, label: Host name, example: "lnx-api-02" }
+  - { key: account, label: Linux user, example: "www-data" }
+start: c-shell
+nodes:
+  c-shell:
+    type: check
+    text: Read the command, its parent and any connection it opened.
+    kql:
+      - title: Suspicious shell commands and parents (48h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}"
+          | where ProcessCommandLine has_any ("/dev/tcp/", "nc -e", "ncat -e", "bash -i", "pty.spawn", "socat", "mkfifo", "| sh", "| bash", "base64 -d", "authorized_keys", "chmod +x /tmp")
+             or (InitiatingProcessFileName in~ ("nginx", "httpd", "apache2", "java", "node", "php-fpm", "mysqld", "postgres") and FileName in~ ("sh", "bash", "dash"))
+          | project Timestamp, AccountName, InitiatingProcessFileName, InitiatingProcessCommandLine, FileName, ProcessCommandLine
+    note: I reviewed the shell activity by {{account}} on {{device}} and its parent process.
+    next: q-admin
+
+  q-admin:
+    type: question
+    text: Is it an admin or automation doing a known task (configuration management, installer script from a trusted repo, a developer on a dev box)?
+    yes: o-benign
+    no: q-service-parent
+    notes:
+      yes: The command on {{device}} came from known administration or automation.
+      no: No admin task explains the command on {{device}}.
+
+  q-service-parent:
+    type: question
+    text: Was the shell spawned by a network service (web server, app runtime, database), running as its service account?
+    yes: o-tp-exploit
+    no: q-ssh
+    notes:
+      yes: The shell was spawned by a network service running as {{account}}, which indicates exploitation.
+      no: The shell ran in an interactive or SSH session as {{account}}.
+
+  q-ssh:
+    type: question
+    text: Did the session come from an unusual SSH source, or did it add keys, users or cron jobs?
+    yes: o-tp-access
+    no: o-inconclusive
+    notes:
+      yes: The session came from an unusual source or added persistence.
+      no: The session came from a known source with no persistence added.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Known administration
+    anchor: The shell activity on {{device}} came from known administration or automation.
+    risk: The risk here is remote shell access for an attacker; it doesn't apply given the known task.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Unexplained interactive command
+    anchor: "{{account}} ran a suspicious command on {{device}} from a known source with no persistence added."
+    risk: The risk here is misuse of the account or a mistake that opened a shell, which stays open until the owner explains it.
+    actions:
+      - Ask the account owner or system owner to explain the command
+    monitor: I will monitor {{device}} for outbound shells and new SSH keys.
+
+  o-tp-exploit:
+    type: outcome
+    verdict: true_positive
+    title: Exploited service spawned a shell
+    anchor: A network service on {{device}} spawned a shell as {{account}}, indicating exploitation.
+    risk: The risk here is attacker control of the host and a pivot into the environment; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Identify the exploited service and CVE from application logs, and patch
+      - Check for persistence (cron, systemd units, SSH keys, new users)
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for connections to the reverse shell destination across the estate.
+
+  o-tp-access:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised SSH access with persistence
+    anchor: "{{account}} on {{device}} was used from an unusual source or to add persistence."
+    risk: The risk here is persistent attacker access through SSH keys, users or cron; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Remove rogue keys, users and cron or systemd entries
+      - Rotate the credentials and keys for {{account}}
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{device}} for SSH logons and changes to authorized_keys.

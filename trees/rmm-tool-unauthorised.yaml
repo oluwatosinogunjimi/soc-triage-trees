@@ -1,0 +1,133 @@
+id: rmm-tool-unauthorised
+title: Unauthorised Remote Access Tool
+category: endpoint
+summary: >-
+  AnyDesk, ScreenConnect, TeamViewer, Atera, NetSupport, Quick Assist or similar was
+  installed or run. These are legitimate products and a favourite of ransomware crews and
+  callback scammers. The customer's approved tool list decides most of these.
+applies_to:
+  - Suspicious remote monitoring and management (RMM) tool
+  - AnyDesk / ScreenConnect installed
+  - Quick Assist session started after unsolicited contact
+mitre: [T1219]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1219 Remote Access Tools"
+    url: https://attack.mitre.org/techniques/T1219/
+  - title: CISA advisory AA23-025A, malicious use of RMM software
+    url: https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-025a
+entities:
+  - { key: device, label: Device name, example: "WKS-FIN-023" }
+  - { key: file, label: Tool executable, example: "AnyDesk.exe" }
+start: c-tool
+nodes:
+  c-tool:
+    type: check
+    text: Identify the tool, how it arrived and whether it connected out.
+    kql:
+      - title: RMM processes, installs and connections on the device (7d)
+        platform: xdr
+        query: |
+          let rmm = dynamic(["anydesk", "teamviewer", "screenconnect", "connectwise", "atera", "netsupport", "client32",
+                             "splashtop", "rustdesk", "logmein", "supremo", "remoteutilities", "quickassist", "zoho", "tacticalrmm", "meshagent"]);
+          union
+            (DeviceProcessEvents | where FileName has_any (rmm) or ProcessCommandLine has_any (rmm)
+               | project Timestamp, DeviceName, Kind = "Process", Detail = ProcessCommandLine, Parent = InitiatingProcessFileName, AccountName),
+            (DeviceNetworkEvents | where InitiatingProcessFileName has_any (rmm) and RemoteIPType == "Public"
+               | project Timestamp, DeviceName, Kind = "Network", Detail = strcat(RemoteUrl, " ", RemoteIP), Parent = InitiatingProcessFileName, AccountName = InitiatingProcessAccountName)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+      - title: Estate prevalence of the tool (30d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(30d)
+          | where FileName =~ "{{file}}"
+          | summarize Devices = dcount(DeviceName), DeviceList = make_set(DeviceName, 20)
+    note: I identified {{file}} on {{device}}, how it arrived and whether it connected out.
+    next: q-approved
+
+  q-approved:
+    type: question
+    text: Is this tool on the customer's approved list and deployed by IT (their tenant ID or relay, managed install)?
+    yes: o-fp
+    no: q-trigger
+    notes:
+      yes: "{{file}} is the customer's approved remote access tool, deployed by IT."
+      no: "{{file}} is not on the customer's approved list."
+
+  q-trigger:
+    type: question
+    text: Did it follow unsolicited contact (callback lure, Teams "helpdesk", email bomb) or appear from a script or another RMM tool?
+    yes: q-session
+    no: q-user-reason
+    notes:
+      yes: "{{file}} appeared after unsolicited contact or was dropped by a script."
+      no: "{{file}} was installed by the user without any preceding lure."
+
+  q-user-reason:
+    type: question
+    text: Does the user have a legitimate reason (vendor support session, personal use against policy)?
+    yes: o-policy
+    no: q-session
+    notes:
+      yes: The user installed {{file}} for a vendor support session or personal use.
+      no: The user cannot explain {{file}}.
+
+  q-session:
+    type: question
+    text: Was a remote session established, followed by other activity (new tools, credential access, discovery, data transfer)?
+    yes: o-tp-active
+    no: o-tp-contained
+    notes:
+      yes: A remote session was established on {{device}} and followed by further activity.
+      no: No remote session or follow-on activity occurred.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Approved IT tool
+    anchor: "{{file}} on {{device}} is the customer's approved remote access tool, deployed by IT."
+    risk: The risk here is attacker remote access through RMM software; it doesn't apply as this is the managed instance.
+    actions:
+      - Close
+    tuning: Exclude the approved tool by signer plus the customer's tenant or relay, not by name alone.
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Unapproved but explained use
+    anchor: The user installed {{file}} on {{device}} for a support session or personal use, against policy.
+    risk: The risk here is an unmanaged remote access channel that attackers can reuse; removing it closes the exposure.
+    actions:
+      - Remove the tool and remind the user of policy
+      - Recommend application control that blocks unapproved RMM tools
+
+  o-tp-contained:
+    type: outcome
+    verdict: true_positive
+    title: Social-engineered RMM install, no session
+    anchor: "{{file}} was installed on {{device}} after social engineering, and no remote session took place."
+    risk: The risk here is hands-on-keyboard access leading to ransomware; it doesn't apply as no session was established.
+    actions:
+      - Remove the tool and block its hash and relay domains
+      - Brief the user
+    monitor: I will monitor {{device}} for remote access tools over the next 7 days.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Attacker remote session
+    anchor: An attacker used {{file}} to access {{device}} and carried out further activity.
+    risk: The risk here is hands-on-keyboard intrusion that commonly ends in ransomware; containment is required now.
+    actions:
+      - Isolate {{device}} per client RACI
+      - Kill and remove the tool and any others installed
+      - Reset credentials used on the device
+      - Scope follow-on activity (tools, discovery, lateral movement)
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same tool, relay and attacker infrastructure.

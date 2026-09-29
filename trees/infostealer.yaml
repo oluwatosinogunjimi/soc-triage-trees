@@ -1,0 +1,100 @@
+id: infostealer
+title: Infostealer Malware
+category: endpoint
+summary: >-
+  Lumma, RedLine, Vidar, StealC or similar reading browser credential stores and cookies,
+  usually after a cracked-software download or a fake CAPTCHA "paste this command" lure.
+  Once it ran, every saved password and session on the device is gone, including
+  personal ones.
+applies_to:
+  - Infostealer malware detected
+  - Suspicious access to browser credential store
+  - Possible theft of sensitive browser data
+  - ClickFix / fake CAPTCHA Run dialog execution
+mitre: [T1555.003, T1539, T1204.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1555.003 Credentials from Web Browsers"
+    url: https://attack.mitre.org/techniques/T1555/003/
+  - title: "MITRE ATT&CK T1204.004 User Execution: Malicious Copy and Paste"
+    url: https://attack.mitre.org/techniques/T1204/004/
+entities:
+  - { key: device, label: Device name, example: "WKS-MKT-019" }
+  - { key: user, label: Logged-on user UPN, example: "jdoe@contoso.com" }
+start: c-access
+nodes:
+  c-access:
+    type: check
+    text: See what touched the browser stores and how it got there.
+    kql:
+      - title: Non-browser processes reading browser credential files (7d)
+        platform: xdr
+        query: |
+          DeviceFileEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where FileName in~ ("Login Data", "Cookies", "Web Data", "logins.json", "key4.db", "Local State")
+          | where InitiatingProcessFileName !in~ ("chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe")
+          | project Timestamp, ActionType, FolderPath, InitiatingProcessFileName, InitiatingProcessFolderPath, InitiatingProcessSHA256
+      - title: Run dialog and paste-style executions (ClickFix, 7d)
+        platform: xdr
+        query: |
+          DeviceRegistryEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and RegistryKey has @"\Explorer\RunMRU"
+          | project Timestamp, RegistryValueData, InitiatingProcessAccountName
+    note: I reviewed access to browser credential stores on {{device}} and the process behind it.
+    next: q-executed
+
+  q-executed:
+    type: question
+    text: Did the stealer run (not just quarantined on download)?
+    yes: q-exfil
+    no: o-blocked
+    notes:
+      yes: The stealer ran on {{device}}.
+      no: The stealer was quarantined before it ran.
+
+  q-exfil:
+    type: question
+    text: Did it connect out to exfiltrate (outbound POST to a new domain, Telegram, Discord, paste sites) after reading the stores?
+    kql:
+      - title: Outbound connections from the stealer process (7d)
+        platform: xdr
+        query: |
+          DeviceNetworkEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and RemoteIPType == "Public"
+          | where InitiatingProcessFileName !in~ ("chrome.exe", "msedge.exe", "firefox.exe", "svchost.exe", "MsSense.exe", "OneDrive.exe", "Teams.exe")
+          | summarize Connections = count(), First = min(Timestamp) by InitiatingProcessFileName, RemoteUrl, RemoteIP
+    yes: o-tp-exfil
+    no: o-tp-exfil
+    notes:
+      yes: The stealer on {{device}} connected out after reading the credential stores.
+      no: I found no clear exfiltration connection, which does not rule it out as many stealers blend in over HTTPS.
+
+  o-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Infostealer blocked before running
+    anchor: An infostealer was downloaded to {{device}} and quarantined before it ran.
+    risk: The risk here is theft of every saved credential and session; it doesn't apply as the stealer never ran.
+    actions:
+      - Block the download source and hash
+      - Brief {{user}} on the lure (cracked software, fake CAPTCHA)
+
+  o-tp-exfil:
+    type: outcome
+    verdict: true_positive
+    title: Credentials and sessions stolen
+    anchor: An infostealer ran on {{device}} and read the browser credential and cookie stores of {{user}}.
+    risk: The risk here is account takeover through stolen passwords and session cookies, for work and personal accounts alike; containment is required now.
+    actions:
+      - Isolate {{device}} and reimage it
+      - Revoke sessions and reset the password for {{user}}, and every other account saved in the browser
+      - Tell the user to change personal passwords saved on the device from a clean machine
+      - Block the C2 domains and hunt for the same hash
+    escalate: true
+    monitor: I will monitor {{user}} for sign-ins from new infrastructure over the next 14 days.

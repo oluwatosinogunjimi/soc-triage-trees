@@ -1,0 +1,78 @@
+id: restricted-sender
+title: User Restricted from Sending Email
+category: email
+summary: >-
+  Exchange Online blocked a user from sending because they exceeded outbound spam limits.
+  It is almost always a compromised mailbox being used for spam or phishing. Sometimes it
+  is a misconfigured app or a large legitimate send.
+applies_to:
+  - User restricted from sending email
+  - Email sending limit exceeded
+  - Suspicious email sending patterns detected
+mitre: [T1534, T1114]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft, remove blocked users from the Restricted entities page
+    url: https://learn.microsoft.com/en-us/defender-office-365/outbound-spam-restore-restricted-users
+  - title: "MITRE ATT&CK T1534 Internal Spearphishing"
+    url: https://attack.mitre.org/techniques/T1534/
+entities:
+  - { key: user, label: Restricted user, example: "sales.rep@contoso.com" }
+start: c-sends
+nodes:
+  c-sends:
+    type: check
+    text: Look at what was sent before the restriction.
+    kql:
+      - title: Outbound volume and subjects (48h)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(48h)
+          | where SenderFromAddress =~ "{{user}}"
+          | summarize Messages = count(), Recipients = dcount(RecipientEmailAddress), Subjects = make_set(Subject, 10) by bin(Timestamp, 1h)
+    note: I reviewed the mail sent by {{user}} before the restriction.
+    next: q-legit
+
+  q-legit:
+    type: question
+    text: Is the volume explained by a legitimate send (newsletter, app using the mailbox, mail merge) with normal content?
+    yes: o-benign
+    no: q-compromise
+    notes:
+      yes: The volume came from a legitimate send by {{user}} or an app using the mailbox.
+      no: The messages are spam or phishing that {{user}} would not send.
+
+  q-compromise:
+    type: question
+    text: Are there signs of account takeover (unfamiliar sign-ins, new inbox rules, new MFA method)?
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: The account of {{user}} shows takeover indicators.
+      no: I found no sign-in anomaly, so the sends may come from malware or a stolen token on the user's device.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate high-volume send
+    anchor: "{{user}} exceeded sending limits with a legitimate send."
+    risk: The risk here is a compromised mailbox sending spam; it doesn't apply given the content and source of the send.
+    actions:
+      - Release the user from the Restricted entities page
+      - Recommend a proper bulk mail service for this use
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Mailbox compromised and used for spam
+    anchor: The mailbox of {{user}} was used to send spam or phishing that triggered the outbound restriction.
+    risk: The risk here is further phishing from a trusted address and reputation damage to the domain; the account must be contained before release.
+    actions:
+      - Revoke sessions, reset the password, remove inbox rules and rogue MFA methods
+      - Warn recipients and purge internal copies
+      - Release the restriction only after containment
+    escalate: true
+    monitor: I will monitor {{user}} for outbound volume and sign-ins from new infrastructure after release.

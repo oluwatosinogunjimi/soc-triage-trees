@@ -1,0 +1,94 @@
+id: wmi-persistence
+title: WMI Event Subscription Persistence
+category: endpoint
+summary: >-
+  A permanent WMI event subscription (filter, consumer and binding) was created. It runs a
+  command or script when an event fires, survives reboots and leaves no file in the usual
+  autostart places. Legitimate use is rare outside management agents.
+applies_to:
+  - WMI event subscription created
+  - Suspicious WMI persistence (CommandLineEventConsumer / ActiveScriptEventConsumer)
+mitre: [T1546.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1546.003 Windows Management Instrumentation Event Subscription"
+    url: https://attack.mitre.org/techniques/T1546/003/
+entities:
+  - { key: device, label: Device name, example: "SRV-APP02" }
+start: c-subscription
+nodes:
+  c-subscription:
+    type: check
+    text: Read the consumer's command or script and who created it.
+    kql:
+      - title: WMI subscription events (7d)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where ActionType has "Wmi"
+          | project Timestamp, ActionType, AdditionalFields, InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessAccountName
+      - title: Processes spawned by the WMI script host (7d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and InitiatingProcessFileName in~ ("scrcons.exe", "wmiprvse.exe")
+          | project Timestamp, FileName, ProcessCommandLine, AccountName
+    note: I read the WMI subscription on {{device}} and the process that created it.
+    next: q-agent
+
+  q-agent:
+    type: question
+    text: Was it created by a known management or monitoring agent (SCCM, monitoring tool) with a recognisable consumer?
+    yes: o-fp
+    no: q-fired
+    notes:
+      yes: The WMI subscription on {{device}} belongs to a known management agent.
+      no: The WMI subscription on {{device}} does not belong to any known agent.
+
+  q-fired:
+    type: question
+    text: Has the consumer already executed a payload (scrcons.exe or WmiPrvSE spawning processes, outbound connections)?
+    yes: o-tp-active
+    no: o-tp
+    notes:
+      yes: The WMI consumer on {{device}} has already executed its payload.
+      no: The WMI consumer on {{device}} has not executed yet.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Management agent subscription
+    anchor: The WMI subscription on {{device}} belongs to a known management agent.
+    risk: The risk here is fileless persistence; it doesn't apply given the known agent and consumer.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Malicious WMI persistence, not yet fired
+    anchor: A malicious WMI event subscription was created on {{device}} and has not executed yet.
+    risk: The risk here is fileless re-infection at the next trigger; removing the filter, consumer and binding closes it.
+    actions:
+      - Remove the filter, consumer and binding
+      - Investigate how the attacker got the rights to create it
+    escalate: true
+    monitor: I will monitor {{device}} for re-creation of WMI subscriptions.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Malicious WMI persistence executing
+    anchor: A malicious WMI event subscription on {{device}} has executed its payload.
+    risk: The risk here is an attacker with persistent code execution on {{device}}; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Remove the subscription and investigate the payload
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same consumer command.

@@ -1,0 +1,103 @@
+id: executive-impersonation
+title: Executive Impersonation (CEO Fraud)
+category: email
+summary: >-
+  An external sender poses as a named executive, usually from free mail or a lookalike
+  domain, asking for an urgent payment, gift cards, W-2 or payroll data, or a quiet chat.
+  There is no payload; the request is the attack.
+applies_to:
+  - User impersonation detected
+  - Domain impersonation detected
+  - Display name spoofing of executive
+mitre: [T1656, T1566.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Office 365 impersonation protection
+    url: https://learn.microsoft.com/en-us/defender-office-365/anti-phishing-policies-about
+  - title: "MITRE ATT&CK T1656 Impersonation"
+    url: https://attack.mitre.org/techniques/T1656/
+entities:
+  - { key: sender, label: External sender, example: "ceo.office@gmail.com" }
+  - { key: executive, label: Impersonated executive, example: "Jane Smith (CEO)" }
+  - { key: recipient, label: Recipient UPN, example: "finance.lead@contoso.com" }
+start: c-message
+nodes:
+  c-message:
+    type: check
+    text: Confirm the impersonation and who received it.
+    look_for:
+      - Display name matching the executive with an external or lookalike address
+      - Reply-To pointing somewhere else
+      - Targets in finance, HR, payroll or executive assistants
+    kql:
+      - title: Messages from the sender (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where SenderFromAddress =~ "{{sender}}" or SenderMailFromAddress =~ "{{sender}}"
+          | project Timestamp, RecipientEmailAddress, SenderDisplayName, Subject, DeliveryAction, DeliveryLocation, ThreatTypes
+    note: I confirmed that {{sender}} impersonated {{executive}} in messages to {{recipient}}.
+    next: q-exec-own
+
+  q-exec-own:
+    type: question
+    text: Is the address actually the executive's own personal account (confirmed with the executive or their assistant)?
+    yes: o-fp
+    no: q-engaged
+    notes:
+      yes: "{{sender}} is a personal address that {{executive}} confirmed as theirs."
+      no: "{{sender}} is not an address {{executive}} uses."
+
+  q-engaged:
+    type: question
+    text: Did anyone reply, move to another channel (WhatsApp, text), buy gift cards or make a payment?
+    kql:
+      - title: Replies to the sender (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where EmailDirection == "Outbound" and RecipientEmailAddress =~ "{{sender}}"
+          | project Timestamp, SenderFromAddress, Subject
+    yes: o-tp-engaged
+    no: o-tp
+    notes:
+      yes: A recipient engaged with the impersonator.
+      no: No recipient replied or acted on the request.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Executive's own address
+    anchor: "{{sender}} belongs to {{executive}}, confirmed by the executive's office."
+    risk: The risk here is fraud through executive impersonation; it doesn't apply as the sender is genuine.
+    actions:
+      - Close
+      - Suggest the executive uses corporate mail for business requests
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Impersonation attempt, no engagement
+    anchor: "{{sender}} impersonated {{executive}}, and no recipient engaged."
+    risk: The risk here is payment fraud or data disclosure under executive pressure; it doesn't apply as nobody acted.
+    actions:
+      - Purge the messages and block the sender
+      - Add {{executive}} to the impersonation protection list if missing
+      - Let the targeted teams know the lure is circulating
+
+  o-tp-engaged:
+    type: outcome
+    verdict: true_positive
+    title: Impersonation, recipient engaged
+    anchor: "{{sender}} impersonated {{executive}}, and a recipient engaged with the request."
+    risk: The risk here is financial loss or disclosure of payroll or personal data; the business must act now.
+    actions:
+      - Escalate urgently to the customer, including finance and the executive's office
+      - Advise contacting the bank immediately if money moved
+      - Purge the messages and block the sender
+    escalate: true
+    monitor: I will monitor for new lookalike senders impersonating {{executive}}.

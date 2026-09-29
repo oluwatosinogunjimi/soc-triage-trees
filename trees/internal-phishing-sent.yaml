@@ -1,0 +1,119 @@
+id: internal-phishing-sent
+title: Phishing Sent from an Internal Account
+category: email
+summary: >-
+  An internal mailbox sent a burst of messages that look like phishing, to colleagues or
+  external contacts. This is usually the second stage of an account takeover. Treat the
+  sender as compromised until proven otherwise.
+applies_to:
+  - Suspicious sending patterns detected
+  - Internal phishing campaign detected
+  - Suspicious email sending patterns (suspiciousSendingPatterns)
+mitre: [T1534, T1566.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1534 Internal Spearphishing"
+    url: https://attack.mitre.org/techniques/T1534/
+  - title: Microsoft Entra ID Protection risk detections (suspiciousSendingPatterns)
+    url: https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-risks
+entities:
+  - { key: sender, label: Internal sender UPN, example: "ap.clerk@contoso.com" }
+start: c-volume
+nodes:
+  c-volume:
+    type: check
+    text: Measure what the account sent and to whom.
+    kql:
+      - title: Outbound and internal mail from the sender (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d)
+          | where SenderFromAddress =~ "{{sender}}"
+          | summarize Messages = count(), Recipients = dcount(RecipientEmailAddress), Subjects = make_set(Subject, 10),
+                      ThreatTypes = make_set(ThreatTypes) by bin(Timestamp, 1h), EmailDirection
+          | order by Timestamp desc
+    note: I measured the mail sent by {{sender}} and its recipients.
+    next: q-content
+
+  q-content:
+    type: question
+    text: Is the content phishing (credential lure, shared document link to an external login page, invoice with a link) rather than a genuine bulk mail?
+    yes: q-signin
+    no: o-fp
+    notes:
+      yes: The messages from {{sender}} are phishing lures.
+      no: The messages from {{sender}} are a legitimate bulk send.
+
+  q-signin:
+    type: question
+    text: Were the messages sent from a session on unfamiliar infrastructure?
+    kql:
+      - title: Send operations and their client IPs (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{sender}}" and Operation in~ ("Send", "SendAs", "SendOnBehalf", "Create")
+          | summarize Count = count(), First = min(TimeGenerated) by ClientIP, Operation
+    yes: q-clicks
+    no: q-clicks
+    notes:
+      yes: The messages were sent from unfamiliar infrastructure.
+      no: The messages were sent from the usual client of {{sender}}, which may mean malware or a token on their device.
+
+  q-clicks:
+    type: question
+    text: Did any recipient click the link or reply?
+    kql:
+      - title: Clicks on URLs in the sender's messages (7d)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(7d) and SenderFromAddress =~ "{{sender}}"
+          | join kind=inner (UrlClickEvents | where Timestamp > ago(7d)) on NetworkMessageId
+          | project Timestamp1, AccountUpn, Url, ActionType, IsClickedThrough
+    yes: o-tp-spread
+    no: o-tp
+    notes:
+      yes: Recipients clicked links in the messages from {{sender}}.
+      no: No recipient clicked links in the messages.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Legitimate bulk send
+    anchor: The burst of mail from {{sender}} was a legitimate bulk send with no phishing content.
+    risk: The risk here is internal phishing from a compromised account; it doesn't apply as the content is genuine.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Compromised account sent phishing
+    anchor: "{{sender}} sent phishing lures to colleagues or contacts, and no recipient clicked."
+    risk: The risk here is the campaign spreading through trusted internal mail; the sending account is compromised.
+    actions:
+      - Revoke sessions, reset the password and check inbox rules for {{sender}}
+      - Purge the messages from all mailboxes and warn external recipients
+      - Block the phishing URLs
+      - Run the token theft tree for {{sender}}
+    escalate: true
+    monitor: I will monitor {{sender}} for further sends and sign-ins from new infrastructure.
+
+  o-tp-spread:
+    type: outcome
+    verdict: true_positive
+    title: Internal phishing with clicks
+    anchor: "{{sender}} sent phishing lures and recipients clicked them."
+    risk: The risk here is a spreading compromise across accounts; each clicker needs the same checks.
+    actions:
+      - Contain {{sender}} (revoke sessions, reset, remove rules)
+      - Run the malicious URL click tree for every recipient who clicked
+      - Purge the messages and block the URLs
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor every recipient who clicked for sign-ins from new infrastructure.

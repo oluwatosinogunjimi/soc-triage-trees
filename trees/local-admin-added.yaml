@@ -1,0 +1,125 @@
+id: local-admin-added
+title: Local Account Created or Added to Administrators
+category: endpoint
+summary: >-
+  A local account was created or added to the local Administrators group. Look hard at
+  the source process: net.exe run by an IT script is routine, but anything spawned from
+  Utilman.exe, sethc.exe or a web server means someone bypassed the login screen or owns
+  a service.
+applies_to:
+  - User account was added to local administrators group
+  - New local user account created (4720)
+  - Member added to security-enabled local group (4732)
+mitre: [T1136.001, T1098, T1546.008]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1136.001 Create Account: Local Account"
+    url: https://attack.mitre.org/techniques/T1136/001/
+  - title: "MITRE ATT&CK T1546.008 Accessibility Features"
+    url: https://attack.mitre.org/techniques/T1546/008/
+entities:
+  - { key: device, label: Device name, example: "WKS-REC-002" }
+  - { key: account, label: Account created or added, example: "support$" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Find the change and the full process chain behind it.
+    kql:
+      - title: Local account and group changes with their source process (7d)
+        platform: xdr
+        query: |
+          DeviceEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | where ActionType in ("UserAccountCreated", "UserAccountAddedToLocalGroup")
+          | project Timestamp, ActionType, AccountName, AdditionalFields,
+                    InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessParentFileName, InitiatingProcessAccountName
+    note: I found the change for {{account}} on {{device}} and its process chain.
+    next: q-accessibility
+
+  q-accessibility:
+    type: question
+    text: Did the chain start from an accessibility binary (Utilman.exe, sethc.exe, osk.exe, Magnify.exe, narrator) or from a web or database server process?
+    why: Those parents mean the login screen was bypassed (sticky keys style backdoor) or a server application was exploited. Neither has a benign explanation.
+    yes: o-tp-backdoor
+    no: q-it-process
+    notes:
+      yes: The change on {{device}} was made from a process chain starting at an accessibility binary or server process.
+      no: The change on {{device}} was made from a normal administrative process chain.
+
+  q-it-process:
+    type: question
+    text: Is it IT tooling or an admin action with a ticket (LAPS, Intune, SCCM, a known admin account)?
+    yes: o-benign
+    no: q-used
+    notes:
+      yes: The change was made by IT tooling or an approved admin action.
+      no: No IT process or ticket explains the change.
+
+  q-used:
+    type: question
+    text: Has {{account}} been used to log on (locally, RDP, network)?
+    kql:
+      - title: Logons by the account (7d)
+        platform: xdr
+        query: |
+          DeviceLogonEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and AccountName =~ "{{account}}"
+          | project Timestamp, ActionType, LogonType, RemoteIP, RemoteDeviceName
+    yes: o-tp
+    no: o-tp-unused
+    notes:
+      yes: "{{account}} has been used to log on to {{device}}."
+      no: "{{account}} has not been used to log on yet."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: IT administration
+    anchor: The change for {{account}} on {{device}} was made by IT tooling or an approved admin.
+    risk: The risk here is a backdoor administrator account; it doesn't apply given the IT process and ticket.
+    actions:
+      - Close referencing the ticket
+
+  o-tp-unused:
+    type: outcome
+    verdict: true_positive
+    title: Rogue local admin, not yet used
+    anchor: "{{account}} was created or made local admin on {{device}} with no legitimate reason, and has not been used."
+    risk: The risk here is persistent administrative access; removing the account closes it before use.
+    actions:
+      - Remove or disable {{account}}
+      - Investigate the process and account that made the change
+    escalate: true
+    monitor: I will monitor {{device}} for new local accounts and group changes.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Rogue local admin in use
+    anchor: "{{account}} was made local admin on {{device}} without a legitimate reason and has been used."
+    risk: The risk here is an attacker with persistent admin rights on {{device}}; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Remove {{account}} and investigate its logon sessions
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same account name.
+
+  o-tp-backdoor:
+    type: outcome
+    verdict: true_positive
+    title: Login screen or service backdoor
+    anchor: The change for {{account}} on {{device}} was made through an accessibility binary or a server process.
+    risk: The risk here is SYSTEM-level access without credentials, through a replaced accessibility tool or an exploited service; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Check Utilman.exe, sethc.exe and similar for replacement or Image File Execution Options debugger keys
+      - Remove {{account}}
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for accessibility binary tampering and the same account name.

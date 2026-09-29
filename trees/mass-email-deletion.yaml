@@ -1,0 +1,89 @@
+id: mass-email-deletion
+title: Mass Email Deletion
+category: email
+summary: >-
+  A mailbox deleted or hard-deleted an unusual number of messages. Attackers delete
+  security notifications, replies from victims and evidence of their sends. Users also
+  clean up. Look at what was deleted and from which session.
+applies_to:
+  - Suspicious email deletion activity
+  - Unusual file deletion activities (mail)
+  - Mass HardDelete in mailbox
+mitre: [T1070.008]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1070.008 Clear Mailbox Data"
+    url: https://attack.mitre.org/techniques/T1070/008/
+  - title: Defender for Cloud Apps anomaly detection policies
+    url: https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
+entities:
+  - { key: user, label: Mailbox owner, example: "jdoe@contoso.com" }
+start: c-deletes
+nodes:
+  c-deletes:
+    type: check
+    text: Measure the deletions, their source session and what they targeted.
+    kql:
+      - title: Deletions by operation and client IP (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{user}}"
+          | where Operation in~ ("HardDelete", "SoftDelete", "MoveToDeletedItems")
+          | summarize Count = count(), First = min(TimeGenerated), Last = max(TimeGenerated) by Operation, ClientIP, ClientInfoString
+    note: I measured the deletions in the mailbox of {{user}} and the sessions that made them.
+    next: q-session
+
+  q-session:
+    type: question
+    text: Did the deletions come from the user's usual client and network?
+    yes: q-content
+    no: o-tp
+    notes:
+      yes: The deletions came from the usual client and network of {{user}}.
+      no: The deletions came from an unfamiliar client or network.
+
+  q-content:
+    type: question
+    text: Did the deletions target security alerts, bounce messages, replies to recent sends, or a specific thread (rather than general clean-up)?
+    yes: o-inconclusive
+    no: o-benign
+    notes:
+      yes: The deletions targeted security notifications or specific replies.
+      no: The deletions look like general mailbox clean-up.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: User clean-up
+    anchor: "{{user}} cleaned up their mailbox from their usual client."
+    risk: The risk here is an attacker hiding evidence; it doesn't apply given the usual session and general content.
+    actions:
+      - Close
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Targeted deletions from usual client
+    anchor: The deletions in the mailbox of {{user}} came from their usual client but targeted security or reply messages.
+    risk: The risk here is malware or a hijacked session on the user's device hiding activity, which stays open until the user explains it.
+    actions:
+      - Ask the user whether they deleted those messages
+      - Check the device for malware and the account for inbox rules
+    monitor: I will monitor {{user}} for further targeted deletions and outbound sends.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Attacker deleting mail
+    anchor: Mail in the mailbox of {{user}} was deleted from an unfamiliar session.
+    risk: The risk here is an attacker hiding a compromise, usually business email compromise; containment is required now.
+    actions:
+      - Revoke sessions and reset the password
+      - Recover deleted items for review
+      - Run the inbox rule and token theft checks for the account
+    escalate: true
+    monitor: I will monitor {{user}} for further deletions and sign-ins from new infrastructure.

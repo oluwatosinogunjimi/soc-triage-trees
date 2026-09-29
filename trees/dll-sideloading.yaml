@@ -1,0 +1,96 @@
+id: dll-sideloading
+title: DLL Sideloading
+category: endpoint
+summary: >-
+  A signed, trusted executable loaded an unsigned DLL from its own folder instead of the
+  real one from System32. Attackers ship a legitimate EXE with a malicious DLL next to it
+  so the malware runs under a trusted name.
+applies_to:
+  - Suspicious DLL loaded by signed binary
+  - DLL search order hijacking
+  - Unsigned DLL loaded from user-writable path
+mitre: [T1574.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1574.002 Hijack Execution Flow: DLL Side-Loading"
+    url: https://attack.mitre.org/techniques/T1574/002/
+  - title: HijackLibs, list of DLL hijacking candidates
+    url: https://hijacklibs.net/
+entities:
+  - { key: device, label: Device name, example: "WKS-FIN-023" }
+  - { key: dll, label: DLL name, example: "version.dll" }
+start: c-load
+nodes:
+  c-load:
+    type: check
+    text: Identify the host executable, the DLL and where both live.
+    kql:
+      - title: DLL loads by name, path and signer (7d)
+        platform: xdr
+        query: |
+          DeviceImageLoadEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}" and FileName =~ "{{dll}}"
+          | project Timestamp, FolderPath, SHA1, SHA256, InitiatingProcessFileName, InitiatingProcessFolderPath
+          | join kind=leftouter (DeviceFileCertificateInfo | summarize arg_max(Timestamp, Signer, IsSigned) by SHA1) on SHA1
+          | project Timestamp, FolderPath, SHA256, Signer, IsSigned, InitiatingProcessFileName, InitiatingProcessFolderPath
+    note: I identified which executable loaded {{dll}} on {{device}} and from where.
+    next: q-location
+
+  q-location:
+    type: question
+    text: Was the DLL loaded from a user-writable path (AppData, Temp, ProgramData, Downloads, Public) next to a copied signed EXE?
+    yes: q-dll-signed
+    no: o-fp
+    notes:
+      yes: "{{dll}} was loaded from a user-writable folder next to a copied signed executable."
+      no: "{{dll}} was loaded from its normal install location."
+
+  q-dll-signed:
+    type: question
+    text: Is the DLL signed by the same vendor as the executable and known to that product?
+    yes: o-fp
+    no: q-behaviour
+    notes:
+      yes: "{{dll}} is signed by the product vendor and known to that product."
+      no: "{{dll}} is unsigned or not part of the product."
+
+  q-behaviour:
+    type: question
+    text: Did the host process then behave maliciously (network beacons, injection, persistence)?
+    yes: o-tp
+    no: l-edr
+    notes:
+      yes: The host process behaved maliciously after loading {{dll}}.
+      no: The host process showed no malicious behaviour yet.
+
+  l-edr:
+    type: link
+    text: Assess the DLL itself in the EDR tree.
+    tree: edr-malware-detection
+    node: q-legit
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Normal DLL load
+    anchor: "{{dll}} on {{device}} is a legitimate library loaded by its own product."
+    risk: The risk here is malware running under a trusted executable; it doesn't apply given the location and signer.
+    actions:
+      - Close
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Malicious sideloaded DLL
+    anchor: A malicious {{dll}} was sideloaded by a signed executable on {{device}}.
+    risk: The risk here is an implant hiding behind a trusted signature; containment is required now.
+    actions:
+      - Isolate {{device}}
+      - Quarantine the DLL and the copied executable, and find the persistence that launches them
+      - Hunt for the DLL hash and the folder pattern across the estate
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the DLL hash and its C2 destinations.

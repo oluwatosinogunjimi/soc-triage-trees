@@ -1,0 +1,100 @@
+id: teams-external-phishing
+title: Microsoft Teams External Phishing or Fake Helpdesk
+category: email
+summary: >-
+  An external Teams account, often named "Help Desk" or "IT Support", messages or calls a
+  user, frequently after an email bomb, and talks them into Quick Assist or a download.
+  This bypasses email security entirely.
+applies_to:
+  - External Teams chat from unknown tenant
+  - Teams phishing message detected
+  - Email bombing followed by Teams contact
+mitre: [T1566.003, T1656, T1219]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Threat Intelligence, Storm-1811 abuse of Quick Assist and Teams
+    url: https://www.microsoft.com/en-us/security/blog/2024/05/15/threat-actors-misusing-quick-assist-in-social-engineering-attacks-leading-to-ransomware/
+  - title: "MITRE ATT&CK T1566.003 Spearphishing via Service"
+    url: https://attack.mitre.org/techniques/T1566/003/
+entities:
+  - { key: user, label: Targeted user, example: "jdoe@contoso.com" }
+  - { key: device, label: User's device, example: "WKS-FIN-023" }
+start: c-chat
+nodes:
+  c-chat:
+    type: check
+    text: Find the external chats and any email bombing before them.
+    kql:
+      - title: External Teams chats involving the user (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where OfficeWorkload == "MicrosoftTeams" and Operation in~ ("ChatCreated", "MessageSent", "MemberAdded")
+          | where UserId =~ "{{user}}" or tostring(Members) has "{{user}}"
+          | where tostring(ParticipantInfo) has "HasForeignTenantUsers\":true" or tostring(Members) has "#EXT#"
+          | project TimeGenerated, Operation, UserId, ChatName, Members, ParticipantInfo
+      - title: Inbound mail volume to the user (email bomb check, 48h)
+        platform: xdr
+        query: |
+          EmailEvents
+          | where Timestamp > ago(48h)
+          | where RecipientEmailAddress =~ "{{user}}"
+          | summarize Messages = count() by bin(Timestamp, 15m)
+          | where Messages > 50
+    note: I found the external Teams contact with {{user}} and checked for email bombing beforehand.
+    next: q-known-partner
+
+  q-known-partner:
+    type: question
+    text: Is the external contact a known partner or supplier the user works with?
+    yes: o-fp
+    no: q-remote-access
+    notes:
+      yes: The external contact is a known partner of {{user}}.
+      no: The external contact is unknown and posed as IT support or a trusted brand.
+
+  q-remote-access:
+    type: question
+    text: Did the user start Quick Assist or another remote tool, or download a file after the chat?
+    kql:
+      - title: Quick Assist and remote tools after the chat (48h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(48h)
+          | where DeviceName =~ "{{device}}"
+          | where FileName has_any ("quickassist", "anydesk", "teamviewer", "screenconnect") or ProcessCommandLine has "quickassist"
+          | project Timestamp, AccountName, FileName, ProcessCommandLine
+    yes: l-rmm
+    no: o-tp-attempt
+    notes:
+      yes: "{{user}} started remote access on {{device}} after the chat."
+      no: "{{user}} did not start remote access or download anything."
+
+  l-rmm:
+    type: link
+    text: Remote access was granted. Continue in the RMM tree.
+    tree: rmm-tool-unauthorised
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Known external collaborator
+    anchor: The external Teams contact with {{user}} is a known partner.
+    risk: The risk here is social engineering through external Teams chat; it doesn't apply to a known collaborator.
+    actions:
+      - Close
+
+  o-tp-attempt:
+    type: outcome
+    verdict: true_positive
+    title: Fake helpdesk attempt, no access granted
+    anchor: An unknown external Teams account posed as IT support to {{user}}, and no remote access was granted.
+    risk: The risk here is remote access leading to ransomware; it doesn't apply as the user did not comply.
+    actions:
+      - Block the external tenant or domain in Teams
+      - Brief the user and helpdesk on the lure
+      - Recommend restricting external Teams access to allowed domains

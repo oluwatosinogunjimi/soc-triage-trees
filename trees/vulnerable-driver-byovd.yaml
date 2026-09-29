@@ -1,0 +1,99 @@
+id: vulnerable-driver-byovd
+title: Vulnerable Driver Loaded (BYOVD)
+category: endpoint
+summary: >-
+  A known-vulnerable signed kernel driver was dropped or loaded. Ransomware groups bring
+  these drivers to kill EDR from kernel mode. Some legitimate hardware and gaming tools
+  ship old drivers too, so the path and what happened next decide it.
+applies_to:
+  - Vulnerable driver loaded
+  - Suspicious driver load (known vulnerable driver blocklist)
+  - Possible EDR killer activity
+mitre: [T1068, T1562.001, T1543.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1068 Exploitation for Privilege Escalation"
+    url: https://attack.mitre.org/techniques/T1068/
+  - title: LOLDrivers, curated list of vulnerable and malicious drivers
+    url: https://www.loldrivers.io/
+  - title: Microsoft recommended driver block rules
+    url: https://learn.microsoft.com/en-us/windows/security/application-security/application-control/app-control-for-business/design/microsoft-recommended-driver-block-rules
+entities:
+  - { key: device, label: Device name, example: "SRV-FS01" }
+  - { key: driver, label: Driver file name, example: "RTCore64.sys" }
+start: c-driver
+nodes:
+  c-driver:
+    type: check
+    text: Identify the driver, where it was dropped and how it was loaded.
+    kql:
+      - title: Driver drops, service creation and loads (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceFileEvents | where FileName endswith ".sys" and ActionType == "FileCreated"
+               | project Timestamp, DeviceName, Kind = "Drop", Detail = FolderPath, SHA1, Proc = InitiatingProcessFileName),
+            (DeviceEvents | where ActionType in ("DriverLoad", "ServiceInstalled") and (FileName endswith ".sys" or tostring(AdditionalFields) has ".sys")
+               | project Timestamp, DeviceName, Kind = ActionType, Detail = strcat(FolderPath, " ", tostring(AdditionalFields)), SHA1, Proc = InitiatingProcessFileName)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+    note: I identified {{driver}} on {{device}}, where it was dropped and how it was loaded.
+    next: q-legit-product
+
+  q-legit-product:
+    type: question
+    text: Did it come from an installed product (hardware utility, overclocking or gaming tool) in its normal install path?
+    yes: o-benign-risky
+    no: q-edr-impact
+    notes:
+      yes: "{{driver}} was installed by a known product in its normal path."
+      no: "{{driver}} was dropped outside any product install, often in a temp or user folder."
+
+  q-edr-impact:
+    type: question
+    text: After the load, did security processes stop or the sensor go quiet, or did other attack activity follow?
+    yes: o-tp-edr-killed
+    no: o-tp
+    notes:
+      yes: Security tools on {{device}} stopped or went quiet after {{driver}} loaded.
+      no: Security tools on {{device}} kept working after {{driver}} loaded.
+
+  o-benign-risky:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate product, vulnerable driver
+    anchor: "{{driver}} on {{device}} belongs to an installed product."
+    risk: The risk here is an attacker reusing the vulnerable driver to kill security tools; nobody is abusing it now, but it should be removed or blocked.
+    actions:
+      - Recommend removing the product or updating the driver
+      - Recommend enabling the Microsoft vulnerable driver blocklist
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: BYOVD attempt, protection intact
+    anchor: "{{driver}} was dropped and loaded on {{device}} outside any product install, and security tools kept working."
+    risk: The risk here is an EDR killer preparing for ransomware; the attacker has admin rights on the host.
+    actions:
+      - Isolate {{device}}
+      - Remove the driver and its service
+      - Find how the attacker got admin rights
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same driver hash.
+
+  o-tp-edr-killed:
+    type: outcome
+    verdict: true_positive
+    title: EDR killed through a vulnerable driver
+    anchor: "{{driver}} was loaded on {{device}} and security tools stopped afterwards."
+    risk: The risk here is ransomware deployment on a host that can no longer see it; this is a P1.
+    actions:
+      - Isolate {{device}} through the network or switch if the agent cannot
+      - Call the customer on the P1 path and engage incident response
+      - Hunt for the driver and silent sensors across the estate
+    escalate: true
+    monitor: I will monitor for sensors going silent and the driver hash across the estate.

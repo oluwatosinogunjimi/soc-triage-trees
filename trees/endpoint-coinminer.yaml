@@ -1,0 +1,82 @@
+id: endpoint-coinminer
+title: Cryptominer on Endpoint or Server
+category: endpoint
+summary: >-
+  XMRig or another miner detected, or sustained high CPU with connections to mining pools.
+  On a workstation it is often a PUA a user installed. On a server it usually means the
+  server was exploited, and the miner is just the visible part.
+applies_to:
+  - Coinminer detected (Trojan:Win32/CoinMiner)
+  - Connection to cryptocurrency mining pool
+  - XMRig execution
+mitre: [T1496]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1496 Resource Hijacking"
+    url: https://attack.mitre.org/techniques/T1496/
+entities:
+  - { key: device, label: Device name, example: "SRV-WEB03" }
+start: c-miner
+nodes:
+  c-miner:
+    type: check
+    text: Identify the miner, its parent and its pool connections.
+    kql:
+      - title: Miner processes and pool connections (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceProcessEvents | where ProcessCommandLine has_any ("stratum+tcp", "xmrig", "--donate-level", "cryptonight", "randomx", "-o pool", "nicehash")
+               | project Timestamp, DeviceName, Kind = "Process", Detail = ProcessCommandLine, Parent = InitiatingProcessFileName, Account = AccountName),
+            (DeviceNetworkEvents | where RemotePort in (3333, 4444, 5555, 7777, 14444, 45700) or RemoteUrl has_any ("pool", "xmr", "monero", "nanopool", "2miners", "supportxmr")
+               | project Timestamp, DeviceName, Kind = "Network", Detail = strcat(RemoteUrl, " ", RemoteIP, ":", RemotePort), Parent = InitiatingProcessFileName, Account = InitiatingProcessAccountName)
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{device}}"
+          | order by Timestamp asc
+    note: I identified the miner on {{device}}, its parent process and its pool connections.
+    next: q-server
+
+  q-server:
+    type: question
+    text: Is {{device}} a server (especially internet-facing) or was the miner started by a service, web server or scheduled task?
+    yes: o-tp-server
+    no: q-user-installed
+    notes:
+      yes: The miner is on a server or was started by a service, web server or scheduled task.
+      no: The miner is on a user workstation and started in the user's session.
+
+  q-user-installed:
+    type: question
+    text: Did the user install it (cracked software, game mod, "earn crypto" app)?
+    yes: o-tp-pua
+    no: o-tp-server
+    notes:
+      yes: The user installed the miner as or with other software.
+      no: The user did not install the miner, so something else put it there.
+
+  o-tp-pua:
+    type: outcome
+    verdict: true_positive
+    title: User-installed miner
+    anchor: A cryptominer on {{device}} came from software the user installed.
+    risk: The risk here is resource abuse and whatever else came with the cracked software; the miner is often bundled with stealers.
+    actions:
+      - Remove the miner and the bundled software
+      - Run an infostealer check on {{device}}
+      - Remind the user of software policy
+
+  o-tp-server:
+    type: outcome
+    verdict: true_positive
+    title: Miner deployed by an intruder
+    anchor: A cryptominer was deployed on {{device}} through a service, web server or scheduled task.
+    risk: The risk here is an attacker with code execution on {{device}}, usually through an unpatched service; the miner is only the visible payload.
+    actions:
+      - Isolate {{device}}
+      - Find the initial access (exposed service, CVE, weak SSH or RDP credentials)
+      - Remove the miner and its persistence, then patch
+      - Block the pool domains
+    escalate: true
+    monitor: I will monitor the estate for mining pool connections and the miner hash.
