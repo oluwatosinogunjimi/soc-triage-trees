@@ -1,0 +1,127 @@
+id: deprovisioned-user-activity
+title: Activity by a Disabled or Departed User
+category: identity
+summary: >-
+  A leaver's account signed in, was re-enabled, or still has active sessions. Either
+  offboarding missed something, or someone (the leaver or an attacker) is using access
+  that should be gone.
+applies_to:
+  - Activity by a deprovisioned user (activity performed by terminated user)
+  - Suspicious Entra account enablement after disruption
+  - Suspicious on-premises account enablement after disruption
+  - Sign-in by disabled account
+mitre: [T1078, T1098]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Defender for Cloud Apps anomaly detection policies
+    url: https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
+  - title: Microsoft Defender for Identity XDR alerts
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: user, label: Leaver account, example: "former.employee@contoso.com" }
+  - { key: ip, label: Activity IP, example: "86.12.44.201" }
+start: c-status
+nodes:
+  c-status:
+    type: check
+    text: Establish the account's status and the activity.
+    look_for:
+      - Leave date from HR, when the account was disabled, and any re-enablement
+      - The activity itself (interactive sign-in, token refresh, mailbox access, VPN)
+      - Whether the activity used an existing session or a fresh authentication
+    kql:
+      - title: Account enable, disable and sign-in timeline (30d)
+        platform: sentinel
+        query: |
+          union
+            (AuditLogs | where TimeGenerated > ago(30d)
+               | where OperationName has_any ("Disable account", "Enable account", "Update user", "Delete user", "Restore user")
+               | where tostring(TargetResources[0].userPrincipalName) =~ "{{user}}"
+               | project TimeGenerated, Kind = "Directory", Detail = OperationName, Who = tostring(InitiatedBy.user.userPrincipalName), IP = tostring(InitiatedBy.user.ipAddress)),
+            (SigninLogs | where TimeGenerated > ago(30d) | where UserPrincipalName =~ "{{user}}"
+               | project TimeGenerated, Kind = "SignIn", Detail = strcat(AppDisplayName, " ", ResultType), Who = UserPrincipalName, IP = IPAddress)
+          | order by TimeGenerated asc
+    note: I reviewed the account status of {{user}} and the activity from {{ip}}.
+    next: q-reenabled
+
+  q-reenabled:
+    type: question
+    text: Was the account re-enabled after it was disabled?
+    yes: q-reenable-approved
+    no: q-succeeded
+    notes:
+      yes: "{{user}} was re-enabled after being disabled."
+      no: "{{user}} was not re-enabled."
+
+  q-reenable-approved:
+    type: question
+    text: Was the re-enablement approved (rehire, legal hold, mailbox access for a manager) and made from a clean admin session?
+    yes: o-benign-approved
+    no: o-tp
+    notes:
+      yes: The re-enablement of {{user}} was approved and made from a clean admin session.
+      no: The re-enablement of {{user}} was not approved or came from a risky session.
+
+  q-succeeded:
+    type: question
+    text: Did the activity succeed (sign-in result 0 or data access), rather than failing against the disabled account?
+    yes: q-who
+    no: o-fp-blocked
+    notes:
+      yes: The activity from {{ip}} succeeded.
+      no: The activity from {{ip}} failed against the disabled account.
+
+  q-who:
+    type: question
+    text: Is the activity from a device or network the leaver used, or from shared or service use (a shared mailbox, a scheduled job)?
+    yes: o-offboarding-gap
+    no: o-tp
+    notes:
+      yes: The activity came from the leaver's known device or a documented shared use.
+      no: The activity came from {{ip}}, which has no link to the leaver or a documented use.
+
+  o-fp-blocked:
+    type: outcome
+    verdict: false_positive
+    title: Blocked attempt on disabled account
+    anchor: The attempts against {{user}} from {{ip}} failed because the account is disabled.
+    risk: The risk here is continued access by a leaver; it doesn't apply as the account rejected every attempt.
+    actions:
+      - Close
+      - If attempts come from a stale device, ask IT to remove the account from it
+
+  o-benign-approved:
+    type: outcome
+    verdict: benign_positive
+    title: Approved re-enablement
+    anchor: "{{user}} was re-enabled for an approved reason from a clean admin session."
+    risk: The risk here is unauthorised use of a leaver account; it doesn't apply given the approval.
+    actions:
+      - Close referencing the approval
+      - Confirm the account has an owner and an end date
+
+  o-offboarding-gap:
+    type: outcome
+    verdict: benign_positive
+    title: Offboarding gap
+    anchor: The activity on {{user}} came from a session or device that offboarding did not remove.
+    risk: The risk here is a leaver retaining access to company data; revoking sessions and removing the device closes it.
+    actions:
+      - Revoke sessions and refresh tokens for {{user}}
+      - Remove the account from devices and shared mailboxes it still reaches
+      - Raise the gap with the customer's offboarding process owner
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Unauthorised use of a leaver account
+    anchor: "{{user}} was used from {{ip}} without any legitimate reason after offboarding."
+    risk: The risk here is data theft or sabotage by a leaver or an attacker through an account nobody watches; containment is required now.
+    actions:
+      - Disable the account again, revoke sessions and reset the password
+      - Scope what was accessed during the activity
+      - Inform the customer, including HR and legal if the leaver may be involved
+    escalate: true
+    monitor: I will monitor {{user}} and {{ip}} for further activity.

@@ -1,0 +1,141 @@
+id: mfa-fatigue
+title: MFA Fatigue or Suspicious MFA Approval
+category: identity
+summary: >-
+  Repeated MFA prompts the user did not start, or an approval Entra flags as suspicious.
+  A push only fires after a correct password, so the password is the first thing to
+  treat as compromised. Then find out whether the user eventually approved one.
+applies_to:
+  - Suspicious MFA authentication approval (authenticatorPhishing)
+  - MFA fatigue / push bombing
+  - User reported suspicious activity (MFA)
+  - Multiple MFA denials followed by success
+mitre: [T1621, T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Entra ID Protection risk detections
+    url: https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-risks
+  - title: "MITRE ATT&CK T1621 Multi-Factor Authentication Request Generation"
+    url: https://attack.mitre.org/techniques/T1621/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+  - { key: ip, label: IP the prompts came from, example: "102.89.34.10" }
+start: c-prompts
+nodes:
+  c-prompts:
+    type: check
+    text: Count the MFA prompts, denials and approvals and where they came from.
+    look_for:
+      - Number of MFA challenges in a short window, and their results
+      - Source IP, ASN and country of the sign-ins that triggered them
+      - Whether any challenge ended in success (ResultType 0)
+      - Whether the user reported the prompts (user reported suspicious activity)
+    kql:
+      - title: MFA challenges and outcomes for the user (48h)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(48h)
+          | where UserPrincipalName =~ "{{user}}"
+          | where ResultType in ("0", "500121", "50074", "50076", "50158")
+          | summarize Attempts = count(), Denied = countif(ResultType == "500121"), Success = countif(ResultType == "0"),
+                      First = min(TimeGenerated), Last = max(TimeGenerated)
+                    by IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion), AppDisplayName
+          | order by First asc
+    note: I reviewed the MFA challenges for {{user}} and the sign-ins that triggered them from {{ip}}.
+    next: q-user-initiated
+
+  q-user-initiated:
+    type: question
+    text: Did the user start these sign-ins themselves (known IP and device, the user confirms)?
+    why: Users sometimes cause repeated prompts with a stuck app or a new phone. That is only plausible if the IPs are theirs.
+    yes: o-benign-user
+    no: q-approved
+    unknown: q-approved
+    notes:
+      yes: "{{user}} confirmed starting the sign-ins from a known device and network."
+      no: The prompts came from sign-ins that {{user}} did not start, from {{ip}}.
+      unknown: I could not confirm whether {{user}} started the sign-ins.
+
+  q-approved:
+    type: question
+    text: Did any prompt get approved, producing a successful sign-in from the unfamiliar IP?
+    yes: q-post-auth
+    no: o-password-compromised
+    notes:
+      yes: One of the prompts was approved and a sign-in from {{ip}} succeeded.
+      no: Every prompt was denied or ignored and no sign-in from {{ip}} succeeded.
+
+  q-post-auth:
+    type: question
+    text: Did the attacker do anything after getting in (new MFA method, inbox rule, consent, mail sent, file access)?
+    kql:
+      - title: Directory and mailbox changes after the approval (7d)
+        platform: sentinel
+        query: |
+          let upn = "{{user}}";
+          union
+            (AuditLogs | where TimeGenerated > ago(7d)
+               | where tostring(TargetResources[0].userPrincipalName) =~ upn or tostring(InitiatedBy.user.userPrincipalName) =~ upn
+               | project TimeGenerated, Source = "Entra", Action = OperationName, IP = tostring(InitiatedBy.user.ipAddress)),
+            (OfficeActivity | where TimeGenerated > ago(7d) | where UserId =~ upn
+               | where Operation in~ ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Send", "FileDownloaded")
+               | project TimeGenerated, Source = "M365", Action = Operation, IP = ClientIP)
+          | order by TimeGenerated asc
+    yes: o-tp-persistence
+    no: o-tp-contained
+    notes:
+      yes: The attacker used the session to make changes or access data on the account of {{user}}.
+      no: I found no changes or data access after the approved sign-in.
+
+  o-benign-user:
+    type: outcome
+    verdict: benign_positive
+    title: Prompts caused by the user
+    anchor: The MFA prompts for {{user}} came from their own sign-ins on a known device and network.
+    risk: The risk here is an attacker holding the password and pushing prompts; it doesn't apply as every prompt traced back to the user.
+    actions:
+      - Close with the user confirmation quoted
+      - Suggest the user re-registers the authenticator if an app fault caused the loop
+
+  o-password-compromised:
+    type: outcome
+    verdict: true_positive
+    title: Password compromised, MFA held
+    anchor: An attacker at {{ip}} has the password for {{user}} and triggered MFA prompts that were not approved.
+    risk: The risk here is the user eventually approving a prompt; the password is compromised and must be changed now.
+    actions:
+      - Reset the password for {{user}}
+      - Tell the user to deny any prompt they did not start and report it
+      - Block {{ip}}
+      - Recommend number matching or phishing-resistant MFA
+    monitor: I will monitor {{user}} for further MFA challenges and sign-ins from unfamiliar infrastructure over the next 7 days.
+
+  o-tp-contained:
+    type: outcome
+    verdict: true_positive
+    title: Prompt approved, no follow-on activity
+    anchor: "{{user}} approved an MFA prompt for a sign-in from {{ip}} that they did not start, and I found no activity after it."
+    risk: The risk here is the attacker returning with the valid session; revoking sessions removes it.
+    actions:
+      - Revoke sessions and refresh tokens, then reset the password
+      - Confirm the user as compromised in Entra ID Protection
+      - Block {{ip}}
+    escalate: true
+    monitor: I will monitor {{user}} for new sign-ins from {{ip}} or its ASN.
+
+  o-tp-persistence:
+    type: outcome
+    verdict: true_positive
+    title: Prompt approved, attacker active
+    anchor: "{{user}} approved an MFA prompt for a sign-in from {{ip}}, and the attacker then made changes or accessed data."
+    risk: The risk here is persistence and business email compromise through the changes made; containment is required now.
+    actions:
+      - Revoke sessions and refresh tokens, then reset the password
+      - Remove attacker MFA methods, inbox rules and consents
+      - Review mail sent and files accessed during the session
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{user}} for re-entry and new persistence.

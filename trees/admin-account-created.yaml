@@ -1,0 +1,130 @@
+id: admin-account-created
+title: New Account Created and Made Admin
+category: identity
+summary: >-
+  A brand new cloud account was created and quickly given a privileged role, or created
+  by an unusual actor. This is a classic backdoor. Check who created it, whether it
+  matches naming and onboarding standards, and whether anyone has signed in with it.
+applies_to:
+  - User was created and assigned to Global Administrator role
+  - User was created and assigned to sensitive role
+  - Add user followed by Add member to role
+  - OAuth app created a user
+mitre: [T1136.003, T1098.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Identity XDR alerts (persistence)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+  - title: "MITRE ATT&CK T1136.003 Create Account: Cloud Account"
+    url: https://attack.mitre.org/techniques/T1136/003/
+entities:
+  - { key: user, label: New account, example: "support-svc@contoso.onmicrosoft.com" }
+  - { key: actor, label: Creator, example: "it-admin@contoso.com" }
+start: c-created
+nodes:
+  c-created:
+    type: check
+    text: Pull the creation and every change to the new account.
+    kql:
+      - title: Lifecycle of the new account (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where tostring(TargetResources[0].userPrincipalName) =~ "{{user}}"
+          | project TimeGenerated, OperationName, Result,
+                    Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                    ActorIP = tostring(InitiatedBy.user.ipAddress)
+          | order by TimeGenerated asc
+    note: I pulled the creation of {{user}} by {{actor}} and every change since.
+    next: q-created-by-app
+
+  q-created-by-app:
+    type: question
+    text: Was the account created by an application or service principal rather than a person?
+    why: Provisioning connectors (HR sync, SCIM) create users routinely. An unknown app creating users is a strong compromise signal.
+    yes: q-known-provisioner
+    no: q-standards
+    notes:
+      yes: The account was created by an application rather than a person.
+      no: The account was created by {{actor}}.
+
+  q-known-provisioner:
+    type: question
+    text: Is that application a known provisioning service (HR sync, SCIM connector, identity governance)?
+    yes: q-standards
+    no: o-tp-backdoor
+    notes:
+      yes: The creating application is a known provisioning service.
+      no: The creating application is not a known provisioning service.
+
+  q-standards:
+    type: question
+    text: Does the account follow the customer's naming, ownership and onboarding standards, with a ticket or HR record?
+    yes: q-signins
+    no: q-actor-clean
+    notes:
+      yes: "{{user}} matches naming standards and has an onboarding record."
+      no: "{{user}} does not match naming standards or has no onboarding record."
+
+  q-actor-clean:
+    type: question
+    text: Was the creator's session clean (usual IP and device, no risk)?
+    yes: o-inconclusive
+    no: o-tp-backdoor
+    notes:
+      yes: The session of {{actor}} was clean when the account was created.
+      no: The session of {{actor}} was risky or unusual when the account was created.
+
+  q-signins:
+    type: question
+    text: Have sign-ins to the new account come only from expected locations?
+    kql:
+      - title: Sign-ins by the new account
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(30d)
+          | where UserPrincipalName =~ "{{user}}"
+          | summarize Attempts = count(), Success = countif(ResultType == "0") by IPAddress, Country = tostring(LocationDetails.countryOrRegion), AppDisplayName
+    yes: o-benign
+    no: o-tp-backdoor
+    notes:
+      yes: Sign-ins to {{user}} came only from expected locations.
+      no: "{{user}} was used from unexpected locations."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate new admin
+    anchor: "{{user}} was created through the customer's onboarding process and has only been used from expected locations."
+    risk: The risk here is a backdoor admin account; it doesn't apply given the onboarding record and clean usage.
+    actions:
+      - Close referencing the onboarding record
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Non-standard account, needs confirmation
+    anchor: "{{actor}} created {{user}} from a clean session, but the account does not match the customer's standards."
+    risk: The risk here is an unapproved privileged account, which stays open until the customer confirms it.
+    actions:
+      - Ask the customer to confirm the account and its role
+      - Disable it pending confirmation if it holds a privileged role
+    monitor: I will monitor {{user}} for sign-ins and privileged actions until this is resolved.
+
+  o-tp-backdoor:
+    type: outcome
+    verdict: true_positive
+    title: Backdoor admin account
+    anchor: "{{user}} was created outside any legitimate process, consistent with an attacker backdoor."
+    risk: The risk here is persistent tenant control through a hidden admin account; containment is required now.
+    actions:
+      - Disable {{user}} and remove its roles
+      - Revoke sessions for {{actor}} and investigate how it was compromised
+      - Review everything done by both accounts
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor for new account creation and role assignments across the tenant.

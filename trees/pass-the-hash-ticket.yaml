@@ -1,0 +1,110 @@
+id: pass-the-hash-ticket
+title: Pass-the-Hash, Pass-the-Ticket or Overpass-the-Hash
+category: identity
+summary: >-
+  Stolen NTLM hashes or Kerberos tickets being reused to authenticate as another user.
+  Look for the account logging on from a host it never uses, NTLM where Kerberos is
+  expected, or the same ticket on two machines.
+applies_to:
+  - Suspected pass-the-ticket attack
+  - Possible overpass-the-hash attack
+  - Suspicious NTLM authentication
+  - Logon with LogonType 9 (NewCredentials) by admin tools
+mitre: [T1550.002, T1550.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1550.002 Pass the Hash"
+    url: https://attack.mitre.org/techniques/T1550/002/
+  - title: "MITRE ATT&CK T1550.003 Pass the Ticket"
+    url: https://attack.mitre.org/techniques/T1550/003/
+entities:
+  - { key: account, label: Account being reused, example: "adm-jdoe" }
+  - { key: src_host, label: Host using the credential, example: "WKS-HR-011" }
+start: c-logons
+nodes:
+  c-logons:
+    type: check
+    text: Map where the account normally logs on and where it did now.
+    kql:
+      - title: Logons by the account, by source host and protocol (14d)
+        platform: xdr
+        query: |
+          IdentityLogonEvents
+          | where Timestamp > ago(14d)
+          | where AccountName =~ "{{account}}"
+          | summarize Logons = count(), First = min(Timestamp), Last = max(Timestamp), Targets = make_set(DestinationDeviceName, 20)
+                    by DeviceName, Protocol, LogonType
+          | order by First desc
+      - title: NewCredentials logons and seclogo (Event 4624 type 9, 7d)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(7d)
+          | where EventID == 4624 and LogonType == 9
+          | where TargetUserName =~ "{{account}}" or Computer has "{{src_host}}"
+          | project TimeGenerated, Computer, TargetUserName, LogonProcessName, AuthenticationPackageName, IpAddress
+    note: I mapped the normal logon hosts for {{account}} and the activity from {{src_host}}.
+    next: q-usual-host
+
+  q-usual-host:
+    type: question
+    text: Does the account normally log on from {{src_host}} (it is the user's workstation, an admin jump host or a PAW)?
+    yes: q-protocol
+    no: q-user-present
+    notes:
+      yes: "{{src_host}} is a normal logon host for {{account}}."
+      no: "{{src_host}} is not a normal logon host for {{account}}."
+
+  q-protocol:
+    type: question
+    text: Is the authentication pattern normal (Kerberos from a domain-joined host, no RC4 downgrade, no type 9 logons from mimikatz-style tooling)?
+    yes: o-fp
+    no: q-user-present
+    notes:
+      yes: The authentication pattern for {{account}} is normal.
+      no: The authentication pattern for {{account}} is abnormal, with NTLM, RC4 or NewCredentials logons.
+
+  q-user-present:
+    type: question
+    text: Is the real owner of the account logged on at {{src_host}}, or does the host show credential theft tooling?
+    kql:
+      - title: Interactive sessions and credential tooling on the host (7d)
+        platform: xdr
+        query: |
+          union
+            (DeviceLogonEvents | where Timestamp > ago(7d) | where DeviceName =~ "{{src_host}}"
+               | summarize Logons = count() by AccountName, LogonType | extend Kind = "Logon"),
+            (DeviceProcessEvents | where Timestamp > ago(7d) | where DeviceName =~ "{{src_host}}"
+               | where ProcessCommandLine has_any ("sekurlsa", "pth", "asktgt", "ptt", "Rubeus", "wmiexec", "psexec", "smbexec")
+               | summarize Logons = count() by AccountName, LogonType = ProcessCommandLine | extend Kind = "Tooling")
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: "{{src_host}} shows credential theft tooling or a different user driving the session."
+      no: I found no tooling on {{src_host}}, but the credential use from it is still unexplained.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Normal logon pattern
+    anchor: "{{account}} authenticated from {{src_host}}, a normal host for it, with a normal protocol."
+    risk: The risk here is reuse of stolen hashes or tickets; it doesn't apply as the host and protocol match the account's baseline.
+    actions:
+      - Close
+    tuning: Tune the detection to the admin tools and jump hosts the customer uses legitimately.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Credential reuse by an attacker
+    anchor: "{{account}} was used from {{src_host}} with stolen credential material."
+    risk: The risk here is lateral movement toward domain admin with the reused credential; containment is required now.
+    actions:
+      - Isolate {{src_host}}
+      - Reset {{account}} (twice for a Kerberos-heavy account) and purge its tickets
+      - Find where the credential was stolen from (LSASS dump on another host)
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{account}} for logons from any host outside its baseline.

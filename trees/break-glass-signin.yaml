@@ -1,0 +1,114 @@
+id: break-glass-signin
+title: Break-Glass Account Sign-in
+category: identity
+summary: >-
+  An emergency access account was used. These accounts should almost never sign in, are
+  often excluded from Conditional Access, and hold Global Administrator. Every use must be
+  explained by a declared emergency or a scheduled test.
+applies_to:
+  - Emergency access account sign-in
+  - Break-glass account used
+  - Sign-in by excluded privileged account
+mitre: [T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Entra, manage emergency access accounts
+    url: https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/security-emergency-access
+  - title: "MITRE ATT&CK T1078.004 Valid Accounts: Cloud Accounts"
+    url: https://attack.mitre.org/techniques/T1078/004/
+entities:
+  - { key: user, label: Break-glass account, example: "bg-01@contoso.onmicrosoft.com" }
+  - { key: ip, label: Sign-in IP, example: "81.2.69.160" }
+start: c-signin
+nodes:
+  c-signin:
+    type: check
+    text: Pull every sign-in and action by the account.
+    kql:
+      - title: Sign-ins and directory actions by the account (7d)
+        platform: sentinel
+        query: |
+          union
+            (SigninLogs | where TimeGenerated > ago(7d) | where UserPrincipalName =~ "{{user}}"
+               | project TimeGenerated, Kind = "SignIn", Detail = strcat(AppDisplayName, " result ", ResultType), IP = IPAddress),
+            (AuditLogs | where TimeGenerated > ago(7d) | where tostring(InitiatedBy.user.userPrincipalName) =~ "{{user}}"
+               | project TimeGenerated, Kind = "Action", Detail = OperationName, IP = tostring(InitiatedBy.user.ipAddress))
+          | order by TimeGenerated asc
+    note: I pulled every sign-in and action by {{user}}, including the sign-in from {{ip}}.
+    next: q-declared
+
+  q-declared:
+    type: question
+    text: Is there a declared emergency or a scheduled break-glass test that covers this use?
+    yes: q-actions-match
+    no: q-success
+    notes:
+      yes: The use of {{user}} is covered by a declared emergency or scheduled test.
+      no: No emergency or scheduled test covers the use of {{user}}.
+
+  q-actions-match:
+    type: question
+    text: Did the account only do what the emergency or test required, from the expected location?
+    yes: o-benign
+    no: o-inconclusive
+    notes:
+      yes: "{{user}} performed only the expected actions from {{ip}}."
+      no: "{{user}} performed actions beyond what the emergency or test required."
+
+  q-success:
+    type: question
+    text: Did the sign-in succeed?
+    yes: o-tp
+    no: o-tp-attempt
+    notes:
+      yes: The undeclared sign-in to {{user}} from {{ip}} succeeded.
+      no: The undeclared sign-in to {{user}} from {{ip}} failed.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Declared emergency or test
+    anchor: "{{user}} was used from {{ip}} during a declared emergency or scheduled test, for expected actions only."
+    risk: The risk here is misuse of an unrestricted admin account; it doesn't apply given the declared purpose and matching actions.
+    actions:
+      - Close referencing the emergency or test record
+      - Confirm the credential was rotated and sealed after use
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Declared use, unexpected actions
+    anchor: "{{user}} was used during a declared emergency but performed actions beyond it."
+    risk: The risk here is misuse of the break-glass account under cover of the emergency, which stays open until the actions are confirmed.
+    actions:
+      - Send the action list to the customer's identity owner for confirmation
+      - Rotate the credential after the emergency closes
+    monitor: I will monitor {{user}} for any further use until the emergency is closed.
+
+  o-tp-attempt:
+    type: outcome
+    verdict: true_positive
+    title: Undeclared attempt on break-glass account
+    anchor: Someone attempted to sign in to {{user}} from {{ip}} with no declared emergency, and the attempt failed.
+    risk: The risk here is takeover of an unrestricted admin account; the account name is known to an attacker even though this attempt failed.
+    actions:
+      - Tell the customer immediately
+      - Block {{ip}} and confirm the credential is strong and phishing-resistant
+    escalate: true
+    monitor: I will monitor {{user}} for any further sign-in attempts.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Undeclared break-glass sign-in
+    anchor: "{{user}} was signed in from {{ip}} with no declared emergency or test."
+    risk: The risk here is full tenant compromise through an account that bypasses Conditional Access; containment is required now.
+    actions:
+      - Call the customer immediately on the agreed escalation path
+      - Reset the credential and revoke sessions
+      - Review every action taken by the account
+      - Raise a P1 incident
+    escalate: true
+    monitor: I will monitor {{user}} and the tenant for further privileged changes.

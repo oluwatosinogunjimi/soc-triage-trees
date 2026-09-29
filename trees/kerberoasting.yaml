@@ -1,0 +1,122 @@
+id: kerberoasting
+title: Kerberoasting
+category: identity
+summary: >-
+  A host requested Kerberos service tickets for many service accounts, often with RC4
+  encryption, so the tickets can be cracked offline for the service account passwords.
+  Find the requesting host and account, and check which service accounts have weak
+  passwords.
+applies_to:
+  - Possible Kerberoasting attack
+  - Possible Kerberoasting attack following a suspicious LDAP query
+  - Suspicious Kerberos SPN request
+  - Multiple RC4 service ticket requests (4769)
+mitre: [T1558.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1558.003 Kerberoasting"
+    url: https://attack.mitre.org/techniques/T1558/003/
+  - title: Microsoft Defender for Identity XDR alerts (credential access)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: account, label: Requesting account (sAMAccountName), example: "jdoe" }
+  - { key: src_host, label: Requesting host or IP, example: "WKS-FIN-023" }
+start: c-requests
+nodes:
+  c-requests:
+    type: check
+    text: Count the service ticket requests by the account and host.
+    kql:
+      - title: TGS requests by the account (Event 4769, 24h)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(24h)
+          | where EventID == 4769
+          | where TargetUserName startswith "{{account}}"
+          | where ServiceName !endswith "$" and ServiceName != "krbtgt"
+          | summarize Services = dcount(ServiceName), RC4 = countif(TicketEncryptionType == "0x17"),
+                      ServiceList = make_set(ServiceName, 50), First = min(TimeGenerated), Last = max(TimeGenerated) by IpAddress
+      - title: SPN enumeration from the host (24h)
+        platform: xdr
+        query: |
+          IdentityQueryEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{src_host}}" or AccountName =~ "{{account}}"
+          | where Query has "servicePrincipalName"
+          | project Timestamp, ActionType, AccountName, DeviceName, Query, QueryTarget
+    note: I counted the service ticket requests by {{account}} from {{src_host}}.
+    next: q-volume
+
+  q-volume:
+    type: question
+    text: Did the account request tickets for many distinct service accounts in a short window, or mainly with RC4 (0x17)?
+    why: A normal user requests tickets for the handful of services they use, with AES. Dozens of SPNs, or RC4 in an AES environment, is roasting.
+    yes: q-tooling
+    no: o-fp
+    notes:
+      yes: "{{account}} requested tickets for many service accounts in a short window, with RC4 encryption."
+      no: The requests by {{account}} match normal service use.
+
+  q-tooling:
+    type: question
+    text: Is there a known legitimate source (vulnerability scanner, identity audit tool, approved pen test)?
+    yes: o-benign
+    no: q-endpoint
+    notes:
+      yes: The requests came from an approved scanner or pen test on {{src_host}}.
+      no: No approved tool or test explains the requests from {{src_host}}.
+
+  q-endpoint:
+    type: question
+    text: Does the requesting host show offensive tooling or other compromise (Rubeus, Impacket, PowerView, suspicious PowerShell)?
+    kql:
+      - title: Offensive tooling on the host (24h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{src_host}}"
+          | where ProcessCommandLine has_any ("kerberoast", "Rubeus", "GetUserSPNs", "Invoke-Kerberoast", "asktgs", "PowerView", "setspn -q")
+             or FileName in~ ("rubeus.exe")
+          | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: "{{src_host}} shows offensive tooling consistent with Kerberoasting."
+      no: I found no tooling on {{src_host}}, which may be unmanaged or the attacker's own device.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Normal ticket requests
+    anchor: The service ticket requests by {{account}} from {{src_host}} match normal service use.
+    risk: The risk here is offline cracking of service account passwords; it doesn't apply as the volume and encryption are normal.
+    actions:
+      - Close
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved scanner or test
+    anchor: The requests from {{src_host}} came from an approved scanner or penetration test.
+    risk: The risk here is offline cracking of service account passwords; it doesn't apply to this activity, though the exposure it found is real.
+    actions:
+      - Close referencing the scan or test
+    tuning: Exclude the scanner host and account for this detection, scoped to its scan window.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Kerberoasting
+    anchor: "{{account}} requested service tickets for many service accounts from {{src_host}}, consistent with Kerberoasting."
+    risk: The risk here is cracked service account passwords giving the attacker privileged, often domain-wide, access; containment is required now.
+    actions:
+      - Isolate {{src_host}} and disable or reset {{account}}
+      - Rotate passwords for every service account whose ticket was requested, starting with privileged ones, using long random passwords or gMSAs
+      - Enforce AES-only Kerberos for service accounts where possible
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the roasted service accounts for logons from unusual hosts.

@@ -1,0 +1,87 @@
+id: federation-trust-change
+title: Domain Federation or Authentication Trust Change
+category: identity
+summary: >-
+  A domain was switched to federated, its federation settings or signing certificate
+  changed, or a new domain was added and verified. An attacker who controls the trust can
+  mint tokens for any user (Golden SAML style). This is rare and high impact.
+applies_to:
+  - Set domain authentication
+  - Set federation settings on domain
+  - Possible Golden SAML attack
+  - New domain added and verified
+mitre: [T1484.002, T1606.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1484.002 Domain or Tenant Policy Modification: Trust Modification"
+    url: https://attack.mitre.org/techniques/T1484/002/
+  - title: "MITRE ATT&CK T1606.002 Forge Web Credentials: SAML Tokens"
+    url: https://attack.mitre.org/techniques/T1606/002/
+entities:
+  - { key: domain, label: Domain changed, example: "contoso.com" }
+  - { key: actor, label: Who changed it, example: "it-admin@contoso.com" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull every domain and federation change.
+    kql:
+      - title: Domain and federation changes (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where OperationName has_any ("Set domain authentication", "Set federation settings on domain", "Add unverified domain",
+                                         "Verify domain", "Update domain", "Add verified domain")
+          | project TimeGenerated, OperationName, Result,
+                    Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                    ActorIP = tostring(InitiatedBy.user.ipAddress), Domain = tostring(TargetResources[0].displayName),
+                    Changes = TargetResources[0].modifiedProperties
+    note: I pulled the change to {{domain}} by {{actor}}.
+    next: q-project
+
+  q-project:
+    type: question
+    text: Is it part of a documented identity project (ADFS migration, new IdP, certificate rollover) with a change ticket?
+    yes: q-actor-clean
+    no: o-tp
+    unknown: o-tp
+    notes:
+      yes: The change to {{domain}} is part of a documented identity project.
+      no: No project or change ticket covers the change to {{domain}}.
+      unknown: I could not confirm a project for the change, so I treated it as unauthorised given the impact.
+
+  q-actor-clean:
+    type: question
+    text: Was the actor's session clean, and do the new issuer URI and signing certificate belong to the customer's own IdP?
+    yes: o-benign
+    no: o-tp
+    notes:
+      yes: The session of {{actor}} was clean and the new trust points at the customer's own IdP.
+      no: The session was risky, or the new trust points at infrastructure the customer does not own.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Planned federation change
+    anchor: The change to {{domain}} by {{actor}} is part of a documented identity project and points at the customer's own IdP.
+    risk: The risk here is token forgery through a rogue trust; it doesn't apply given the project record and verified issuer.
+    actions:
+      - Close referencing the change ticket
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Rogue authentication trust
+    anchor: The authentication trust for {{domain}} was changed outside any approved project.
+    risk: The risk here is forged tokens for any user in the domain, including admins, bypassing passwords and MFA; this is a tenant-level emergency.
+    actions:
+      - Call the customer immediately
+      - Revert the domain authentication and remove any rogue certificates or domains
+      - Revoke sessions for {{actor}} and all privileged users
+      - Hunt for sign-ins issued by the rogue trust
+      - Raise a P1 incident
+    escalate: true
+    monitor: I will monitor for further domain, federation and privileged role changes.

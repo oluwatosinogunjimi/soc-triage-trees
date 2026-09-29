@@ -1,0 +1,138 @@
+id: legacy-auth-success
+title: Successful Legacy Authentication Sign-in
+category: identity
+summary: >-
+  A successful sign-in over IMAP, POP, SMTP AUTH, Exchange ActiveSync basic or another
+  legacy protocol. These cannot do MFA, so a correct password is enough. Decide whether
+  it is a known device or service, or an attacker who guessed or stole the password.
+applies_to:
+  - Legacy authentication sign-in succeeded
+  - IMAP/POP sign-in from unusual location
+  - SMTP AUTH client submission from unknown IP
+mitre: [T1078.004, T1110]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft password spray playbook (legacy authentication checks)
+    url: https://learn.microsoft.com/en-us/security/operations/incident-response-playbook-password-spray
+  - title: "MITRE ATT&CK T1078.004 Valid Accounts: Cloud Accounts"
+    url: https://attack.mitre.org/techniques/T1078/004/
+entities:
+  - { key: user, label: User principal name, example: "scanner@contoso.com" }
+  - { key: ip, label: Source IP, example: "193.35.18.71" }
+start: c-legacy
+nodes:
+  c-legacy:
+    type: check
+    text: Identify the protocol, source and pattern of the legacy sign-ins.
+    kql:
+      - title: Legacy protocol sign-ins for the user (30d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(30d)
+          | where UserPrincipalName =~ "{{user}}"
+          | where ClientAppUsed in ("IMAP4", "POP3", "Authenticated SMTP", "Exchange ActiveSync", "Other clients",
+                                    "Exchange Web Services", "MAPI Over HTTP", "Offline Address Book", "Exchange Online PowerShell")
+          | summarize Attempts = count(), Success = countif(ResultType == "0"), First = min(TimeGenerated), Last = max(TimeGenerated)
+                    by ClientAppUsed, IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion)
+    note: I identified the legacy protocol sign-ins for {{user}} from {{ip}}.
+    next: q-service-account
+
+  q-service-account:
+    type: question
+    text: Is the account a known device or service that relies on legacy auth (scanner, printer, line-of-business app) signing in from its documented IP?
+    yes: o-benign-service
+    no: q-new-source
+    notes:
+      yes: "{{user}} is a documented service account using legacy authentication from its known IP."
+      no: "{{user}} is not a documented legacy-auth service account."
+
+  q-new-source:
+    type: question
+    text: Is the source new for this user, or a hosting, VPN or foreign IP?
+    yes: q-spray-context
+    no: o-benign-client
+    notes:
+      yes: "{{ip}} is a new or suspicious source for {{user}}."
+      no: "{{ip}} is a source {{user}} has used before with the same client."
+
+  q-spray-context:
+    type: question
+    text: Is the success part of a spray or preceded by failures from the same source?
+    yes: l-spray
+    no: q-mail-access
+    notes:
+      yes: The success followed failed attempts from {{ip}} consistent with spraying.
+      no: The success was not preceded by failed attempts.
+
+  l-spray:
+    type: link
+    text: Continue in the password spray tree.
+    tree: password-spray
+    node: q-any-accepted
+
+  q-mail-access:
+    type: question
+    text: Was mail read, synced or sent over the legacy session?
+    kql:
+      - title: Mailbox activity from the IP (7d)
+        platform: sentinel
+        query: |
+          OfficeActivity
+          | where TimeGenerated > ago(7d)
+          | where UserId =~ "{{user}}" and ClientIP has "{{ip}}"
+          | summarize Count = count() by Operation
+    yes: o-tp-active
+    no: o-tp-contained
+    notes:
+      yes: Mail was accessed or sent over the legacy session from {{ip}}.
+      no: I found no mailbox activity from {{ip}}.
+
+  o-benign-service:
+    type: outcome
+    verdict: benign_positive
+    title: Known legacy-auth service
+    anchor: "{{user}} is a documented device or service that uses legacy authentication from {{ip}}."
+    risk: The risk here is password guessing that bypasses MFA; it applies to this account by design, which is why it should be scoped tightly.
+    actions:
+      - Close
+      - Recommend moving the service to modern auth or restricting it to its IP with Conditional Access
+
+  o-benign-client:
+    type: outcome
+    verdict: benign_positive
+    title: User's own legacy client
+    anchor: "{{user}} signed in with a legacy client from a source they use regularly."
+    risk: The risk here is MFA bypass through legacy protocols; it doesn't apply to this sign-in, but the exposure remains while legacy auth is allowed.
+    actions:
+      - Close
+      - Recommend moving the user to a modern-auth client and blocking legacy authentication
+
+  o-tp-contained:
+    type: outcome
+    verdict: true_positive
+    title: Password used over legacy auth, no data access
+    anchor: The password for {{user}} was used successfully over a legacy protocol from {{ip}}, with no mailbox activity found.
+    risk: The risk here is mailbox access that MFA cannot stop; the password is compromised.
+    actions:
+      - Reset the password and revoke sessions
+      - Block {{ip}}
+      - Block legacy authentication for the user or tenant
+    escalate: true
+    monitor: I will monitor {{user}} for further legacy protocol sign-ins.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Mailbox accessed over legacy auth
+    anchor: An attacker at {{ip}} signed in as {{user}} over a legacy protocol and accessed the mailbox.
+    risk: The risk here is data theft and business email compromise through the mailbox; containment is required now.
+    actions:
+      - Reset the password, revoke sessions and block legacy authentication
+      - Scope the mail read, synced or sent
+      - Check for inbox rules and forwarding
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{user}} and {{ip}} for further access.

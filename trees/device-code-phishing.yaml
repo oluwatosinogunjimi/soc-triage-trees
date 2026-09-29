@@ -1,0 +1,135 @@
+id: device-code-phishing
+title: Device Code Phishing
+category: identity
+summary: >-
+  An attacker sends a device login code and the user types it into the real Microsoft
+  page, handing the attacker a token. No password or MFA prompt looks wrong to the user.
+  Device code flow is rare for normal staff, so its presence is the main signal.
+applies_to:
+  - Anomalous OAuth device code authentication activity
+  - Suspicious sign-in using device code flow
+  - Sign-in with authentication protocol deviceCode
+mitre: [T1528, T1566.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Identity XDR alerts (credential access)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+  - title: "MITRE ATT&CK T1528 Steal Application Access Token"
+    url: https://attack.mitre.org/techniques/T1528/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+  - { key: ip, label: IP that redeemed the token, example: "20.83.112.4" }
+start: c-flow
+nodes:
+  c-flow:
+    type: check
+    text: Find the device code sign-ins and what they accessed.
+    look_for:
+      - AuthenticationProtocol = deviceCode on the sign-in
+      - Client app and resource (Microsoft Graph, Office, Azure CLI)
+      - IP of the sign-in versus the user's usual IPs
+    kql:
+      - title: Device code sign-ins for the user (14d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(14d)
+          | where UserPrincipalName =~ "{{user}}"
+          | where AuthenticationProtocol == "deviceCode"
+          | project TimeGenerated, ResultType, AppDisplayName, ResourceDisplayName, IPAddress, AutonomousSystemNumber,
+                    Country = tostring(LocationDetails.countryOrRegion), UserAgent, DeviceId = tostring(DeviceDetail.deviceId)
+    note: I found the device code sign-ins for {{user}} and the IP that used them, {{ip}}.
+    next: q-expected-use
+
+  q-expected-use:
+    type: question
+    text: Does the user have a legitimate reason for device code flow (developer or admin using Azure CLI, Teams room device, a shared kiosk)?
+    yes: q-ip-known
+    no: q-lure
+    notes:
+      yes: "{{user}} has a legitimate need for device code sign-ins."
+      no: "{{user}} has no legitimate reason to use device code sign-ins."
+
+  q-ip-known:
+    type: question
+    text: Did the device code sign-in come from the user's usual network or a known device?
+    yes: o-benign
+    no: q-lure
+    notes:
+      yes: The device code sign-in came from a network and device {{user}} normally uses.
+      no: The device code sign-in came from {{ip}}, which is unfamiliar for {{user}}.
+
+  q-lure:
+    type: question
+    text: Did the user receive a message with a device login code or microsoft.com/devicelogin link (email, Teams, SMS) just before?
+    kql:
+      - title: Emails and Teams messages mentioning device login (7d)
+        platform: xdr
+        query: |
+          EmailUrlInfo
+          | where Timestamp > ago(7d)
+          | where Url has_any ("devicelogin", "microsoft.com/devicelogin", "login.microsoftonline.com/common/oauth2/deviceauth")
+          | join kind=inner (EmailEvents | where RecipientEmailAddress =~ "{{user}}") on NetworkMessageId
+          | project Timestamp, SenderFromAddress, Subject, Url
+    yes: q-token-used
+    no: q-token-used
+    notes:
+      yes: "{{user}} received a lure containing a device login code shortly before the sign-in."
+      no: I did not find the lure in email; it may have come through Teams, SMS or a call.
+
+  q-token-used:
+    type: question
+    text: Has the token been used to access data (mail, files, Graph calls from the attacker IP)?
+    kql:
+      - title: Non-interactive activity from the redeeming IP (7d)
+        platform: sentinel
+        query: |
+          AADNonInteractiveUserSignInLogs
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{user}}" and IPAddress == "{{ip}}"
+          | summarize SignIns = count(), Resources = make_set(ResourceDisplayName, 10), First = min(TimeGenerated), Last = max(TimeGenerated) by AppDisplayName
+    yes: o-tp-active
+    no: o-tp-contained
+    notes:
+      yes: The token redeemed from {{ip}} was used to access data.
+      no: I found no data access with the token after it was issued.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate device code use
+    anchor: "{{user}} used device code sign-in for a known purpose from a familiar network."
+    risk: The risk here is token theft through device code phishing; it doesn't apply as the sign-in came from the user's own environment.
+    actions:
+      - Close
+    tuning: Consider a Conditional Access policy that blocks device code flow for everyone except the groups that need it.
+
+  o-tp-contained:
+    type: outcome
+    verdict: true_positive
+    title: Device code phishing, token not yet used
+    anchor: "{{user}} completed a device code sign-in initiated by an attacker at {{ip}}, and I found no use of the token yet."
+    risk: The risk here is mailbox and file access with the stolen refresh token, which stays valid until sessions are revoked.
+    actions:
+      - Revoke sessions and refresh tokens for {{user}}
+      - Purge the lure and find other recipients
+      - Block device code flow with Conditional Access where it is not needed
+    escalate: true
+    monitor: I will monitor {{user}} for non-interactive sign-ins from {{ip}} or its ASN.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Device code phishing, token used
+    anchor: An attacker at {{ip}} obtained a token for {{user}} through device code phishing and used it to access data.
+    risk: The risk here is data theft and persistence through the stolen refresh token; containment is required now.
+    actions:
+      - Revoke sessions and refresh tokens, then reset the password
+      - Scope what was accessed (MailItemsAccessed, file access, Graph calls)
+      - Check for inbox rules, consents and new MFA methods
+      - Block device code flow where it is not needed
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{user}} and {{ip}} for further token use.

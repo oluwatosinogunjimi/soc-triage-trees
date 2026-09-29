@@ -1,0 +1,143 @@
+id: privileged-role-assignment
+title: Privileged Entra Role Assignment
+category: identity
+summary: >-
+  An account was added to Global Administrator or another privileged Entra role, directly
+  or as eligible in PIM. Attackers do this to lock in control of the tenant. Confirm who
+  granted it, whether it went through the normal process, and what the new admin did.
+applies_to:
+  - Add member to role (Global Administrator, Privileged Role Administrator)
+  - Suspicious Entra role addition
+  - Risky sign in followed by privilege role grant
+  - PIM role activation outside business hours
+mitre: [T1098.003, T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Identity XDR alerts (persistence, privilege escalation)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+  - title: "MITRE ATT&CK T1098.003 Account Manipulation: Additional Cloud Roles"
+    url: https://attack.mitre.org/techniques/T1098/003/
+entities:
+  - { key: user, label: Account that received the role, example: "adm-jdoe@contoso.com" }
+  - { key: actor, label: Account that granted the role, example: "it-admin@contoso.com" }
+  - { key: role, label: Role name, example: "Global Administrator" }
+start: c-assignment
+nodes:
+  c-assignment:
+    type: check
+    text: Pull the role change and the actor's session.
+    look_for:
+      - Role, assignment type (active or eligible, permanent or time-bound)
+      - Actor, actor IP and whether it was PIM, portal, PowerShell or Graph
+      - Other role or directory changes by the same actor in the same window
+    kql:
+      - title: Role assignments involving either account (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where OperationName has_any ("Add member to role", "Add eligible member to role", "Add scoped member to role")
+          | extend Target = tostring(TargetResources[0].userPrincipalName),
+                   Role = tostring(parse_json(tostring(TargetResources[0].modifiedProperties))[1].newValue),
+                   Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                   ActorIP = tostring(InitiatedBy.user.ipAddress)
+          | where Target =~ "{{user}}" or Actor =~ "{{actor}}"
+          | project TimeGenerated, OperationName, Target, Role, Actor, ActorIP, Result
+    note: I pulled the assignment of {{role}} to {{user}} by {{actor}}.
+    next: q-actor-session
+
+  q-actor-session:
+    type: question
+    text: Was the actor's session clean (usual IP and device, no risk detections, not a newly created or recently compromised account)?
+    kql:
+      - title: The actor's sign-ins and risk (7d)
+        platform: sentinel
+        query: |
+          union
+            (SigninLogs | where TimeGenerated > ago(7d) | where UserPrincipalName =~ "{{actor}}" and ResultType == "0"
+               | summarize SignIns = count(), Risk = make_set(RiskLevelDuringSignIn) by IPAddress, Country = tostring(LocationDetails.countryOrRegion)
+               | extend Source = "SignIn"),
+            (AADUserRiskEvents | where TimeGenerated > ago(7d) | where UserPrincipalName =~ "{{actor}}"
+               | summarize SignIns = count(), Risk = make_set(RiskEventType) by IPAddress = IpAddress
+               | extend Country = "", Source = "Risk")
+    yes: q-change-approved
+    no: o-tp-takeover
+    notes:
+      yes: The session of {{actor}} was clean, from a usual network and device.
+      no: The session of {{actor}} was risky or unusual when the role was granted.
+
+  q-change-approved:
+    type: question
+    text: Is the assignment backed by an approved request (change ticket, PIM approval, onboarding of a new admin)?
+    yes: q-new-admin-activity
+    no: o-policy
+    notes:
+      yes: The assignment of {{role}} to {{user}} is backed by an approved request.
+      no: I found no approved request for the assignment of {{role}} to {{user}}.
+
+  q-new-admin-activity:
+    type: question
+    text: Has the new admin done anything unexpected (created users, apps or credentials, changed Conditional Access, federation or MFA settings)?
+    kql:
+      - title: Actions by the new admin since the grant (7d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(7d)
+          | where tostring(InitiatedBy.user.userPrincipalName) =~ "{{user}}"
+          | summarize Count = count(), First = min(TimeGenerated) by OperationName
+          | order by Count desc
+    yes: o-inconclusive
+    no: o-benign
+    notes:
+      yes: "{{user}} performed unexpected administrative actions after receiving the role."
+      no: "{{user}} performed only expected actions after receiving the role."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved role assignment
+    anchor: "{{actor}} assigned {{role}} to {{user}} through the approved process from a clean session."
+    risk: The risk here is an attacker granting themselves tenant control; it doesn't apply given the approval and the clean session.
+    actions:
+      - Close referencing the approval
+      - Recommend eligible (PIM) rather than permanent assignment if it was permanent
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate admin, process bypassed
+    anchor: "{{actor}} assigned {{role}} to {{user}} from a clean session but without an approved request."
+    risk: The risk here is standing privilege that nobody reviewed; it is a process failure rather than an attack.
+    actions:
+      - Confirm the assignment with the customer's identity owner
+      - Remove it if not justified and recommend PIM with approval for this role
+    monitor: I will monitor {{user}} for privileged actions until the assignment is confirmed.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Approved grant, unexpected use
+    anchor: "{{user}} received {{role}} through the approved process but has since performed actions that need confirming."
+    risk: The risk here is misuse of new privileges, which stays open until the customer confirms the actions.
+    actions:
+      - Send the list of actions to the customer for confirmation
+      - Remove the role pending confirmation if the actions touch security settings
+    monitor: I will monitor {{user}} for further privileged changes until this is resolved.
+
+  o-tp-takeover:
+    type: outcome
+    verdict: true_positive
+    title: Privilege granted from a compromised session
+    anchor: "{{role}} was assigned to {{user}} from a risky session of {{actor}}, consistent with tenant takeover."
+    risk: The risk here is full tenant compromise, including new backdoor accounts, apps and federation changes; containment is required now.
+    actions:
+      - Remove the role and disable {{user}} if it is attacker-created
+      - Revoke sessions for {{actor}} and {{user}}, reset passwords
+      - Review every change made by both accounts (users, apps, credentials, Conditional Access, federation)
+      - Engage the customer's break-glass process
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor for further role assignments, app credential additions and federation changes across the tenant.

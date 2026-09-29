@@ -1,0 +1,107 @@
+id: temporary-access-pass-created
+title: Temporary Access Pass Created
+category: identity
+summary: >-
+  An admin issued a Temporary Access Pass, which lets the holder sign in and register new
+  MFA without the old factors. Helpdesk social engineering and compromised admins both
+  abuse it. Check the request, the issuer and who used the pass.
+applies_to:
+  - Temporary Access Pass created for user
+  - Reciprocal Temporary Access Pass creation between users
+  - Admin registered security info (TAP)
+mitre: [T1098.005, T1556.006]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Entra Temporary Access Pass
+    url: https://learn.microsoft.com/en-us/entra/identity/authentication/howto-authentication-temporary-access-pass
+  - title: Microsoft Defender for Identity XDR alerts (persistence)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: user, label: User the TAP was issued for, example: "cfo@contoso.com" }
+  - { key: actor, label: Admin who issued it, example: "helpdesk01@contoso.com" }
+start: c-tap
+nodes:
+  c-tap:
+    type: check
+    text: Pull the TAP creation and every use of it.
+    kql:
+      - title: TAP events and sign-ins using it (7d)
+        platform: sentinel
+        query: |
+          union
+            (AuditLogs | where TimeGenerated > ago(7d)
+               | where tostring(pack_all()) has "Temporary Access Pass"
+               | project TimeGenerated, Kind = "Audit", Detail = OperationName,
+                         Target = tostring(TargetResources[0].userPrincipalName),
+                         Actor = tostring(InitiatedBy.user.userPrincipalName), IP = tostring(InitiatedBy.user.ipAddress)),
+            (SigninLogs | where TimeGenerated > ago(7d)
+               | where tostring(AuthenticationDetails) has "Temporary Access Pass"
+               | project TimeGenerated, Kind = "SignIn", Detail = AppDisplayName, Target = UserPrincipalName, Actor = "", IP = IPAddress)
+          | where Target =~ "{{user}}" or Actor =~ "{{actor}}"
+          | order by TimeGenerated asc
+    note: I pulled the Temporary Access Pass issued for {{user}} by {{actor}} and the sign-ins that used it.
+    next: q-ticket
+
+  q-ticket:
+    type: question
+    text: Is there a helpdesk ticket, and was the requester's identity verified out of band (call-back to a known number, manager approval, in person)?
+    why: Groups like Scattered Spider call the helpdesk pretending to be the user. A ticket alone is not verification.
+    yes: q-reciprocal
+    no: q-user-confirm
+    notes:
+      yes: The TAP for {{user}} was issued against a ticket with out-of-band identity verification.
+      no: The TAP for {{user}} was issued without verified identity.
+
+  q-reciprocal:
+    type: question
+    text: Did the issuer and target issue passes to each other, or did the issuer's session show risk?
+    yes: o-tp
+    no: q-usage
+    notes:
+      yes: The issuing session of {{actor}} was risky or part of reciprocal TAP creation.
+      no: The issuing session of {{actor}} was clean and not reciprocal.
+
+  q-user-confirm:
+    type: question
+    text: Does the user confirm they asked for the pass and used it themselves?
+    yes: q-usage
+    no: o-tp
+    unknown: o-tp
+    notes:
+      yes: "{{user}} confirmed requesting and using the pass."
+      no: "{{user}} did not request the pass."
+      unknown: I could not reach {{user}} to confirm the request, so I treated it as suspicious.
+
+  q-usage:
+    type: question
+    text: Was the pass used from the user's normal location and device, followed by normal MFA registration?
+    yes: o-benign
+    no: o-tp
+    notes:
+      yes: The pass was used from a normal location and device for {{user}}.
+      no: The pass was used from an unfamiliar location or device.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Verified TAP for account recovery
+    anchor: "{{actor}} issued a Temporary Access Pass for {{user}} after verification, and the user redeemed it from a normal location."
+    risk: The risk here is account takeover through helpdesk social engineering; it doesn't apply given the verification and normal redemption.
+    actions:
+      - Close referencing the ticket
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: TAP abused for account takeover
+    anchor: A Temporary Access Pass for {{user}} was issued or used without legitimate verification.
+    risk: The risk here is full takeover of {{user}} with attacker-registered MFA; containment is required now.
+    actions:
+      - Delete the pass and any MFA methods registered with it
+      - Revoke sessions and reset the password for {{user}}
+      - Review the helpdesk interaction and the session of {{actor}}
+      - Raise an incident and escalate, including the helpdesk lead
+    escalate: true
+    monitor: I will monitor {{user}} and {{actor}} for further authentication method changes.

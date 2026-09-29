@@ -1,0 +1,123 @@
+id: ad-reconnaissance
+title: Active Directory Reconnaissance
+category: identity
+summary: >-
+  LDAP, SAMR or ADWS enumeration of users, groups, admins, SPNs or trusts, often by
+  BloodHound, AdFind or PowerView. On its own it is discovery, but it is almost always
+  the step before privilege escalation.
+applies_to:
+  - Suspicious LDAP query
+  - Anomalous Samr activity
+  - Discovery tool was observed
+  - Possible Active Directory enumeration via ADWS
+  - Suspected account enumeration (Kerberos, NTLM)
+mitre: [T1087.002, T1069.002, T1482]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Identity XDR alerts (discovery)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+  - title: "MITRE ATT&CK T1087.002 Account Discovery: Domain Account"
+    url: https://attack.mitre.org/techniques/T1087/002/
+entities:
+  - { key: account, label: Account running the queries, example: "jdoe" }
+  - { key: src_host, label: Source host, example: "WKS-MKT-019" }
+start: c-queries
+nodes:
+  c-queries:
+    type: check
+    text: See what was queried, by whom and with which tool.
+    kql:
+      - title: Directory queries from the host (24h)
+        platform: xdr
+        query: |
+          IdentityQueryEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{src_host}}" or AccountName =~ "{{account}}"
+          | summarize Queries = count(), Types = make_set(ActionType), Targets = make_set(QueryTarget, 20), Samples = make_set(Query, 10)
+                    by AccountName, DeviceName
+      - title: Recon tools and commands on the host (24h)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(24h)
+          | where DeviceName =~ "{{src_host}}"
+          | where FileName in~ ("adfind.exe", "sharphound.exe", "nltest.exe", "dsquery.exe")
+             or ProcessCommandLine has_any ("Invoke-BloodHound", "Get-DomainUser", "Get-NetGroup", "domain admins", "enterprise admins", "/domain_trusts", "Get-ADComputer")
+          | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
+    note: I reviewed the directory queries and recon commands by {{account}} on {{src_host}}.
+    next: q-admin-tool
+
+  q-admin-tool:
+    type: question
+    text: Is this an IT or security team member doing their job, or an approved tool (identity audit, PingCastle, approved pen test)?
+    yes: o-benign
+    no: q-scope
+    notes:
+      yes: The queries came from approved IT or security activity by {{account}}.
+      no: "{{account}} has no role that explains the queries."
+
+  q-scope:
+    type: question
+    text: Is the enumeration broad or targeted at privilege (all users, admin groups, SPNs, trusts, AD CS templates, ACLs)?
+    yes: q-followon
+    no: o-inconclusive
+    notes:
+      yes: The enumeration was broad and focused on privileged objects.
+      no: The enumeration was narrow and not focused on privileged objects.
+
+  q-followon:
+    type: question
+    text: Did follow-on activity occur (Kerberoasting, credential dumping, remote execution, new group memberships)?
+    yes: o-tp-active
+    no: o-tp-recon
+    notes:
+      yes: The enumeration was followed by credential access or lateral movement activity.
+      no: I found no follow-on activity after the enumeration yet.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved enumeration
+    anchor: The directory enumeration by {{account}} on {{src_host}} was approved IT or security activity.
+    risk: The risk here is attacker reconnaissance before privilege escalation; it doesn't apply given the approved source.
+    actions:
+      - Close
+    tuning: Exclude the approved tool's host and account, scoped to the tool's process.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Narrow unexplained queries
+    anchor: "{{account}} ran narrow directory queries on {{src_host}} that no role explains."
+    risk: The risk here is early reconnaissance by an attacker using the account, which stays open until the user explains it.
+    actions:
+      - Ask the user or their manager what they were doing
+    monitor: I will monitor {{account}} and {{src_host}} for broader enumeration or credential access.
+
+  o-tp-recon:
+    type: outcome
+    verdict: true_positive
+    title: Attacker reconnaissance
+    anchor: "{{account}} ran broad, privilege-focused enumeration of Active Directory from {{src_host}} with no legitimate reason."
+    risk: The risk here is an attacker mapping a path to domain admin; they are early in the chain, which is the best time to stop them.
+    actions:
+      - Isolate {{src_host}} and reset {{account}}
+      - Investigate how the host or account was compromised
+      - Review attack paths the tool would have found (Kerberoastable admins, excessive ACLs)
+    escalate: true
+    monitor: I will monitor for Kerberoasting, credential dumping and lateral movement from any host.
+
+  o-tp-active:
+    type: outcome
+    verdict: true_positive
+    title: Reconnaissance with follow-on attack
+    anchor: The enumeration by {{account}} from {{src_host}} was followed by credential access or lateral movement.
+    risk: The risk here is imminent domain compromise; containment is required now.
+    actions:
+      - Isolate {{src_host}} and any hosts reached
+      - Reset {{account}} and any accounts touched by the follow-on activity
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor for privileged logons and replication requests across the domain.

@@ -1,0 +1,100 @@
+id: dcsync
+title: DCSync (Directory Replication Request)
+category: identity
+summary: >-
+  A non-domain-controller asked a DC to replicate directory secrets, which returns password
+  hashes, including krbtgt. Only DCs and a few sync services should ever do this. A
+  confirmed DCSync means the domain is compromised.
+applies_to:
+  - DCSync attack (replication of directory services)
+  - Suspected DCSync attack
+  - Directory Services replication from non-DC (Event 4662)
+mitre: [T1003.006]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1003.006 OS Credential Dumping: DCSync"
+    url: https://attack.mitre.org/techniques/T1003/006/
+  - title: Microsoft Defender for Identity XDR alerts (credential access)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: account, label: Account that requested replication, example: "jdoe" }
+  - { key: src_host, label: Source host, example: "WKS-IT-004" }
+start: c-replication
+nodes:
+  c-replication:
+    type: check
+    text: Confirm the replication request and its source.
+    kql:
+      - title: Replication rights used by non-machine accounts (Event 4662, 7d)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(7d)
+          | where EventID == 4662
+          | where Properties has_any ("1131f6aa-9c07-11d1-f79f-00c04fc2dcd2", "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2", "89e95b76-444d-4c62-991a-0facbeda640c")
+          | where SubjectUserName !endswith "$"
+          | project TimeGenerated, Computer, SubjectUserName, SubjectDomainName, ObjectName
+      - title: Replication observed by Defender for Identity (7d)
+        platform: xdr
+        query: |
+          IdentityDirectoryEvents
+          | where Timestamp > ago(7d)
+          | where ActionType has "replication"
+          | project Timestamp, ActionType, AccountName, DeviceName, IPAddress, DestinationDeviceName, AdditionalFields
+    note: I confirmed the replication request by {{account}} from {{src_host}}.
+    next: q-dc-or-sync
+
+  q-dc-or-sync:
+    type: question
+    text: Is the source a domain controller, or the documented Entra Connect or other sync server using its dedicated account?
+    yes: o-benign
+    no: q-tooling
+    notes:
+      yes: "{{src_host}} is a domain controller or the documented sync server."
+      no: "{{src_host}} is neither a domain controller nor a documented sync server."
+
+  q-tooling:
+    type: question
+    text: Is it an approved penetration test or identity audit with written authorisation?
+    yes: o-benign-test
+    no: o-tp
+    notes:
+      yes: The replication was part of an authorised test.
+      no: No authorised test covers the replication from {{src_host}}.
+
+  o-benign:
+    type: outcome
+    verdict: false_positive
+    title: Legitimate replication
+    anchor: The replication request came from {{src_host}}, which is a domain controller or the documented sync server.
+    risk: The risk here is theft of every domain password hash; it doesn't apply as the source is a legitimate replication partner.
+    actions:
+      - Close
+    tuning: Exclude the sync server and its account by name, and alert if that account replicates from anywhere else.
+
+  o-benign-test:
+    type: outcome
+    verdict: benign_positive
+    title: Authorised test
+    anchor: The replication from {{src_host}} was part of an authorised penetration test.
+    risk: The risk here is theft of every domain password hash; the test proved an account had replication rights, which should be reviewed.
+    actions:
+      - Close referencing the test authorisation
+      - Recommend reviewing which accounts hold replication rights
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: DCSync, domain compromise
+    anchor: "{{account}} replicated directory secrets from a domain controller to {{src_host}}, which is not a replication partner."
+    risk: The risk here is full domain compromise, including golden tickets from the krbtgt hash; this is a domain-level emergency.
+    actions:
+      - Call the customer on the P1 path immediately
+      - Isolate {{src_host}} and disable {{account}}
+      - Plan a double krbtgt reset and reset privileged account passwords
+      - Remove replication rights from any account that should not hold them
+      - Engage incident response
+    escalate: true
+    monitor: I will monitor for Kerberos ticket anomalies and further replication requests.

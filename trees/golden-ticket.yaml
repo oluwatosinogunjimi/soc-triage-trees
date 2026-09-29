@@ -1,0 +1,94 @@
+id: golden-ticket
+title: Golden Ticket or Forged Kerberos Ticket
+category: identity
+summary: >-
+  A Kerberos ticket that the DC never issued, or with impossible properties (very long
+  lifetime, nonexistent user, mismatched encryption). A forged TGT needs the krbtgt hash,
+  so a true positive implies the domain was already compromised.
+applies_to:
+  - Possible golden ticket attack
+  - Possible golden ticket attack (suspicious ticket)
+  - Possible golden ticket attack (CVE-2021-42287 exploitation)
+  - Suspicious Kerberos authentication (TGT request using TGS-REQ)
+mitre: [T1558.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1558.001 Golden Ticket"
+    url: https://attack.mitre.org/techniques/T1558/001/
+  - title: Microsoft Defender for Identity XDR alerts (credential access)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: account, label: Account in the ticket, example: "Administrator" }
+  - { key: src_host, label: Host that used the ticket, example: "WKS-IT-004" }
+start: c-ticket
+nodes:
+  c-ticket:
+    type: check
+    text: Read the alert's evidence about the ticket and where it was used.
+    look_for:
+      - What was anomalous (lifetime, encryption downgrade, nonexistent or disabled account, missing TGT request)
+      - Host and target resources the ticket was used against
+      - Any DCSync, NTDS.dit access or DC compromise in the preceding weeks
+    kql:
+      - title: Logons by the account from the host (Defender for Identity, 7d)
+        platform: xdr
+        query: |
+          IdentityLogonEvents
+          | where Timestamp > ago(7d)
+          | where AccountName =~ "{{account}}" or DeviceName =~ "{{src_host}}"
+          | where Protocol == "Kerberos"
+          | project Timestamp, ActionType, AccountName, DeviceName, DestinationDeviceName, TargetDeviceName, FailureReason, AdditionalFields
+    note: I reviewed the ticket evidence for {{account}} used from {{src_host}}.
+    next: q-known-cause
+
+  q-known-cause:
+    type: question
+    text: Is there a known benign cause (clock skew, a recent krbtgt reset in progress, a trust or interoperability quirk documented by the customer)?
+    yes: o-fp
+    no: q-prior-compromise
+    notes:
+      yes: A documented benign cause explains the ticket anomaly.
+      no: No benign cause explains the ticket anomaly.
+
+  q-prior-compromise:
+    type: question
+    text: Is there evidence of earlier domain compromise (DCSync, NTDS.dit copy, DC logon by unusual account, LSASS dump on a DC)?
+    kql:
+      - title: NTDS access and DC credential dumping signs (30d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(30d)
+          | where ProcessCommandLine has_any ("ntds.dit", "ntdsutil", "ifm", "vssadmin create shadow", "lsadump::dcsync", "secretsdump")
+          | project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine
+    yes: o-tp
+    no: o-tp
+    notes:
+      yes: I found earlier signs of domain compromise that explain how the krbtgt hash was obtained.
+      no: I found no earlier sign of how the krbtgt hash was obtained, which widens the hunt.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Documented Kerberos anomaly
+    anchor: The ticket anomaly for {{account}} on {{src_host}} has a documented benign cause.
+    risk: The risk here is a forged ticket giving domain-wide access; it doesn't apply given the documented cause.
+    actions:
+      - Close referencing the cause
+      - Fix clock sync or the configuration if it will keep firing
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Forged Kerberos ticket
+    anchor: A forged Kerberos ticket for {{account}} was used from {{src_host}}.
+    risk: The risk here is persistent domain-wide access that survives password resets until krbtgt is reset twice; this is a domain-level emergency.
+    actions:
+      - Call the customer on the P1 path and engage incident response
+      - Isolate {{src_host}}
+      - Plan a double krbtgt reset (allowing replication between resets)
+      - Hunt for the original domain compromise and other persistence
+    escalate: true
+    monitor: I will monitor for further Kerberos anomalies and privileged logons during recovery.

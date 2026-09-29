@@ -1,0 +1,127 @@
+id: conditional-access-change
+title: Conditional Access Policy Changed or Deleted
+category: identity
+summary: >-
+  A Conditional Access policy was created, changed, disabled or deleted, or a named
+  location was edited. Attackers weaken these to keep access, for example by excluding
+  their account or trusting their IP. Compare before and after.
+applies_to:
+  - Update conditional access policy
+  - Delete conditional access policy
+  - Add or update named location
+  - MFA disabled for user or tenant
+mitre: [T1556.009, T1562.001]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Entra audit activity reference
+    url: https://learn.microsoft.com/en-us/entra/identity/monitoring-health/reference-audit-activities
+  - title: "MITRE ATT&CK T1556.009 Modify Authentication Process: Conditional Access Policies"
+    url: https://attack.mitre.org/techniques/T1556/009/
+entities:
+  - { key: actor, label: Who changed it, example: "it-admin@contoso.com" }
+  - { key: policy, label: Policy or location name, example: "Require MFA for all users" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull the change with old and new values.
+    kql:
+      - title: Conditional Access and named location changes (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where OperationName has_any ("conditional access policy", "named location")
+          | project TimeGenerated, OperationName, Result,
+                    Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                    ActorIP = tostring(InitiatedBy.user.ipAddress),
+                    Policy = tostring(TargetResources[0].displayName),
+                    OldValue = tostring(TargetResources[0].modifiedProperties[0].oldValue),
+                    NewValue = tostring(TargetResources[0].modifiedProperties[0].newValue)
+          | order by TimeGenerated desc
+    note: I pulled the change to "{{policy}}" by {{actor}} with its old and new values.
+    next: q-weakens
+
+  q-weakens:
+    type: question
+    text: Does the change weaken protection (policy disabled or deleted, report-only, new user or group exclusion, new trusted IP, grant control removed)?
+    yes: q-approved
+    no: o-benign-tightening
+    notes:
+      yes: The change to "{{policy}}" weakens protection.
+      no: The change to "{{policy}}" keeps or strengthens protection.
+
+  q-approved:
+    type: question
+    text: Is it approved (change ticket) and was the actor's session clean?
+    yes: q-scope
+    no: o-tp
+    unknown: o-inconclusive
+    notes:
+      yes: The change was approved and {{actor}} made it from a clean session.
+      no: The change was not approved, or {{actor}} made it from a risky session.
+      unknown: I could not confirm approval for the change.
+
+  q-scope:
+    type: question
+    text: Is the weakening narrow and time-bound (a single break-fix exclusion with an end date)?
+    yes: o-benign-approved
+    no: o-policy
+    notes:
+      yes: The weakening is narrow and time-bound.
+      no: The weakening is broad or open-ended.
+
+  o-benign-tightening:
+    type: outcome
+    verdict: benign_positive
+    title: Policy tightened or neutral change
+    anchor: The change to "{{policy}}" by {{actor}} keeps or strengthens protection.
+    risk: The risk here is an attacker weakening access controls; it doesn't apply as nothing was loosened.
+    actions:
+      - Close
+
+  o-benign-approved:
+    type: outcome
+    verdict: benign_positive
+    title: Approved temporary exception
+    anchor: "{{actor}} made an approved, time-bound exception to \"{{policy}}\" from a clean session."
+    risk: The risk here is a permanent gap in access controls; it doesn't apply while the exception expires as planned.
+    actions:
+      - Close referencing the change ticket
+    monitor: I will check that the exception on "{{policy}}" is removed by its end date.
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Approved but broad weakening
+    anchor: "{{actor}} made an approved change to \"{{policy}}\" that weakens protection broadly."
+    risk: The risk here is a lasting gap in MFA or access controls that attackers can use; the business should review it.
+    actions:
+      - Raise the gap with the customer's identity owner and recommend narrowing it
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Weakening awaiting confirmation
+    anchor: I could not confirm approval for the change to "{{policy}}" by {{actor}}.
+    risk: The risk here is an attacker-made gap in access controls, which stays open until confirmed or reverted.
+    actions:
+      - Ask the customer to confirm
+      - Recommend reverting the change until confirmed
+    monitor: I will monitor for sign-ins that take advantage of the change until this is resolved.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Access controls weakened by an attacker
+    anchor: "\"{{policy}}\" was weakened without approval or from a risky session of {{actor}}."
+    risk: The risk here is attackers bypassing MFA and device controls tenant-wide; containment is required now.
+    actions:
+      - Revert the policy to its previous state
+      - Revoke sessions for {{actor}} and investigate the compromise
+      - Review sign-ins that benefited from the weakened policy
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor for further Conditional Access and authentication method changes.

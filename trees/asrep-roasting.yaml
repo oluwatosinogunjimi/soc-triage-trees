@@ -1,0 +1,97 @@
+id: asrep-roasting
+title: AS-REP Roasting
+category: identity
+summary: >-
+  Authentication requests for accounts that do not require Kerberos pre-authentication,
+  so the reply can be cracked offline. The misconfigured accounts are the root problem;
+  the requester tells you whether someone is exploiting it.
+applies_to:
+  - AS-REP roasting
+  - Possible AS-REP roasting attack
+  - TGT request without pre-authentication (Event 4768, PreAuthType 0)
+mitre: [T1558.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1558.004 AS-REP Roasting"
+    url: https://attack.mitre.org/techniques/T1558/004/
+  - title: Microsoft Defender for Identity XDR alerts (credential access)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+entities:
+  - { key: account, label: Targeted account, example: "svc-legacyapp" }
+  - { key: src_host, label: Requesting host or IP, example: "10.20.4.18" }
+start: c-requests
+nodes:
+  c-requests:
+    type: check
+    text: Find the pre-authentication-free TGT requests and their source.
+    kql:
+      - title: TGT requests without pre-auth (Event 4768, 24h)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(24h)
+          | where EventID == 4768 and PreAuthType == "0"
+          | summarize Requests = count(), Accounts = make_set(TargetUserName, 50), First = min(TimeGenerated) by IpAddress
+    note: I found the TGT requests without pre-authentication, including for {{account}}, from {{src_host}}.
+    next: q-many
+
+  q-many:
+    type: question
+    text: Did one source request tickets for several no-preauth accounts, or for an account it never normally uses?
+    yes: q-approved
+    no: q-legacy
+    notes:
+      yes: "{{src_host}} requested tickets for several accounts without pre-authentication."
+      no: The request matches the normal use of {{account}} by its own system.
+
+  q-legacy:
+    type: question
+    text: Is {{account}} a documented legacy account that needs pre-auth disabled, used from its own system?
+    yes: o-benign-config
+    no: q-approved
+    notes:
+      yes: "{{account}} is a documented legacy account used from its own system."
+      no: "{{account}} has no documented reason to skip pre-authentication."
+
+  q-approved:
+    type: question
+    text: Is the source an approved scanner or penetration test?
+    yes: o-benign-test
+    no: o-tp
+    notes:
+      yes: "{{src_host}} is an approved scanner or penetration test."
+      no: "{{src_host}} is not an approved scanner or test."
+
+  o-benign-config:
+    type: outcome
+    verdict: benign_positive
+    title: Known legacy configuration
+    anchor: "{{account}} is a documented legacy account that authenticates without pre-authentication from its own system."
+    risk: The risk here is offline cracking of the account password; nobody is exploiting it now, but the configuration keeps the exposure open.
+    actions:
+      - Recommend enabling pre-authentication or giving the account a long random password
+
+  o-benign-test:
+    type: outcome
+    verdict: benign_positive
+    title: Approved scanner or test
+    anchor: The requests came from an approved scanner or penetration test on {{src_host}}.
+    risk: The risk here is offline cracking; it doesn't apply to this activity, though the misconfigured accounts it found should be fixed.
+    actions:
+      - Close
+      - Pass the list of no-preauth accounts to the customer for remediation
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: AS-REP roasting
+    anchor: "{{src_host}} requested tickets for accounts without pre-authentication, including {{account}}, consistent with AS-REP roasting."
+    risk: The risk here is cracked passwords for the targeted accounts; containment is required now.
+    actions:
+      - Isolate or investigate {{src_host}}
+      - Reset passwords for every targeted account and enable pre-authentication
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the targeted accounts for logons from unusual hosts.

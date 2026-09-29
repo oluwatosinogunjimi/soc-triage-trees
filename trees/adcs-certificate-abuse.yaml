@@ -1,0 +1,115 @@
+id: adcs-certificate-abuse
+title: AD CS Certificate Abuse
+category: identity
+summary: >-
+  Abuse of Active Directory Certificate Services: requesting a certificate with another
+  user's name in the SAN (ESC1-style), abusing vulnerable templates, or signing in with a
+  certificate issued to a different identity. A certificate for a domain admin works
+  until it expires, regardless of password resets.
+applies_to:
+  - Suspected certificate enrollment abuse (ESC15)
+  - Possible Active Directory Certificate Services enumeration
+  - Suspicious login attempt using possibly compromised account certificate
+  - Certificate issued with SAN different from requester (Event 4887)
+mitre: [T1649]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1649 Steal or Forge Authentication Certificates"
+    url: https://attack.mitre.org/techniques/T1649/
+  - title: "SpecterOps: Certified Pre-Owned (AD CS abuse research)"
+    url: https://specterops.io/wp-content/uploads/sites/3/2022/06/Certified_Pre-Owned.pdf
+entities:
+  - { key: account, label: Requesting account, example: "jdoe" }
+  - { key: target, label: Identity in the certificate, example: "Administrator" }
+  - { key: src_host, label: Requesting host, example: "WKS-IT-004" }
+start: c-request
+nodes:
+  c-request:
+    type: check
+    text: Pull the certificate request, template and subject or SAN.
+    look_for:
+      - Template name and whether it allows enrollee-supplied subject
+      - Requester versus the identity in the certificate
+      - Tools on the host (Certify, Certipy, ForgeCert)
+    kql:
+      - title: Certificate requests and issuances on the CA (Events 4886/4887, 7d)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(7d)
+          | where EventID in (4886, 4887, 4888)
+          | where EventData has "{{account}}" or EventData has "{{target}}"
+          | project TimeGenerated, Computer, EventID, Activity, EventData
+      - title: AD CS tooling on the host (7d)
+        platform: xdr
+        query: |
+          DeviceProcessEvents
+          | where Timestamp > ago(7d)
+          | where DeviceName =~ "{{src_host}}"
+          | where ProcessCommandLine has_any ("certify", "certipy", "ForgeCert", "req /ca", "find /vulnerable", "certreq")
+          | project Timestamp, AccountName, FileName, ProcessCommandLine
+    note: I reviewed the certificate request by {{account}} from {{src_host}} for {{target}}.
+    next: q-mismatch
+
+  q-mismatch:
+    type: question
+    text: Does the certificate name a different identity from the requester, or was a vulnerable template used by a low-privileged account?
+    yes: q-approved
+    no: q-auth-use
+    notes:
+      yes: The certificate names {{target}}, which differs from the requester {{account}}, or used a vulnerable template.
+      no: The certificate matches the requester and a normal template.
+
+  q-auth-use:
+    type: question
+    text: Was the certificate used to authenticate (PKINIT) from an unusual host?
+    yes: o-tp
+    no: o-fp
+    notes:
+      yes: The certificate was used to authenticate from an unusual host.
+      no: The certificate has not been used from any unusual host.
+
+  q-approved:
+    type: question
+    text: Is it an approved PKI admin action or authorised penetration test?
+    yes: o-benign-test
+    no: o-tp
+    notes:
+      yes: The request was an approved PKI action or authorised test.
+      no: No approval covers the request.
+
+  o-fp:
+    type: outcome
+    verdict: false_positive
+    title: Normal certificate enrollment
+    anchor: The certificate issued to {{account}} matches its own identity and a normal template.
+    risk: The risk here is impersonation through a forged or mis-issued certificate; it doesn't apply as the certificate is for the requester.
+    actions:
+      - Close
+
+  o-benign-test:
+    type: outcome
+    verdict: benign_positive
+    title: Approved PKI action or test
+    anchor: The certificate request by {{account}} for {{target}} was an approved PKI action or authorised test.
+    risk: The risk here is impersonation through vulnerable templates; the test proves the template is exploitable and must be fixed.
+    actions:
+      - Revoke any test certificates issued for privileged identities
+      - Recommend fixing the vulnerable template (remove enrollee-supplied subject, restrict enrollment)
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Certificate abuse for impersonation
+    anchor: "{{account}} obtained or used a certificate for {{target}} from {{src_host}} without authorisation."
+    risk: The risk here is persistent impersonation of {{target}} that survives password resets until the certificate is revoked; containment is required now.
+    actions:
+      - Revoke the certificate and publish the CRL
+      - Isolate {{src_host}} and disable {{account}}
+      - Fix the abused template
+      - Review logons as {{target}} since issuance
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor for certificate-based logons as {{target}} and new requests on the abused template.

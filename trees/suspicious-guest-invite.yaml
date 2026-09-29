@@ -1,0 +1,113 @@
+id: suspicious-guest-invite
+title: Suspicious Guest Invitation or Guest Promotion
+category: identity
+summary: >-
+  An external guest was invited, or a guest was converted to a member. Attackers use
+  guest accounts for quiet persistence and data access. Check who invited them, from
+  which domain, and what the guest can reach.
+applies_to:
+  - Suspicious guest user invitation
+  - Guest user account promoted to member
+  - Invite external user (unusual inviter or domain)
+mitre: [T1136.003, T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Identity XDR alerts (persistence)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+  - title: "MITRE ATT&CK T1136.003 Create Account: Cloud Account"
+    url: https://attack.mitre.org/techniques/T1136/003/
+entities:
+  - { key: guest, label: Guest email or UPN, example: "partner_gmail.com#EXT#@contoso.onmicrosoft.com" }
+  - { key: actor, label: Inviter, example: "jdoe@contoso.com" }
+start: c-invite
+nodes:
+  c-invite:
+    type: check
+    text: Pull the invitation, redemption and group or app assignments.
+    kql:
+      - title: Guest lifecycle (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where OperationName has_any ("Invite external user", "Redeem external user invite", "Add member to group",
+                                         "Update user", "Add app role assignment grant to user", "Add member to role")
+          | where tostring(TargetResources[0].userPrincipalName) has "{{guest}}" or tostring(InitiatedBy.user.userPrincipalName) =~ "{{actor}}"
+          | project TimeGenerated, OperationName, Result, Target = tostring(TargetResources[0].userPrincipalName),
+                    Actor = tostring(InitiatedBy.user.userPrincipalName), ActorIP = tostring(InitiatedBy.user.ipAddress)
+    note: I reviewed the invitation of {{guest}} by {{actor}} and its later assignments.
+    next: q-promoted
+
+  q-promoted:
+    type: question
+    text: Was the guest converted to a member or given a directory role?
+    why: A guest promoted to member gets member-level directory visibility. It is rare and usually deliberate.
+    yes: q-actor-clean
+    no: q-business
+    notes:
+      yes: "{{guest}} was converted to a member or given a directory role."
+      no: "{{guest}} remains a standard guest."
+
+  q-business:
+    type: question
+    text: Is there a business relationship with the guest's domain (partner, supplier, known collaborator), and does the inviter work with them?
+    yes: q-access-scope
+    no: q-actor-clean
+    notes:
+      yes: The guest's domain belongs to a known business partner of {{actor}}.
+      no: The guest's domain has no known business relationship, or is a free-mail domain.
+
+  q-access-scope:
+    type: question
+    text: Is the guest's access limited to what the collaboration needs (specific Teams, sites or apps)?
+    yes: o-benign
+    no: o-policy
+    notes:
+      yes: The guest's access is limited to the collaboration spaces.
+      no: The guest has broader access than the collaboration needs.
+
+  q-actor-clean:
+    type: question
+    text: Was the inviter's session clean and does the inviter confirm the action?
+    yes: o-policy
+    no: o-tp
+    unknown: o-tp
+    notes:
+      yes: "{{actor}} confirmed the action from a clean session."
+      no: The session of {{actor}} was risky, or {{actor}} did not make the change.
+      unknown: I could not confirm the action with {{actor}}, so I treated it as suspicious.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Normal partner collaboration
+    anchor: "{{actor}} invited {{guest}} from a known partner domain with access limited to the collaboration."
+    risk: The risk here is persistent external access to tenant data; it doesn't apply given the business relationship and scoped access.
+    actions:
+      - Close
+      - Recommend an access review for guests on a regular cycle
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Legitimate but over-permissioned guest
+    anchor: The invitation of {{guest}} by {{actor}} was intended but grants more access than needed.
+    risk: The risk here is data exposure through excess guest access; reducing the access closes it.
+    actions:
+      - Ask the customer to review and reduce the guest's access, or revert a member conversion
+      - Recommend restricting who can invite guests
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Attacker-controlled guest
+    anchor: "{{guest}} was invited or promoted without a legitimate reason, from a risky or unconfirmed session of {{actor}}."
+    risk: The risk here is persistent external access that survives resetting the compromised account; the guest must be removed.
+    actions:
+      - Remove or block the guest account
+      - Revoke sessions for {{actor}} and investigate the compromise
+      - Review what the guest accessed (Teams, SharePoint, apps)
+    escalate: true
+    monitor: I will monitor for new guest invitations and redemptions across the tenant.

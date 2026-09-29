@@ -1,0 +1,101 @@
+id: ad-privileged-group-change
+title: On-Premises Privileged Group Membership Change
+category: identity
+summary: >-
+  An account was added to Domain Admins, Enterprise Admins, Administrators, Account
+  Operators, Backup Operators, DnsAdmins or a similar group. Verify the change against a
+  request and the actor's session.
+applies_to:
+  - Member added to security-enabled global/local/universal group (4728/4732/4756)
+  - Suspicious additions to sensitive groups
+  - Group Membership changed (Defender for Identity)
+mitre: [T1098, T1078.002]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: "MITRE ATT&CK T1098 Account Manipulation"
+    url: https://attack.mitre.org/techniques/T1098/
+  - title: Microsoft, appendix B privileged accounts and groups in Active Directory
+    url: https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/appendix-b--privileged-accounts-and-groups-in-active-directory
+entities:
+  - { key: account, label: Account added, example: "jdoe" }
+  - { key: actor, label: Account that made the change, example: "adm-it01" }
+  - { key: group, label: Group, example: "Domain Admins" }
+start: c-change
+nodes:
+  c-change:
+    type: check
+    text: Pull the membership change and the actor's logon.
+    kql:
+      - title: Privileged group membership changes (7d)
+        platform: sentinel
+        query: |
+          SecurityEvent
+          | where TimeGenerated > ago(7d)
+          | where EventID in (4728, 4732, 4756)
+          | where TargetUserName in~ ("Domain Admins", "Enterprise Admins", "Administrators", "Schema Admins", "Account Operators",
+                                      "Backup Operators", "Server Operators", "DnsAdmins", "Group Policy Creator Owners", "{{group}}")
+          | project TimeGenerated, Computer, Group = TargetUserName, MemberName, MemberSid, Actor = SubjectUserName
+      - title: Group changes seen by Defender for Identity (7d)
+        platform: xdr
+        query: |
+          IdentityDirectoryEvents
+          | where Timestamp > ago(7d)
+          | where ActionType == "Group Membership changed"
+          | extend Group = tostring(AdditionalFields["TO.GROUP"]), Actor = tostring(AdditionalFields["ACTOR.ACCOUNT"])
+          | project Timestamp, TargetAccountDisplayName, Group, Actor, DeviceName, AdditionalFields
+    note: I pulled the addition of {{account}} to {{group}} by {{actor}}.
+    next: q-actor-normal
+
+  q-request:
+    type: question
+    text: Is there an approved request (change ticket, access request) for this membership?
+    yes: o-benign
+    no: o-policy
+    notes:
+      yes: The addition of {{account}} to {{group}} has an approved request.
+      no: I found no approved request for the addition of {{account}} to {{group}}.
+
+  q-actor-normal:
+    type: question
+    text: Did the actor make the change from their usual admin host and tool, with no recent risk?
+    yes: q-request
+    no: o-tp
+    notes:
+      yes: "{{actor}} made the change from their usual admin host."
+      no: "{{actor}} made the change from an unusual host or after risky activity."
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Approved privileged group change
+    anchor: "{{actor}} added {{account}} to {{group}} through an approved request from their usual admin host."
+    risk: The risk here is an attacker granting themselves domain privilege; it doesn't apply given the approval and normal admin session.
+    actions:
+      - Close referencing the request
+      - Confirm the membership is time-bound if policy requires it
+
+  o-policy:
+    type: outcome
+    verdict: benign_positive
+    title: Unapproved change by a legitimate admin
+    anchor: "{{actor}} added {{account}} to {{group}} from a normal session but without an approved request."
+    risk: The risk here is unreviewed standing privilege; it is a process failure, not an attack.
+    actions:
+      - Confirm with the customer and remove the membership if not justified
+    monitor: I will monitor {{account}} for privileged logons until the membership is confirmed.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Rogue privileged group addition
+    anchor: "{{account}} was added to {{group}} by {{actor}} from an unusual host or compromised session."
+    risk: The risk here is domain-level control for the attacker; containment is required now.
+    actions:
+      - Remove {{account}} from {{group}} and disable it if attacker-controlled
+      - Reset {{actor}} and investigate the source host
+      - Review every change made with the new privilege
+      - Raise a P1 incident and escalate
+    escalate: true
+    monitor: I will monitor privileged groups for further changes and {{account}} for logons.

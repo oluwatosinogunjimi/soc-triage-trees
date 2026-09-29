@@ -1,0 +1,130 @@
+id: suspicious-mfa-registration
+title: Suspicious MFA Method Registration
+category: identity
+summary: >-
+  A new authenticator app, phone number or email method was registered. Attackers do
+  this right after taking over an account so they can come back. Tie the registration to
+  the sign-in that made it.
+applies_to:
+  - Suspicious registration of a new Authenticator MFA method
+  - Suspicious addition of alternative phone number
+  - Malicious registration of an attacker controlled MFA device
+  - User registered security info
+mitre: [T1098.005, T1556.006]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Defender for Identity XDR alerts (persistence)
+    url: https://learn.microsoft.com/en-us/defender-for-identity/alerts-xdr
+  - title: "MITRE ATT&CK T1098.005 Device Registration"
+    url: https://attack.mitre.org/techniques/T1098/005/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+  - { key: ip, label: IP the method was registered from, example: "45.87.154.22" }
+start: c-registration
+nodes:
+  c-registration:
+    type: check
+    text: Pull the registration event and the sign-in session that performed it.
+    look_for:
+      - Method type (Authenticator app, phone, email, FIDO2, TAP)
+      - Registration time, IP and user agent
+      - Whether an admin or the user registered it
+      - Other methods removed or changed at the same time
+    kql:
+      - title: Security info changes for the user (30d)
+        platform: sentinel
+        query: |
+          AuditLogs
+          | where TimeGenerated > ago(30d)
+          | where OperationName has_any ("security info", "Update user", "StrongAuthentication")
+          | where tostring(TargetResources[0].userPrincipalName) =~ "{{user}}" or tostring(InitiatedBy.user.userPrincipalName) =~ "{{user}}"
+          | project TimeGenerated, OperationName, Result, ResultReason,
+                    Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+                    ActorIP = tostring(InitiatedBy.user.ipAddress), AdditionalDetails
+    note: I pulled the MFA registration for {{user}} made from {{ip}}.
+    next: q-known-source
+
+  q-known-source:
+    type: question
+    text: Was the method registered from the user's normal network and device, during normal working pattern?
+    kql:
+      - title: Sign-ins around the registration (7d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(7d)
+          | where UserPrincipalName =~ "{{user}}" and ResultType == "0"
+          | summarize SignIns = count(), First = min(TimeGenerated), Last = max(TimeGenerated)
+                    by IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion),
+                       DeviceId = tostring(DeviceDetail.deviceId), Browser = tostring(DeviceDetail.browser)
+          | extend IsRegistrationIP = IPAddress == "{{ip}}"
+    yes: q-user-confirm
+    no: q-prior-risk
+    notes:
+      yes: The registration came from {{ip}}, which is part of the normal sign-in pattern for {{user}}.
+      no: The registration came from {{ip}}, which is outside the normal sign-in pattern for {{user}}.
+
+  q-prior-risk:
+    type: question
+    text: Was the registering session preceded by risk (phishing click, risky sign-in, AiTM or token anomaly)?
+    why: Registration straight after a phishing click or an AiTM sign-in is the classic persistence step.
+    kql:
+      - title: Risk detections for the user (14d)
+        platform: sentinel
+        query: |
+          AADUserRiskEvents
+          | where TimeGenerated > ago(14d)
+          | where UserPrincipalName =~ "{{user}}"
+          | project TimeGenerated, RiskEventType, RiskLevel, IpAddress, DetectionTimingType
+    yes: o-tp-persistence
+    no: q-user-confirm
+    notes:
+      yes: The registering session followed a risky sign-in or phishing interaction.
+      no: I found no risk detections before the registration.
+
+  q-user-confirm:
+    type: question
+    text: Does the user confirm they registered this method (new phone, re-setup)?
+    yes: o-benign
+    no: o-tp-persistence
+    unknown: o-inconclusive
+    notes:
+      yes: "{{user}} confirmed registering the new method."
+      no: "{{user}} did not register the new method."
+      unknown: I have not yet received confirmation from {{user}}.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: User registered a new device
+    anchor: "{{user}} registered the new MFA method from a known network and confirmed it."
+    risk: The risk here is attacker persistence through a rogue MFA method; it doesn't apply given the known source and the confirmation.
+    actions:
+      - Close with the user confirmation quoted
+
+  o-tp-persistence:
+    type: outcome
+    verdict: true_positive
+    title: Attacker-registered MFA method
+    anchor: An MFA method was registered on the account of {{user}} from {{ip}} without the user's knowledge.
+    risk: The risk here is the attacker satisfying MFA at will; the method keeps working after a password reset until it is removed.
+    actions:
+      - Remove the rogue method and any others added in the same session
+      - Revoke sessions and refresh tokens, then reset the password
+      - Require re-registration of MFA with identity proofing
+      - Investigate how the attacker got the session (phishing, AiTM, helpdesk)
+    escalate: true
+    monitor: I will monitor {{user}} for new registrations and sign-ins from {{ip}}.
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Awaiting user confirmation
+    anchor: I could not confirm whether {{user}} registered the new MFA method.
+    risk: The risk here is attacker persistence through the method, which stays open until the user confirms or the method is removed.
+    actions:
+      - Chase the user for confirmation
+      - Consider removing the method as a precaution if the source was unfamiliar
+    monitor: I will monitor {{user}} for sign-ins that use the new method.

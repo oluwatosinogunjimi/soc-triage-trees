@@ -1,0 +1,107 @@
+id: helpdesk-reset-takeover
+title: Password or MFA Reset Followed by Risky Sign-in
+category: identity
+summary: >-
+  An admin reset a user's password or MFA and a sign-in from somewhere new followed soon
+  after. This is how helpdesk social engineering looks in the logs. Verify the request
+  before anything else.
+applies_to:
+  - Reset password (by admin) followed by risky sign-in
+  - Admin deleted security info then new registration
+  - Suspicious MFA tampering activity by admin account
+  - Suspicious sign-in to a web app following MFA phone number tampering activity
+mitre: [T1656, T1098.005, T1078.004]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: CISA advisory AA23-320A Scattered Spider
+    url: https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-320a
+  - title: "MITRE ATT&CK T1656 Impersonation"
+    url: https://attack.mitre.org/techniques/T1656/
+entities:
+  - { key: user, label: User whose credentials were reset, example: "finance.lead@contoso.com" }
+  - { key: actor, label: Admin or helpdesk account, example: "helpdesk02@contoso.com" }
+  - { key: ip, label: IP of the sign-in after the reset, example: "154.47.20.9" }
+start: c-sequence
+nodes:
+  c-sequence:
+    type: check
+    text: Put the reset, the method changes and the next sign-ins on one timeline.
+    kql:
+      - title: Resets, method changes and sign-ins (7d)
+        platform: sentinel
+        query: |
+          union
+            (AuditLogs | where TimeGenerated > ago(7d)
+               | where OperationName has_any ("Reset password", "Reset user password", "security info", "Update user")
+               | where tostring(TargetResources[0].userPrincipalName) =~ "{{user}}"
+               | project TimeGenerated, Kind = "Audit", Detail = OperationName, By = tostring(InitiatedBy.user.userPrincipalName), IP = tostring(InitiatedBy.user.ipAddress)),
+            (SigninLogs | where TimeGenerated > ago(7d) | where UserPrincipalName =~ "{{user}}"
+               | project TimeGenerated, Kind = "SignIn", Detail = strcat(AppDisplayName, " ", ResultType), By = UserPrincipalName, IP = IPAddress)
+          | order by TimeGenerated asc
+    note: I built the timeline of the reset of {{user}} by {{actor}} and the sign-in from {{ip}} that followed.
+    next: q-verified
+
+  q-verified:
+    type: question
+    text: Did the helpdesk verify the caller through an out-of-band method (call-back to a number on file, manager approval, video or in person)?
+    yes: q-signin-normal
+    no: q-user-confirm
+    notes:
+      yes: The helpdesk verified the requester through an out-of-band method before the reset.
+      no: The helpdesk did not verify the requester out of band before the reset.
+
+  q-user-confirm:
+    type: question
+    text: Does the real user (reached on a known number) confirm they asked for the reset?
+    yes: q-signin-normal
+    no: o-tp
+    unknown: o-tp
+    notes:
+      yes: "{{user}} confirmed requesting the reset."
+      no: "{{user}} did not request the reset."
+      unknown: I could not reach {{user}} on a known number, so I treated the reset as suspicious.
+
+  q-signin-normal:
+    type: question
+    text: Was the sign-in after the reset from the user's usual location and device?
+    yes: o-benign
+    no: o-inconclusive
+    notes:
+      yes: The sign-in after the reset came from the usual location and device of {{user}}.
+      no: The sign-in after the reset came from {{ip}}, which is unfamiliar for {{user}}.
+
+  o-benign:
+    type: outcome
+    verdict: benign_positive
+    title: Verified reset
+    anchor: The reset of {{user}} by {{actor}} was verified and the next sign-in came from the user's usual environment.
+    risk: The risk here is account takeover through helpdesk impersonation; it doesn't apply given the verification and normal sign-in.
+    actions:
+      - Close referencing the ticket
+
+  o-inconclusive:
+    type: outcome
+    verdict: inconclusive
+    title: Verified reset, unusual sign-in
+    anchor: The reset of {{user}} was requested by the user, but the next sign-in came from {{ip}}.
+    risk: The risk here is a third party using the new credentials, which stays open until the user explains the location.
+    actions:
+      - Ask the user about the sign-in location (travel, new phone, VPN)
+      - Revoke sessions if the user cannot explain it
+    monitor: I will monitor {{user}} for further sign-ins from {{ip}} and new MFA registrations.
+
+  o-tp:
+    type: outcome
+    verdict: true_positive
+    title: Helpdesk social engineering
+    anchor: The credentials of {{user}} were reset by {{actor}} for someone other than the user.
+    risk: The risk here is full account takeover and, for privileged or finance users, fraud or lateral movement; containment is required now.
+    actions:
+      - Revoke sessions, reset the password through a verified channel and remove new MFA methods
+      - Review what the attacker did after signing in from {{ip}}
+      - Brief the helpdesk and check for similar calls about other users
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor {{user}} and other recent helpdesk resets for sign-ins from {{ip}} or its ASN.

@@ -1,0 +1,129 @@
+id: risky-ip-signin
+title: Sign-in from Anonymous, TOR or Malicious IP
+category: identity
+summary: >-
+  A sign-in from a TOR exit node, anonymising proxy, known-malicious IP or verified threat
+  actor infrastructure. Some users run commercial VPNs, so check the provider and the
+  user's history before concluding anything.
+applies_to:
+  - Activity from anonymous IP address
+  - Anonymous IP address (anonymizedIPAddress)
+  - Malicious IP address
+  - Verified threat actor IP (nationStateIP)
+  - Activity from a TOR IP address
+mitre: [T1078.004, T1090.003]
+version: 1.0.0
+last_reviewed: 2026-09-29
+authors: [Oluwatosin Ogunjimi]
+sources:
+  - title: Microsoft Entra ID Protection risk detections
+    url: https://learn.microsoft.com/en-us/entra/id-protection/concept-identity-protection-risks
+  - title: "MITRE ATT&CK T1090.003 Proxy: Multi-hop Proxy"
+    url: https://attack.mitre.org/techniques/T1090/003/
+entities:
+  - { key: user, label: User principal name, example: "jdoe@contoso.com" }
+  - { key: ip, label: Flagged IP address, example: "185.220.101.44" }
+start: c-ip
+nodes:
+  c-ip:
+    type: check
+    text: Classify the IP and the sign-ins from it.
+    look_for:
+      - Provider type (TOR, commercial VPN, residential proxy, hosting, threat intel match)
+      - Result of each sign-in from it and the applications targeted
+      - Whether other users signed in from the same IP
+    kql:
+      - title: All sign-ins from the IP across the tenant (7d)
+        platform: sentinel
+        query: |
+          SigninLogs
+          | where TimeGenerated > ago(7d)
+          | where IPAddress == "{{ip}}"
+          | summarize Attempts = count(), Success = countif(ResultType == "0"), Codes = make_set(ResultType),
+                      Apps = make_set(AppDisplayName, 10), First = min(TimeGenerated) by UserPrincipalName
+    note: I classified {{ip}} and reviewed every sign-in from it across the tenant.
+    next: q-threat-actor
+
+  q-threat-actor:
+    type: question
+    text: Is the IP flagged as malicious or threat-actor infrastructure (not merely anonymising)?
+    yes: q-success-malicious
+    no: q-success
+    notes:
+      yes: "{{ip}} is flagged as malicious or threat actor infrastructure."
+      no: "{{ip}} is an anonymising service with no malicious attribution."
+
+  q-success-malicious:
+    type: question
+    text: Did any sign-in from the IP succeed or get past the password?
+    yes: l-postauth
+    no: o-tp-blocked
+    notes:
+      yes: A sign-in from {{ip}} succeeded or passed the password stage.
+      no: Every sign-in from {{ip}} failed at the password stage.
+
+  q-success:
+    type: question
+    text: Did the sign-in succeed?
+    yes: q-user-vpn
+    no: o-fp-failed
+    notes:
+      yes: The sign-in by {{user}} from {{ip}} succeeded.
+      no: The sign-in from {{ip}} failed.
+
+  q-user-vpn:
+    type: question
+    text: Does the user regularly use this VPN or proxy provider, or confirm they used it this time?
+    kql:
+      - title: The user's history with this ASN (90d)
+        platform: sentinel
+        query: |
+          let asn = toscalar(SigninLogs | where IPAddress == "{{ip}}" | take 1 | project AutonomousSystemNumber);
+          SigninLogs
+          | where TimeGenerated > ago(90d)
+          | where UserPrincipalName =~ "{{user}}" and AutonomousSystemNumber == asn
+          | summarize SignIns = count(), First = min(TimeGenerated), Last = max(TimeGenerated)
+    yes: o-benign-vpn
+    no: l-postauth
+    unknown: l-postauth
+    notes:
+      yes: "{{user}} regularly signs in through this provider or confirmed using it."
+      no: "{{user}} has no history with this provider and did not confirm the sign-in."
+      unknown: I could not confirm whether {{user}} used this provider.
+
+  l-postauth:
+    type: link
+    text: Check what happened after the sign-in.
+    tree: atypical-signin
+    node: c-device-auth
+
+  o-fp-failed:
+    type: outcome
+    verdict: false_positive
+    title: Failed sign-in from anonymiser
+    anchor: The sign-in from {{ip}} failed and no other attempt from it succeeded.
+    risk: The risk here is account access through anonymised infrastructure; it doesn't apply as nothing from {{ip}} got in.
+    actions:
+      - Close
+      - Consider a Conditional Access policy that blocks anonymous IPs if this recurs
+
+  o-benign-vpn:
+    type: outcome
+    verdict: benign_positive
+    title: User's own VPN
+    anchor: "{{user}} signed in through a VPN or proxy provider they use regularly."
+    risk: The risk here is an attacker hiding behind anonymising infrastructure; it doesn't apply given the user's established history with this provider.
+    actions:
+      - Close with the history or confirmation referenced
+      - Remind the user of any policy on personal VPNs
+
+  o-tp-blocked:
+    type: outcome
+    verdict: true_positive
+    title: Attack from malicious IP, blocked
+    anchor: "{{ip}} is malicious infrastructure and its sign-in attempts against the tenant failed at the password stage."
+    risk: The risk here is account takeover by a known threat actor; it doesn't apply to this attempt, but the targeting is real.
+    actions:
+      - Block {{ip}} in Conditional Access named locations
+      - Review every account it targeted and reset any with a password-accepted result
+    monitor: I will monitor the targeted accounts for sign-ins from related infrastructure.
