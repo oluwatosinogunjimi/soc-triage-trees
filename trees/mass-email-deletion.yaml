@@ -10,7 +10,7 @@ applies_to:
   - Unusual file deletion activities (mail)
   - Mass HardDelete in mailbox
 mitre: [T1070.008]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -56,15 +56,43 @@ nodes:
     type: question
     text: Did the deletions target security alerts, bounce messages, replies to recent sends, or a specific thread (rather than general clean-up)?
     also_check:
-      - "Did {{user}} send unusual messages to many colleagues or external contacts before the deletions?"
-      - "Has the mailbox of {{user}} got inbox rules that delete, hide or forward mail?"
       - "Has the mailbox of {{user}} sent attachments or sensitive data outside the organisation in the same period?"
       - "Did {{user}} export mail, contacts or files in bulk in the same period?"
     yes: o-inconclusive
-    no: o-benign
+    no: q-mailbox-rules
     notes:
       yes: The deletions targeted security notifications or specific replies.
       no: The deletions look like general mailbox clean-up.
+
+  q-mailbox-rules:
+    type: question
+    text: Has the mailbox of {{user}} got inbox rules that delete, hide or forward mail?
+    why: A yes means mail is being hidden or sent out automatically, so the deletions are likely part of a compromise rather than clean-up.
+    yes: l-inbox-rule-forwarding
+    no: q-unusual-sends
+    notes:
+      yes: I found inbox rules on the mailbox of {{user}} that delete, hide or forward mail.
+      no: I found no inbox rules on the mailbox of {{user}} that delete, hide or forward mail.
+
+  q-unusual-sends:
+    type: question
+    text: Did {{user}} send unusual messages to many colleagues or external contacts before the deletions?
+    why: A yes means the deletions may be removing evidence of phishing sent from the account.
+    yes: l-internal-phishing-sent
+    no: o-benign
+    notes:
+      yes: I found unusual messages sent by {{user}} to many colleagues or external contacts before the deletions.
+      no: I found no unusual messages sent by {{user}} to many colleagues or external contacts before the deletions.
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
+
+  l-internal-phishing-sent:
+    type: link
+    text: Continue in Phishing Sent from an Internal Account
+    tree: internal-phishing-sent
 
   o-benign:
     type: outcome

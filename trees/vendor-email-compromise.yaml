@@ -10,7 +10,7 @@ applies_to:
   - Invoice fraud from known vendor
   - Suspicious email from trusted partner domain
 mitre: [T1566, T1656]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -32,7 +32,6 @@ nodes:
       - Thread hijacking (a real previous thread continued from a new address)
     also_check:
       - "Has {{recipient}} signed in from an unrecognised IP or device recently?"
-      - "Has {{recipient}} got inbox rules that move, delete or forward mail from the vendor?"
     kql:
       - title: Mail history with the vendor domain (180d)
         platform: xdr
@@ -61,11 +60,26 @@ nodes:
   q-verified:
     type: question
     text: Has someone confirmed the change by calling the vendor on a number already on file (not one from the email)?
-    yes: o-benign
+    yes: q-recipient-rules
     no: q-acted
     notes:
       yes: The vendor confirmed the change by phone on a number on file.
       no: The change has not been verified with the vendor through a known channel.
+
+  q-recipient-rules:
+    type: question
+    text: Has {{recipient}} got inbox rules that move, delete or forward mail from the vendor?
+    why: A yes means someone is intercepting the vendor conversation on our side, so the thread cannot be trusted even after a verified change.
+    yes: l-inbox-rule-forwarding
+    no: o-benign
+    notes:
+      yes: I found inbox rules on the mailbox of {{recipient}} that move, delete or forward mail from the vendor.
+      no: I found no inbox rules on the mailbox of {{recipient}} that move, delete or forward mail from the vendor.
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
 
   q-acted:
     type: question

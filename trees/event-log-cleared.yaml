@@ -10,7 +10,7 @@ applies_to:
   - wevtutil cl executed
   - Audit policy changed
 mitre: [T1070.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,8 +24,6 @@ nodes:
   c-clear:
     type: check
     text: Confirm the clear and what ran around it.
-    also_check:
-      - "Has {{account}} cleared logs on, or signed in to, other devices it does not normally use?"
     kql:
       - title: Log clears and audit changes (7d)
         platform: sentinel
@@ -51,17 +49,41 @@ nodes:
     text: Is it a documented maintenance action (image build, lab machine, a ticket for log reset)?
     also_check:
       - "Has {{account}} recently been added to a privileged group or given admin rights it did not have before?"
-    yes: o-benign
+    yes: q-other-devices
     no: q-before
     notes:
       yes: The log clear on {{device}} was a documented maintenance action.
       no: No maintenance explains the log clear on {{device}}.
 
+  q-other-devices:
+    type: question
+    text: Has {{account}} cleared logs on, or signed in to, other devices it does not normally use?
+    why: A maintenance ticket covers one device; the same account clearing or signing in elsewhere means the ticket is cover for wider activity.
+    yes: o-tp
+    no: q-cred-access
+    notes:
+      yes: I found {{account}} cleared logs on, or signed in to, other devices it does not normally use.
+      no: I found {{account}} active only on its usual devices, with no other log clears.
+
+  q-cred-access:
+    type: question
+    text: Was LSASS memory or a credential store (SAM, NTDS.dit) accessed on {{device}} before the clear?
+    why: Credential access just before a clear is credential theft being hidden, whatever the ticket says.
+    yes: l-lsass-credential-dumping
+    no: o-benign
+    notes:
+      yes: I found LSASS memory or a credential store accessed on {{device}} before the clear.
+      no: I found no access to LSASS memory or credential stores on {{device}} before the clear.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
+
   q-before:
     type: question
     text: Is there other suspicious activity on the device in the hours before (new tools, logons from unusual hosts, other alerts)?
     also_check:
-      - "Was LSASS memory or a credential store (SAM, NTDS.dit) accessed on {{device}} before the clear?"
       - "Were new scheduled tasks, services or local accounts created on {{device}} before the clear?"
       - "Has anyone tried to disable AV, EDR or other logging on {{device}}?"
       - "Was WMI, RDP or SMB used for remote execution to or from {{device}}?"

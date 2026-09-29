@@ -10,7 +10,7 @@ applies_to:
   - File backups were deleted (vssadmin, wbadmin)
   - Ransom note detected
 mitre: [T1486, T1490]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,8 +54,6 @@ nodes:
       - vssadmin, wbadmin, bcdedit or wmic shadowcopy commands
       - The process and account responsible, and remote writes over SMB from another host
     also_check:
-      - "Was security monitoring (antivirus, EDR, logging) disabled or tampered with on {{device}} before the activity?"
-      - "Were security or event logs cleared on {{device}}?"
       - "Were new scheduled tasks, services or startup entries created on {{device}} before the activity?"
       - "Were backup or database services stopped on {{device}} before the activity?"
     kql:
@@ -74,11 +72,31 @@ nodes:
   q-legit-backup:
     type: question
     text: Is it explained by legitimate software (backup product pruning shadows, encryption or archiving tool, a rename script run by IT)?
-    yes: o-fp
+    yes: q-tamper-before
     no: q-spread
     notes:
       yes: The activity on {{device}} is explained by legitimate backup or archiving software.
       no: No legitimate software explains the activity on {{device}}.
+
+  q-tamper-before:
+    type: question
+    text: Was security monitoring (antivirus, EDR, logging) disabled or tampered with on {{device}} before the activity?
+    why: Backup software does not switch off protection first, so a yes means an operator prepared the host and the activity is ransomware.
+    yes: q-spread
+    no: q-logs-cleared
+    notes:
+      yes: I found security monitoring on {{device}} was disabled or tampered with before the activity.
+      no: I found no tampering with security monitoring on {{device}} before the activity.
+
+  q-logs-cleared:
+    type: question
+    text: Were security or event logs cleared on {{device}}?
+    why: Log clearing is anti-forensics that no backup or archiving product needs, so a yes rules out a benign explanation.
+    yes: q-spread
+    no: o-fp
+    notes:
+      yes: I found security or event logs were cleared on {{device}}.
+      no: I found no security or event log clearing on {{device}}.
 
   q-spread:
     type: question

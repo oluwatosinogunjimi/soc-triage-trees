@@ -10,7 +10,7 @@ applies_to:
   - Ransomware payment instruction file uploaded
   - Mass file rename in OneDrive
 mitre: [T1485, T1486]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,8 +27,6 @@ nodes:
     text: Measure deletions, renames and uploads, and their client.
     also_check:
       - "Did the activity touch sites or libraries {{user}} does not normally use?"
-      - "Were the files downloaded or shared externally before being deleted or encrypted?"
-      - "Were recycle bins emptied, or versioning or retention settings changed, to block recovery?"
       - "Have other accounts shown mass deletion or modification in the same period?"
     kql:
       - title: Deletions, renames and uploads by the user (48h)
@@ -73,11 +71,36 @@ nodes:
     text: Is it a user clean-up or retention policy from the usual session?
     also_check:
       - "Was {{user}} given site owner or admin rights shortly before the deletions?"
-    yes: o-benign
+    yes: q-recovery-blocked
     no: o-tp-destruction
     notes:
       yes: The deletions are a user clean-up or retention policy.
       no: The deletions came from an unusual session or have no explanation.
+
+  q-recovery-blocked:
+    type: question
+    text: Were recycle bins emptied, or versioning or retention settings changed, to block recovery?
+    why: A yes means someone made sure the files could not come back, which is destruction rather than a clean-up.
+    yes: o-tp-destruction
+    no: q-taken-first
+    notes:
+      yes: I found recycle bins emptied, or versioning or retention settings changed, blocking recovery of the files deleted by {{user}}.
+      no: I found no emptied recycle bins and no versioning or retention changes blocking recovery of the files deleted by {{user}}.
+
+  q-taken-first:
+    type: question
+    text: Were the files downloaded or shared externally before being deleted?
+    why: A yes means the data may have been taken before it was removed, so the deletion can't be treated as a clean-up alone.
+    yes: l-sharepoint-mass-download
+    no: o-benign
+    notes:
+      yes: I found that the files were downloaded or shared externally before {{user}} deleted them.
+      no: I found no download or external sharing of the files before {{user}} deleted them.
+
+  l-sharepoint-mass-download:
+    type: link
+    text: Continue in SharePoint or OneDrive Mass Download
+    tree: sharepoint-mass-download
 
   o-benign:
     type: outcome

@@ -11,7 +11,7 @@ applies_to:
   - User reported suspicious activity (MFA)
   - Multiple MFA denials followed by success
 mitre: [T1621, T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -53,7 +53,7 @@ nodes:
     type: question
     text: Did the user start these sign-ins themselves (known IP and device, the user confirms)?
     why: Users sometimes cause repeated prompts with a stuck app or a new phone. That is only plausible if the IPs are theirs.
-    yes: o-benign-user
+    yes: q-no-mfa-signin
     no: q-approved
     unknown: q-approved
     notes:
@@ -61,12 +61,26 @@ nodes:
       no: The prompts came from sign-ins that {{user}} did not start, from {{ip}}.
       unknown: I could not confirm whether {{user}} started the sign-ins.
 
+  q-no-mfa-signin:
+    type: question
+    text: "Has the password for {{user}} been used in a successful sign-in that did not require MFA, such as legacy authentication?"
+    why: A success that skipped MFA means the password is being used by someone who did not need the prompts at all.
+    yes: l-legacy-auth-success
+    no: o-benign-user
+    notes:
+      yes: "I found a successful sign-in for {{user}} that did not require MFA."
+      no: "I found no successful sign-in for {{user}} that bypassed MFA."
+
+  l-legacy-auth-success:
+    type: link
+    text: Continue in Successful Legacy Authentication Sign-in.
+    tree: legacy-auth-success
+
   q-approved:
     type: question
     text: Did any prompt get approved, producing a successful sign-in from the unfamiliar IP?
     also_check:
       - "Has {{ip}} triggered MFA prompts or failed sign-ins for other accounts in the tenant?"
-      - "Has the password for {{user}} been used in a successful sign-in that did not require MFA, such as legacy authentication?"
       - "Do the credentials for {{user}} appear in a recent leak or infostealer log?"
     yes: q-post-auth
     no: o-password-compromised

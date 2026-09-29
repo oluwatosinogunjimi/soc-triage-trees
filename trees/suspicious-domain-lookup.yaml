@@ -11,7 +11,7 @@ applies_to:
   - DNS lookup to known malicious domain
   - Connection to sinkholed domain
 mitre: [T1568.002, T1071.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -37,7 +37,37 @@ nodes:
           | summarize Connections = count(), First = min(Timestamp), Last = max(Timestamp)
                     by DeviceName, InitiatingProcessFileName, InitiatingProcessFolderPath, RemoteIP, ActionType
     note: I found which process on {{host}} looked up {{domain}} and whether it connected.
-    next: q-intel
+    next: q-tunnel
+
+  q-tunnel:
+    type: question
+    text: Is there DNS tunnelling from {{host}}, such as long encoded subdomains?
+    why: A yes means the host is hiding data or commands in DNS, which the DNS tunnelling playbook covers.
+    yes: l-dns-tunnelling
+    no: q-data-out
+    notes:
+      yes: I found DNS tunnelling from {{host}}, with long encoded subdomains.
+      no: I found no DNS tunnelling pattern from {{host}}.
+
+  q-data-out:
+    type: question
+    text: Has a large volume of data left {{host}} for {{domain}}?
+    why: A yes means the domain may be receiving stolen data, which the large outbound transfer playbook covers.
+    yes: l-large-outbound-transfer
+    no: q-intel
+    notes:
+      yes: I found a large volume of data sent from {{host}} to {{domain}}.
+      no: I found no unusual data volume from {{host}} to {{domain}}.
+
+  l-dns-tunnelling:
+    type: link
+    text: "Continue in DNS Tunnelling or DNS Exfiltration"
+    tree: dns-tunnelling
+
+  l-large-outbound-transfer:
+    type: link
+    text: "Continue in Large or Unusual Outbound Data Transfer"
+    tree: large-outbound-transfer
 
   q-intel:
     type: question
@@ -64,8 +94,6 @@ nodes:
     type: question
     text: Is the process suspicious (unsigned, from AppData or Temp, a script host), or does it repeat at regular intervals?
     also_check:
-      - "Has a large volume of data left {{host}} for {{domain}}?"
-      - "Is there DNS tunnelling from {{host}}, such as long encoded subdomains?"
       - "Have new scheduled tasks, services or startup entries been created on {{host}}?"
     yes: l-edr
     no: o-benign-browse

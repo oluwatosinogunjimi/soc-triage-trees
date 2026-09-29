@@ -9,7 +9,7 @@ applies_to:
   - Suspicious Run key modification
   - File dropped in Startup folder
 mitre: [T1547.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -46,20 +46,38 @@ nodes:
   q-known:
     type: question
     text: Does it point to known, signed software in a standard install path, written by its installer?
-    yes: o-fp
+    yes: q-tamper
     no: q-suspicious-target
     notes:
       yes: Entry "{{value}}" points to known, signed software written by its installer.
       no: Entry "{{value}}" does not point to known software.
+
+  q-tamper:
+    type: question
+    text: Has anyone tried to disable security monitoring (antivirus, EDR, logging) on {{device}}?
+    why: A yes means someone is working against the host, so a known-looking autostart cannot be closed on its own merits.
+    yes: l-security-tool-tampering
+    no: q-lsass
+    notes:
+      yes: I found an attempt to disable security monitoring on {{device}}.
+      no: I found no attempt to disable security monitoring on {{device}}.
+
+  q-lsass:
+    type: question
+    text: Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?
+    why: A yes means credential theft on the host, which is a compromise whatever the Run key turns out to be.
+    yes: l-lsass-credential-dumping
+    no: o-fp
+    notes:
+      yes: I found an attempt to dump credentials from LSASS or credential stores on {{device}}.
+      no: I found no attempt to dump credentials from LSASS or credential stores on {{device}}.
 
   q-suspicious-target:
     type: question
     text: Does it launch a script host, LOLBin, encoded command, or a binary in AppData, Temp, ProgramData or Public?
     also_check:
       - "Has the binary launched by \"{{value}}\" connected to previously unseen external domains or IPs?"
-      - "Has anyone tried to disable security monitoring (antivirus, EDR, logging) on {{device}}?"
       - "Was a new local account created or added to a privileged group on {{device}}?"
-      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
     yes: l-edr
     no: o-inconclusive
     notes:
@@ -71,6 +89,16 @@ nodes:
     text: Continue in the EDR tree for the launched payload.
     tree: edr-malware-detection
     node: q-executed
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
 
   o-fp:
     type: outcome

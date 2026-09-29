@@ -11,7 +11,7 @@ applies_to:
   - Possible golden ticket attack (CVE-2021-42287 exploitation)
   - Suspicious Kerberos authentication (TGT request using TGS-REQ)
 mitre: [T1558.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -32,9 +32,7 @@ nodes:
       - Host and target resources the ticket was used against
       - Any DCSync, NTDS.dit access or DC compromise in the preceding weeks
     also_check:
-      - "Has Mimikatz or a similar tool run on {{src_host}}?"
       - "Has {{src_host}} been accessed from an unusual or untrusted source?"
-      - "Did {{src_host}} create services or scheduled tasks on other hosts (PsExec, WMI, SMB)?"
     kql:
       - title: Logons by the account from the host (Defender for Identity, 7d)
         platform: xdr
@@ -50,11 +48,36 @@ nodes:
   q-known-cause:
     type: question
     text: Is there a known benign cause (clock skew, a recent krbtgt reset in progress, a trust or interoperability quirk documented by the customer)?
-    yes: o-fp
+    yes: q-mimikatz
     no: q-prior-compromise
     notes:
       yes: A documented benign cause explains the ticket anomaly.
       no: No benign cause explains the ticket anomaly.
+
+  q-mimikatz:
+    type: question
+    text: Has Mimikatz or a similar tool run on {{src_host}}?
+    why: A yes means the host that used the ticket has the tooling to forge one, so a documented quirk cannot explain it away.
+    yes: o-tp
+    no: q-remote-exec
+    notes:
+      yes: I found Mimikatz or a similar tool run on {{src_host}}.
+      no: I found no Mimikatz or similar tool on {{src_host}}.
+
+  q-remote-exec:
+    type: question
+    text: Did {{src_host}} create services or scheduled tasks on other hosts (PsExec, WMI, SMB)?
+    why: A yes means the host is moving laterally, which a clock or trust quirk does not cause.
+    yes: l-remote-execution-lateral
+    no: o-fp
+    notes:
+      yes: I found {{src_host}} creating services or scheduled tasks on other hosts.
+      no: I found no services or scheduled tasks created by {{src_host}} on other hosts.
+
+  l-remote-execution-lateral:
+    type: link
+    text: Continue in Remote Execution (PsExec, WMI, WinRM, RDP)
+    tree: remote-execution-lateral
 
   q-prior-compromise:
     type: question

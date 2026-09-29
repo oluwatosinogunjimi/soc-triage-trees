@@ -10,7 +10,7 @@ applies_to:
   - Break-glass account used
   - Sign-in by excluded privileged account
 mitre: [T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -29,10 +29,8 @@ nodes:
     also_check:
       - "Is {{ip}} flagged in threat intelligence for malicious activity?"
       - "Did {{user}} register an MFA method or change its own password or sign-in settings?"
-      - "Did {{user}} add credentials to app registrations or grant OAuth consent?"
       - "Did {{user}} create accounts or assign roles to other identities?"
       - "Did {{user}} change Conditional Access policies, audit logs or diagnostic settings?"
-      - "Did {{user}} elevate access to Azure subscriptions or read Key Vault secrets?"
     kql:
       - title: Sign-ins and directory actions by the account (7d)
         platform: sentinel
@@ -61,11 +59,31 @@ nodes:
     also_check:
       - "Did {{user}} reset passwords or MFA methods for other accounts?"
       - "Did {{user}} delete accounts, policies or other critical tenant resources?"
-    yes: o-benign
+    yes: q-app-creds
     no: o-inconclusive
     notes:
       yes: "{{user}} performed only the expected actions from {{ip}}."
       no: "{{user}} performed actions beyond what the emergency or test required."
+
+  q-app-creds:
+    type: question
+    text: Did {{user}} add credentials to app registrations or grant OAuth consent?
+    why: A yes means the account created access that outlives the emergency, which an emergency rarely needs and an attacker would want.
+    yes: o-inconclusive
+    no: q-elevate-secrets
+    notes:
+      yes: I found {{user}} added credentials to app registrations or granted OAuth consent.
+      no: I found no app credentials added or OAuth consent granted by {{user}}.
+
+  q-elevate-secrets:
+    type: question
+    text: Did {{user}} elevate access to Azure subscriptions or read Key Vault secrets?
+    why: A yes means the account reached subscriptions or secrets beyond tenant recovery, so the customer must confirm it before the use is closed.
+    yes: o-inconclusive
+    no: o-benign
+    notes:
+      yes: I found {{user}} elevated access to Azure subscriptions or read Key Vault secrets.
+      no: I found no Azure access elevation or Key Vault secret reads by {{user}}.
 
   q-success:
     type: question

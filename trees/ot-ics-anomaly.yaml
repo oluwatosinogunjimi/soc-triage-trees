@@ -11,7 +11,7 @@ applies_to:
   - New IT-to-OT connection
   - Engineering workstation activity outside maintenance window
 mitre: [T0843, T0855, T0886]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,14 +52,32 @@ nodes:
     type: question
     text: Is the source an authorised engineering workstation during a planned maintenance window, confirmed with site operations?
     also_check:
-      - "Were there remote sessions or sign-ins to {{src_ip}} from an unfamiliar user or IT host?"
-      - "Was a new or unsigned binary, or a remote access tool, run on {{src_ip}}?"
       - "Has anyone tried to disable security monitoring or clear logs on {{src_ip}}?"
-    yes: o-benign
+    yes: q-remote-session
     no: q-state-changing
     notes:
       yes: "{{src_ip}} is an authorised engineering workstation working in a planned window."
       no: "{{src_ip}} is not an authorised engineering source, or no maintenance was planned."
+
+  q-remote-session:
+    type: question
+    text: Were there remote sessions or sign-ins to {{src_ip}} from an unfamiliar user or IT host?
+    why: A yes means someone else may have driven the engineering workstation, so the maintenance window does not explain the commands.
+    yes: o-tp-ews
+    no: q-new-binary
+    notes:
+      yes: I found remote sessions or sign-ins to {{src_ip}} from an unfamiliar user or IT host.
+      no: I found no remote sessions or sign-ins to {{src_ip}} from unfamiliar users or IT hosts.
+
+  q-new-binary:
+    type: question
+    text: Was a new or unsigned binary, or a remote access tool, run on {{src_ip}}?
+    why: A yes means unapproved code or remote control on the workstation that sends commands to {{target}}.
+    yes: o-tp-ews
+    no: o-benign
+    notes:
+      yes: I found a new or unsigned binary, or a remote access tool, run on {{src_ip}}.
+      no: I found no new or unsigned binaries or remote access tools run on {{src_ip}}.
 
   q-state-changing:
     type: question
@@ -80,6 +98,21 @@ nodes:
     risk: The risk here is unauthorised manipulation of physical processes; it doesn't apply given site confirmation.
     actions:
       - Close referencing the maintenance record
+
+  o-tp-ews:
+    type: outcome
+    verdict: true_positive
+    title: Engineering workstation under unauthorised control
+    anchor: "{{src_ip}}, an authorised engineering workstation, shows remote access or unapproved code around the commands to {{target}}."
+    risk: The risk here is an attacker using a trusted engineering source to manipulate physical processes while the maintenance window hides it; this carries safety implications.
+    actions:
+      - Call site operations and the customer's OT security lead; let operators decide on isolation
+      - Confirm with the engineer on shift whether they sent every command to {{target}}
+      - Preserve OT monitoring logs and compare controller logic on {{target}} with the known good version
+      - Remove the unapproved remote access path to {{src_ip}} if operators agree
+      - Engage ICS incident response
+    escalate: true
+    monitor: I will monitor {{src_ip}} for remote sessions and all commands to OT controllers.
 
   o-tp-recon:
     type: outcome

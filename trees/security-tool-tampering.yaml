@@ -11,7 +11,7 @@ applies_to:
   - Tamper protection blocked a change
   - EDR agent uninstalled or sensor offline unexpectedly
 mitre: [T1562.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,7 +26,6 @@ nodes:
     text: See exactly what was changed and by what.
     also_check:
       - "Did the process that made the change run from a temporary or user-writable directory, or from an unexpected parent?"
-      - "Were security or event logs cleared, or audit policy changed, on {{device}}?"
       - "Has {{device}} been accessed from an unusual or untrusted source?"
     kql:
       - title: Defender changes, exclusions and tamper events (7d)
@@ -49,11 +48,31 @@ nodes:
   q-it:
     type: question
     text: Is it an IT change with a ticket (troubleshooting, a documented exclusion for an application, a planned agent migration)?
-    yes: o-benign
+    yes: q-logs-cleared
     no: q-blocked
     notes:
       yes: The change on {{device}} was an approved IT change.
       no: No IT change explains the tampering on {{device}}.
+
+  q-logs-cleared:
+    type: question
+    text: Were security or event logs cleared, or audit policy changed, on {{device}}?
+    why: A ticketed exclusion or agent change does not need the logs wiped, so a yes means someone is using the change as cover.
+    yes: o-tp
+    no: q-shadow-deleted
+    notes:
+      yes: I found security or event logs were cleared, or audit policy changed, on {{device}}.
+      no: I found no log clearing or audit policy changes on {{device}}.
+
+  q-shadow-deleted:
+    type: question
+    text: Were shadow copies or backup data deleted or changed on {{device}}?
+    why: Weakened protection followed by recovery inhibition is the ransomware pattern, so a yes hands over to the ransomware playbook.
+    yes: l-ransomware-behaviour
+    no: o-benign
+    notes:
+      yes: I found shadow copies or backup data were deleted or changed on {{device}}.
+      no: I found no shadow copy or backup deletion on {{device}}.
 
   q-blocked:
     type: question
@@ -61,7 +80,6 @@ nodes:
     also_check:
       - "Did an unsigned binary or LOLBin run on {{device}} shortly after the change?"
       - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
-      - "Were shadow copies or backup data deleted or changed on {{device}}?"
       - "Were new scheduled tasks, services or startup entries created on {{device}}?"
       - "Has {{device}} connected to many other internal hosts or used remote execution (WMI, RDP, SMB)?"
     yes: o-tp-blocked
@@ -69,6 +87,11 @@ nodes:
     notes:
       yes: Tamper protection blocked the change and protection on {{device}} is intact.
       no: The change succeeded and protection on {{device}} is weakened or off.
+
+  l-ransomware-behaviour:
+    type: link
+    text: Continue in Ransomware Behaviour
+    tree: ransomware-behaviour
 
   o-benign:
     type: outcome

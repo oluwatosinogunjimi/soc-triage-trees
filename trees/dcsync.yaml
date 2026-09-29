@@ -10,7 +10,7 @@ applies_to:
   - Suspected DCSync attack
   - Directory Services replication from non-DC (Event 4662)
 mitre: [T1003.006]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,9 +27,7 @@ nodes:
     type: check
     text: Confirm the replication request and its source.
     also_check:
-      - "Was {{account}} recently granted replication rights or added to a privileged group?"
       - "Did {{src_host}} run domain reconnaissance (net group, BloodHound) before the replication?"
-      - "Has Mimikatz or a similar credential dumping tool run on {{src_host}}?"
     kql:
       - title: Replication rights used by non-machine accounts (Event 4662, 7d)
         platform: sentinel
@@ -53,11 +51,41 @@ nodes:
   q-dc-or-sync:
     type: question
     text: Is the source a domain controller, or the documented Entra Connect or other sync server using its dedicated account?
-    yes: o-benign
+    yes: q-mimikatz
     no: q-tooling
     notes:
       yes: "{{src_host}} is a domain controller or the documented sync server."
       no: "{{src_host}} is neither a domain controller nor a documented sync server."
+
+  q-mimikatz:
+    type: question
+    text: Has Mimikatz or a similar credential dumping tool run on {{src_host}}?
+    why: A yes means the replication partner itself is compromised, so a legitimate source does not make the request safe.
+    yes: l-lsass-credential-dumping
+    no: q-rights-granted
+    notes:
+      yes: I found Mimikatz or a similar credential dumping tool run on {{src_host}}.
+      no: I found no Mimikatz or similar credential dumping tool on {{src_host}}.
+
+  q-rights-granted:
+    type: question
+    text: Was {{account}} recently granted replication rights or added to a privileged group?
+    why: A yes means the account was given replication power shortly before using it, which is how attackers set up DCSync.
+    yes: l-ad-privileged-group-change
+    no: o-benign
+    notes:
+      yes: I found {{account}} was recently granted replication rights or added to a privileged group.
+      no: I found no recent grant of replication rights or privileged group membership for {{account}}.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
+
+  l-ad-privileged-group-change:
+    type: link
+    text: Continue in On-Premises Privileged Group Membership Change
+    tree: ad-privileged-group-change
 
   q-tooling:
     type: question

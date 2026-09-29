@@ -11,7 +11,7 @@ applies_to:
   - Policy:S3/AccountBlockPublicAccessDisabled
   - Azure storage container set to public access
 mitre: [T1530, T1562]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,7 +28,6 @@ nodes:
     type: check
     text: Pull the change and who made it.
     also_check:
-      - "Did {{principal}} make the change from an unfamiliar IP or one flagged in threat intelligence?"
       - "Did {{principal}} make other buckets, containers, snapshots or AMIs public at the same time?"
       - "Were the permissions of {{principal}} changed just before the change?"
       - "Did {{principal}} create new users, keys or roles in the same session?"
@@ -56,11 +55,27 @@ nodes:
   q-intended:
     type: question
     text: Is the bucket meant to be public (website assets, public downloads) and does it contain only public content?
-    yes: o-benign
+    yes: q-unfamiliar-source
     no: q-anon-read
     notes:
       yes: "{{bucket}} is meant to be public and holds only public content."
       no: "{{bucket}} holds non-public data."
+
+  q-unfamiliar-source:
+    type: question
+    text: Did {{principal}} make the change from an unfamiliar IP or one flagged in threat intelligence?
+    why: A yes means the principal's credentials may be misused, even though this bucket is meant to be public.
+    yes: l-cloud-control-plane
+    no: o-benign
+    notes:
+      yes: I found that {{principal}} made the change to {{bucket}} from an unfamiliar IP or one flagged in threat intelligence.
+      no: I found that {{principal}} made the change to {{bucket}} from a familiar IP with no threat intelligence match.
+
+  l-cloud-control-plane:
+    type: link
+    text: Continue in Cloud Control-Plane Anomaly (Azure / AWS)
+    tree: cloud-control-plane
+    node: q-source
 
   q-anon-read:
     type: question

@@ -10,7 +10,7 @@ applies_to:
   - Sensitive data uploaded to personal cloud storage
   - Sensitive data pasted into generative AI site
 mitre: [T1567.002, T1048]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -25,8 +25,6 @@ nodes:
   c-match:
     type: check
     text: Read the match, including data types, count, destination and channel.
-    also_check:
-      - "Did {{user}} compress, encrypt or rename the files before sending them?"
     kql:
       - title: DLP matches for the user (14d)
         platform: sentinel
@@ -59,14 +57,38 @@ nodes:
     type: question
     text: Is it bulk or repeated (many records, many files, several days), rather than a one-off?
     also_check:
-      - "Has {{user}} downloaded or synced an unusual number of files from SharePoint or OneDrive?"
       - "Has {{user}} created anonymous or external sharing links?"
       - "Has {{user}} copied files to removable media?"
     yes: q-context
-    no: o-mistake
+    no: q-concealed
     notes:
       yes: The transfer was bulk or repeated.
       no: The transfer was a one-off with a small amount of data.
+
+  q-concealed:
+    type: question
+    text: Did {{user}} compress, encrypt or rename the files before sending them?
+    why: A yes means the transfer was deliberately disguised, which does not fit an honest one-off mistake.
+    yes: o-concealed
+    no: q-mass-download
+    notes:
+      yes: I found that {{user}} compressed, encrypted or renamed the files before sending them.
+      no: I found no sign that {{user}} compressed, encrypted or renamed the files before sending them.
+
+  q-mass-download:
+    type: question
+    text: Has {{user}} downloaded or synced an unusual number of files from SharePoint or OneDrive?
+    why: A yes means the small transfer may be one visible part of wider data collection.
+    yes: l-sharepoint-mass-download
+    no: o-mistake
+    notes:
+      yes: I found that {{user}} downloaded or synced an unusual number of files from SharePoint or OneDrive.
+      no: I found no unusual download or sync of files from SharePoint or OneDrive by {{user}}.
+
+  l-sharepoint-mass-download:
+    type: link
+    text: Continue in SharePoint or OneDrive Mass Download
+    tree: sharepoint-mass-download
 
   q-context:
     type: question
@@ -99,6 +121,18 @@ nodes:
     actions:
       - Notify the user's manager and the data protection lead per policy
       - Ask for deletion at the destination if possible
+
+  o-concealed:
+    type: outcome
+    verdict: inconclusive
+    title: Disguised one-off transfer
+    anchor: "{{user}} sent a small amount of sensitive data to an unapproved destination after compressing, encrypting or renaming it."
+    risk: The risk here is deliberate data theft hidden from DLP; the small volume does not rule it out because the files were disguised.
+    actions:
+      - Escalate to the customer's data protection lead through the agreed channel
+      - Check the session of {{user}} for compromise signs and ask about leaver or HR context
+      - Ask for deletion at the destination if possible
+    monitor: I will monitor {{user}} for further DLP matches, archives and encrypted uploads.
 
   o-inconclusive:
     type: outcome

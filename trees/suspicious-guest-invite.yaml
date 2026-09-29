@@ -10,7 +10,7 @@ applies_to:
   - Guest user account promoted to member
   - Invite external user (unusual inviter or domain)
 mitre: [T1136.003, T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,7 +28,6 @@ nodes:
     text: Pull the invitation, redemption and group or app assignments.
     also_check:
       - "Has {{guest}} signed in from TOR, hosting or other unrecognised IPs?"
-      - "Has {{guest}} downloaded or synced a large number of files from SharePoint, OneDrive or Teams?"
       - "Has {{guest}} created sharing links or shared files with other external accounts?"
     kql:
       - title: Guest lifecycle (30d)
@@ -61,11 +60,26 @@ nodes:
     text: Is there a business relationship with the guest's domain (partner, supplier, known collaborator), and does the inviter work with them?
     also_check:
       - "Is the guest's email domain newly registered?"
-    yes: q-access-scope
+    yes: q-guest-download
     no: q-actor-clean
     notes:
       yes: The guest's domain belongs to a known business partner of {{actor}}.
       no: The guest's domain has no known business relationship, or is a free-mail domain.
+
+  q-guest-download:
+    type: question
+    text: "Has {{guest}} downloaded or synced a large number of files from SharePoint, OneDrive or Teams?"
+    why: Bulk download by a guest is collection, which a genuine partner relationship does not explain.
+    yes: l-sharepoint-mass-download
+    no: q-access-scope
+    notes:
+      yes: "I found a large number of files downloaded or synced by {{guest}}."
+      no: "I found no bulk download or sync of files by {{guest}}."
+
+  l-sharepoint-mass-download:
+    type: link
+    text: Continue in SharePoint or OneDrive Mass Download.
+    tree: sharepoint-mass-download
 
   q-access-scope:
     type: question
@@ -80,16 +94,25 @@ nodes:
     type: question
     text: Was the inviter's session clean and does the inviter confirm the action?
     also_check:
-      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
       - "Has {{actor}} created inbox rules or enabled forwarding to an external address?"
       - "Has {{actor}} changed external collaboration or cross-tenant access settings?"
-    yes: o-policy
+    yes: q-actor-mfa
     no: o-tp
     unknown: o-tp
     notes:
       yes: "{{actor}} confirmed the action from a clean session."
       no: The session of {{actor}} was risky, or {{actor}} did not make the change.
       unknown: I could not confirm the action with {{actor}}, so I treated it as suspicious.
+
+  q-actor-mfa:
+    type: question
+    text: "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
+    why: A new MFA method on the inviter from an unknown IP means the confirmation may have come from an attacker holding the account.
+    yes: o-tp
+    no: o-policy
+    notes:
+      yes: "I found an MFA method registered or changed for {{actor}} from an unrecognised IP."
+      no: "I found no MFA method registered or changed for {{actor}} from an unrecognised IP."
 
   o-benign:
     type: outcome

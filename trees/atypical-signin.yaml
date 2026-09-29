@@ -12,7 +12,7 @@ applies_to:
   - Sign-in from an unusual location or anonymous IP
   - Risky sign-in (Entra ID Protection)
 mitre: [T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -223,7 +223,6 @@ nodes:
       - "Has {{user}} created external sharing links or sent files to personal addresses?"
       - "Did {{user}} search mail or files for payment, invoice or password terms after the sign-in?"
       - "Has {{user}} enumerated directory users, groups or roles after the sign-in?"
-      - "Has {{user}} changed Conditional Access, audit or other security settings?"
     kql:
       - title: Directory changes by or to the user (7d)
         platform: sentinel
@@ -248,10 +247,25 @@ nodes:
                                  "Send", "SendAs", "HardDelete")
           | summarize Count = count(), First = min(TimeGenerated), IPs = make_set(ClientIP, 10) by Operation, OfficeWorkload
     yes: o-compromised
-    no: q-user-confirm
+    no: q-security-settings
     notes:
       yes: I found suspicious post-authentication activity on the account of {{user}}.
       no: I found no suspicious post-authentication activity (no inbox rules, MFA changes, consents or unusual downloads).
+
+  q-security-settings:
+    type: question
+    text: Has {{user}} changed Conditional Access, audit or other security settings?
+    why: A yes means the session was used to weaken the tenant's defences, which must be reviewed before any user confirmation can close the case.
+    yes: l-conditional-access-change
+    no: q-user-confirm
+    notes:
+      yes: I found changes to Conditional Access, audit or other security settings by {{user}} after the sign-in.
+      no: I found no changes to Conditional Access, audit or other security settings by {{user}}.
+
+  l-conditional-access-change:
+    type: link
+    text: Continue in Conditional Access Policy Changed or Deleted
+    tree: conditional-access-change
 
   q-user-confirm:
     type: question

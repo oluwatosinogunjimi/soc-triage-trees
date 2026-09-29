@@ -10,7 +10,7 @@ applies_to:
   - Reciprocal Temporary Access Pass creation between users
   - Admin registered security info (TAP)
 mitre: [T1098.005, T1556.006]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,7 +27,6 @@ nodes:
     type: check
     text: Pull the TAP creation and every use of it.
     also_check:
-      - "Has {{user}} created inbox rules or enabled forwarding to an external address since the pass was used?"
       - "Has {{user}} consented to an OAuth app or registered a new device since the pass was used?"
       - "Has {{user}} downloaded or shared an unusual volume of files since the pass was used?"
     kql:
@@ -75,9 +74,7 @@ nodes:
   q-user-confirm:
     type: question
     text: Does the user confirm they asked for the pass and used it themselves?
-    also_check:
-      - "Did {{user}} receive calls, messages or MFA prompts asking for sign-in details or codes around the time of the request?"
-    yes: q-usage
+    yes: q-social-engineering
     no: o-tp
     unknown: o-tp
     notes:
@@ -85,16 +82,49 @@ nodes:
       no: "{{user}} did not request the pass."
       unknown: I could not reach {{user}} to confirm the request, so I treated it as suspicious.
 
+  q-social-engineering:
+    type: question
+    text: "Did {{user}} receive calls, messages or MFA prompts asking for sign-in details or codes around the time of the request?"
+    why: Contact asking for codes around the request means a social engineering attempt is running against the account, whatever the user believes they asked for.
+    yes: o-tp
+    no: q-usage
+    notes:
+      yes: "{{user}} received calls, messages or MFA prompts asking for sign-in details or codes around the time of the request."
+      no: "{{user}} received no calls, messages or prompts asking for sign-in details or codes around the time of the request."
+
   q-usage:
     type: question
     text: Was the pass used from the user's normal location and device, followed by normal MFA registration?
-    also_check:
-      - "Is the IP that used the pass flagged in threat intelligence for malicious activity?"
-    yes: o-benign
+    yes: q-ip-flagged
     no: o-tp
     notes:
       yes: The pass was used from a normal location and device for {{user}}.
       no: The pass was used from an unfamiliar location or device.
+
+  q-ip-flagged:
+    type: question
+    text: "Is the IP that used the pass flagged in threat intelligence for malicious activity?"
+    why: A flagged IP redeeming the pass means someone other than the user used it, even from an expected location.
+    yes: o-tp
+    no: q-inbox-rules
+    notes:
+      yes: "The IP that used the pass for {{user}} is flagged in threat intelligence for malicious activity."
+      no: "The IP that used the pass for {{user}} is not flagged in threat intelligence."
+
+  q-inbox-rules:
+    type: question
+    text: "Has {{user}} created inbox rules or enabled forwarding to an external address since the pass was used?"
+    why: Inbox rules or forwarding right after a TAP sign-in are business email compromise set-up, not account recovery.
+    yes: l-inbox-rule-forwarding
+    no: o-benign
+    notes:
+      yes: "I found inbox rules or external forwarding created for {{user}} since the pass was used."
+      no: "I found no inbox rules or external forwarding created for {{user}} since the pass was used."
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding.
+    tree: inbox-rule-forwarding
 
   o-benign:
     type: outcome

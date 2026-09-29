@@ -11,7 +11,7 @@ applies_to:
   - Unusual addition of credentials to an OAuth app
   - App with suspicious OAuth scopes
 mitre: [T1528, T1550.001, T1098.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -83,10 +83,40 @@ nodes:
           | summarize Consents = count(), Users = make_set(tostring(InitiatedBy.user.userPrincipalName), 50),
                       First = min(TimeGenerated), Last = max(TimeGenerated)
     yes: c-consent-context
-    no: q-high-risk-perms
+    no: q-app-credentials
     notes:
       yes: "{{app}} shows consent phishing red flags: unverified publisher, recent creation, a lookalike or generic name, or a suspicious reply URL."
       no: "{{app}} has a verified publisher, a legitimate reply URL and an established presence."
+
+  q-app-credentials:
+    type: question
+    text: "Have new secrets or certificates been added to {{app}} since the consent?"
+    why: A new credential on the app lets whoever added it use its permissions directly, however legitimate the publisher looks.
+    yes: l-service-principal-credential-added
+    no: q-inbox-rules
+    notes:
+      yes: "I found new secrets or certificates added to {{app}} since the consent."
+      no: "I found no secrets or certificates added to {{app}} since the consent."
+
+  q-inbox-rules:
+    type: question
+    text: "Has {{user}} created inbox rules or enabled forwarding to an external address since the consent?"
+    why: Inbox rules or forwarding after a consent point to a compromised account, so the consent cannot be taken at face value.
+    yes: l-inbox-rule-forwarding
+    no: q-high-risk-perms
+    notes:
+      yes: "I found inbox rules or external forwarding created by {{user}} since the consent."
+      no: "I found no inbox rules or external forwarding created by {{user}} since the consent."
+
+  l-service-principal-credential-added:
+    type: link
+    text: Continue in Credential Added to App or Service Principal.
+    tree: service-principal-credential-added
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding.
+    tree: inbox-rule-forwarding
 
   q-high-risk-perms:
     type: question
@@ -138,8 +168,6 @@ nodes:
     type: question
     text: Has the app used its access (service principal sign-ins, mail or file access through the app ID)?
     also_check:
-      - "Have new secrets or certificates been added to {{app}} since the consent?"
-      - "Has {{user}} created inbox rules or enabled forwarding to an external address since the consent?"
       - "Are any IPs used by {{app}} flagged in threat intelligence for malicious activity?"
       - "Has {{app}} enumerated users, groups or directory data through Microsoft Graph?"
       - "Has {{app}} created sharing links to files for external or anonymous recipients?"

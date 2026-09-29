@@ -10,7 +10,7 @@ applies_to:
   - Root console login
   - Root access key used
 mitre: [T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -66,14 +66,37 @@ nodes:
     also_check:
       - "Is {{ip}} flagged in threat intelligence or hosted on a VPS, VPN or anonymising provider?"
       - "Were the root email, password, MFA device or account contact details changed?"
-      - "Were CloudTrail, GuardDuty or other security services stopped or changed?"
       - "Did root make buckets, snapshots or AMIs public or share them with another account?"
-      - "Did root delete resources, backups or snapshots, or try to leave the AWS Organization?"
-    yes: o-policy
+    yes: q-logging
     no: o-tp
     notes:
       yes: The root activity came from a known network with MFA and no persistence changes.
       no: The root activity came from {{ip}}, an unknown source, or created keys, users or policies.
+
+  q-logging:
+    type: question
+    text: Were CloudTrail, GuardDuty or other security services stopped or changed?
+    why: A yes means root was used to blind monitoring, which routine use by the owner does not explain.
+    yes: l-cloud-logging-disabled
+    no: q-destructive
+    notes:
+      yes: I found that root in {{account_id}} stopped or changed CloudTrail, GuardDuty or other security services.
+      no: I found no changes to CloudTrail, GuardDuty or other security services by root in {{account_id}}.
+
+  l-cloud-logging-disabled:
+    type: link
+    text: Continue in Cloud Logging or Monitoring Disabled
+    tree: cloud-logging-disabled
+
+  q-destructive:
+    type: question
+    text: Did root delete resources, backups or snapshots, or try to leave the AWS Organization?
+    why: A yes means destructive or evasive action with root, which points to an attacker rather than the owner.
+    yes: o-tp
+    no: o-policy
+    notes:
+      yes: I found that root in {{account_id}} deleted resources, backups or snapshots, or tried to leave the AWS Organization.
+      no: I found no deletion of resources, backups or snapshots, and no attempt to leave the AWS Organization, by root in {{account_id}}.
 
   o-benign:
     type: outcome

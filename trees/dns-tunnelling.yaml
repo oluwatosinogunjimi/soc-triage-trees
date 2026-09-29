@@ -10,7 +10,7 @@ applies_to:
   - DNS tunnelling detected
   - Trojan:EC2/DNSDataExfiltration
 mitre: [T1071.004, T1048.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -56,12 +56,21 @@ nodes:
     text: Is the domain a known service that uses encoded subdomains (security vendor lookups, CDN, telemetry, anti-spam DNSBL)?
     also_check:
       - "Is {{domain}} newly registered or on dynamic DNS?"
-      - "Does threat intelligence link {{domain}} to known C2 infrastructure or malware families?"
-    yes: o-fp
+    yes: q-domain-intel
     no: q-pattern
     notes:
       yes: "{{domain}} is a known service that uses encoded subdomains."
       no: "{{domain}} is not a known service."
+
+  q-domain-intel:
+    type: question
+    text: Does threat intelligence link {{domain}} to known C2 infrastructure or malware families?
+    why: A yes means the encoded lookups go to attacker infrastructure, whatever service the domain appears to be.
+    yes: o-tp
+    no: o-fp
+    notes:
+      yes: I found threat intelligence linking {{domain}} to known C2 infrastructure or malware families.
+      no: I found no threat intelligence linking {{domain}} to C2 infrastructure or malware families.
 
   q-pattern:
     type: question

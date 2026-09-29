@@ -193,6 +193,11 @@ mark { background: var(--inc-soft); color: inherit; border-radius: 2px; padding:
 .ans { justify-self: start; font-family: var(--font-mono); font-size: 11.5px; padding: 0 6px; border-radius: 3px; font-weight: 500; }
 .ans-yes { background: var(--btp-soft); color: var(--btp); } .ans-no { background: var(--tp-soft); color: var(--tp); }
 .ans-unknown { background: var(--inc-soft); color: var(--inc); } .ans-other { background: var(--accent-soft); color: var(--accent); }
+.also-snip { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.also-snip.flag { color: var(--tp); font-weight: 600; }
+.also-snip.flag::before, .mm-also.flag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tp); display: inline-block; }
+.mm-also { grid-column: 1 / -1; font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); }
+.mm-also.flag { color: var(--tp); font-weight: 600; }
 .ev-snip { font-size: 12px; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
 .ahead-label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-left: 28px; }
 
@@ -529,6 +534,12 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const n = node(tid, nid);
     return (n.also_check || []).map(q => ({ q, a: S.also[alsoKey(tid, nid, q)] || null }));
   }
+  function alsoSnip(tid, nid) {
+    const ans = alsoAnswers(tid, nid); if (!ans.length) return null;
+    const done = ans.filter(x => x.a).length, yes = ans.filter(x => x.a === "yes").length;
+    const txt = done ? done + " of " + ans.length + " wider checks" + (yes ? ", " + yes + " yes" : ", all clear") : ans.length + " wider checks not answered";
+    return h("span", { class: "also-snip" + (yes ? " flag" : "") }, txt);
+  }
   function visitedSteps() {
     const out = S.path.filter(st => node(st.tree, st.node).type !== "link").map(st => [st.tree, st.node]);
     const cur = node(S.tree, S.node);
@@ -772,7 +783,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         h("button", { type: "button", onclick: () => rewind(i), title: "Go back to this step" },
           h("span", { class: "rq" }, shortText(n.text, 80)),
           h("span", { class: "ans " + cls }, al.length > 30 ? al.slice(0, 28) + "..." : al),
-          ev ? h("span", { class: "ev-snip" }, "“" + (ev.length > 70 ? ev.slice(0, 68) + "..." : ev) + "”") : null)));
+          ev ? h("span", { class: "ev-snip" }, "“" + (ev.length > 70 ? ev.slice(0, 68) + "..." : ev) + "”") : null,
+          alsoSnip(st.tree, st.node))));
     });
     const cur = node(S.tree, S.node);
     if (started) {
@@ -1136,6 +1148,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         drawMap({ keep: k });
       } },
       h("span", { class: "mm-tag" }, tag), h("span", { class: "mm-label" }, label),
+      (() => {
+        if (!n.also_check) return null;
+        const yes = alsoAnswers(t.id, nid).filter(x => x.a === "yes").length;
+        return h("span", { class: "mm-also" + (yes ? " flag" : ""), title: n.also_check.length + " wider checks at this step" }, "+" + n.also_check.length + " checks" + (yes ? " · " + yes + " yes" : ""));
+      })(),
       kids.length ? h("span", { class: "mm-toggle", "aria-hidden": "true" }, isOpen ? "−" : "+" + kids.length) : null);
   }
   function mmBranch(t, nid, k, info, depth) {
@@ -1154,19 +1171,20 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
   function mmDetail(t) {
     const box = h("aside", { class: "ov-detail", "aria-live": "polite" });
+    const add = (...k) => box.append(...k.filter(x => x !== null && x !== undefined && x !== false));
     const nid = nidOf(mm.selected || t.start); const n = t.nodes[nid];
     if (n.type === "outcome") {
-      box.append(h("section", { class: "verdict-banner vb-" + n.verdict, style: "padding:14px 16px" },
+      add(h("section", { class: "verdict-banner vb-" + n.verdict, style: "padding:14px 16px" },
           h("div", { class: "verdict-label" }, VLABEL[n.verdict], n.escalate ? h("span", { class: "esc" }, "Escalate") : null),
           h("h2", { style: "font-size:20px" }, n.title), h("p", { style: "font-size:14px" }, fill(n.anchor))),
         h("div", { class: "sub" }, "Risk"), h("p", {}, fill(n.risk)),
         h("div", { class: "sub" }, "Actions"), h("ol", { style: "margin:0;padding-left:18px;display:grid;gap:4px" }, n.actions.map(a => h("li", {}, fill(a)))));
     } else if (n.type === "link") {
-      box.append(h("div", { class: "kind" }, h("span", { class: "tag" }, "Hand-over")), h("div", { class: "q-text" }, n.text), h("p", { class: "muted" }, TREES[n.tree].summary),
+      add(h("div", { class: "kind" }, h("span", { class: "tag" }, "Hand-over")), h("div", { class: "q-text" }, n.text), h("p", { class: "muted" }, TREES[n.tree].summary),
         h("button", { class: "btn", type: "button", onclick: () => { closeMap(); openTree(n.tree); } }, "Open " + TREES[n.tree].title));
     } else {
       const outs = reachOutcomes(t.id, nid); const counts = verdictCounts(outs);
-      box.append(h("div", { class: "kind" }, h("span", { class: "tag" }, KIND[n.type]), h("span", {}, nid)),
+      add(h("div", { class: "kind" }, h("span", { class: "tag" }, KIND[n.type]), h("span", {}, nid)),
         h("div", { class: "q-text" }, fill(n.text)), n.why ? h("p", { class: "why" }, h("span", {}, fill(n.why))) : null,
         n.look_for ? h("ul", { style: "margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px" }, n.look_for.map(x => h("li", {}, fill(x)))) : null,
         n.also_check ? h("div", { class: "sub" }, "Also check (" + n.also_check.length + ")") : null,

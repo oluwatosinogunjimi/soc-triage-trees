@@ -10,7 +10,7 @@ applies_to:
   - AnyDesk / ScreenConnect installed
   - Quick Assist session started after unsolicited contact
 mitre: [T1219]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -48,7 +48,27 @@ nodes:
           | where FileName =~ "{{file}}"
           | summarize Devices = dcount(DeviceName), DeviceList = make_set(DeviceName, 20)
     note: I identified {{file}} on {{device}}, how it arrived and whether it connected out.
-    next: q-approved
+    next: q-tamper
+
+  q-tamper:
+    type: question
+    text: Were security tools on {{device}} disabled or changed, or event logs cleared, after {{file}} appeared?
+    why: Neither IT support nor a user's own session needs to blind the host, so a yes means someone used the remote access to attack it.
+    yes: o-tp-active
+    no: q-new-admin
+    notes:
+      yes: I found security tools on {{device}} were disabled or changed, or event logs cleared, after {{file}} appeared.
+      no: I found no security tool changes or log clearing on {{device}} after {{file}} appeared.
+
+  q-new-admin:
+    type: question
+    text: Was a new local account created or added to the administrators group on {{device}}?
+    why: A new admin account after a remote access tool appears is a classic backdoor for return access, so a yes means hands-on intrusion.
+    yes: o-tp-active
+    no: q-approved
+    notes:
+      yes: I found a new local account was created or added to the administrators group on {{device}}.
+      no: I found no new local accounts or administrators group changes on {{device}}.
 
   q-approved:
     type: question
@@ -83,8 +103,6 @@ nodes:
     type: question
     text: Was a remote session established, followed by other activity (new tools, credential access, discovery, data transfer)?
     also_check:
-      - "Were security tools on {{device}} disabled or changed, or event logs cleared, after {{file}} appeared?"
-      - "Was a new local account created or added to the administrators group on {{device}}?"
       - "Were other scheduled tasks, services or startup entries created on {{device}} after {{file}} appeared?"
       - "Has {{device}} connected to previously unseen external domains or IPs other than the tool's relay?"
     yes: o-tp-active

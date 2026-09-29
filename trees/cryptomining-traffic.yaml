@@ -10,7 +10,7 @@ applies_to:
   - Impact:EC2/BitcoinDomainRequest.Reputation
   - Firewall detected Stratum mining protocol
 mitre: [T1496]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,7 +27,6 @@ nodes:
     text: Confirm the pool traffic and identify the source device.
     also_check:
       - "Are other internal hosts connecting to the same mining pools?"
-      - "Is {{src_ip}} communicating with known command-and-control infrastructure besides the pool?"
       - "Has a large volume of data left {{src_ip}} for destinations other than the pool?"
     kql:
       - title: Firewall sessions to mining pools (7d)
@@ -61,14 +60,38 @@ nodes:
     text: Is it an internet-facing server, appliance or cloud workload (rather than a personal device on guest Wi-Fi)?
     also_check:
       - "Were there successful logons or admin sessions to {{src_ip}} from an unusual or untrusted source?"
-      - "Is {{src_ip}} scanning or connecting to many other internal hosts?"
       - "Were new accounts, roles or keys created or changed on {{src_ip}} or its cloud account since the mining started?"
       - "Were logging or monitoring services on {{src_ip}} disabled or changed?"
     yes: o-tp-server
-    no: o-policy
+    no: q-c2
     notes:
       yes: "{{src_ip}} is an internet-facing server, appliance or cloud workload."
       no: "{{src_ip}} is a personal or guest device."
+
+  q-c2:
+    type: question
+    text: Is {{src_ip}} communicating with known command-and-control infrastructure besides the pool?
+    why: A yes means the device runs malware beyond a miner, so it can't close as a personal policy matter.
+    yes: o-tp-c2
+    no: q-scan
+    notes:
+      yes: I found {{src_ip}} communicating with known command-and-control infrastructure besides the pool.
+      no: I found no traffic from {{src_ip}} to known command-and-control infrastructure besides the pool.
+
+  q-scan:
+    type: question
+    text: Is {{src_ip}} scanning or connecting to many other internal hosts?
+    why: A yes means the device is mapping or spreading across the network, which the internal port scan playbook covers.
+    yes: l-internal-port-scan
+    no: o-policy
+    notes:
+      yes: I found {{src_ip}} scanning or connecting to many other internal hosts.
+      no: I found no scanning or wide internal connections from {{src_ip}}.
+
+  l-internal-port-scan:
+    type: link
+    text: "Continue in Internal Port Scan or Host Discovery"
+    tree: internal-port-scan
 
   o-policy:
     type: outcome
@@ -92,3 +115,18 @@ nodes:
       - Block the pool destinations
     escalate: true
     monitor: I will monitor the estate for pool traffic from any source.
+
+  o-tp-c2:
+    type: outcome
+    verdict: true_positive
+    title: Unmanaged device mining and talking to C2
+    anchor: "{{src_ip}}, a device without EDR, is mining cryptocurrency and talking to command-and-control infrastructure."
+    risk: The risk here is remote attacker control of a device with no EDR visibility; the miner is one payload among others.
+    actions:
+      - Block {{src_ip}} at the network edge or move it to a quarantine VLAN
+      - Block the pool and C2 destinations at the firewall
+      - Ask the network team to identify the device and its owner
+      - Hunt for other hosts talking to the same C2 infrastructure
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for connections to the same C2 and pool destinations.

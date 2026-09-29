@@ -10,7 +10,7 @@ applies_to:
   - An Office application ran suspicious commands
   - "ASR rule: Block Office applications from creating child processes"
 mitre: [T1204.002, T1566.001, T1059]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -51,17 +51,31 @@ nodes:
   q-known-addin:
     type: question
     text: Is it a known add-in or business macro (signed, seen across many devices, documented)?
-    yes: o-fp
+    yes: q-dropped-files
     no: q-blocked
     notes:
       yes: The child process comes from a known add-in or business macro.
       no: No known add-in or business macro explains the child process.
 
+  q-dropped-files:
+    type: question
+    text: Did the Office process write executables, scripts or DLLs to disk after {{document}} opened?
+    why: Add-ins and business macros automate the document; an Office process dropping executable content is a first-stage loader.
+    yes: l-edr-malware-detection
+    no: o-fp
+    notes:
+      yes: I found the Office process wrote executables, scripts or DLLs to disk on {{device}} after {{document}} opened.
+      no: I found no executables, scripts or DLLs written to disk by the Office process on {{device}} after {{document}} opened.
+
+  l-edr-malware-detection:
+    type: link
+    text: Continue in Malware or EDR Detection
+    tree: edr-malware-detection
+
   q-blocked:
     type: question
     text: Did ASR or the EDR block the child process?
     also_check:
-      - "Did the Office process write executables, scripts or DLLs to disk after {{document}} opened?"
       - "Were new scheduled tasks or Run keys created on {{device}} after {{document}} opened?"
       - "Was {{document}} delivered to other users or opened on other devices?"
     yes: o-tp-blocked

@@ -13,7 +13,7 @@ applies_to:
   - Stolen session cookie was used
   - Suspicious sign-in after a phishing click
 mitre: [T1557, T1539, T1550.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -123,8 +123,6 @@ nodes:
     type: check
     text: Tie it to the lure. Look for a URL click in the minutes before the suspicious sign-in.
     why: Finding the phishing email lets you purge it and check every other recipient who clicked.
-    also_check:
-      - "Has {{ip}} made failed sign-ins against other or privileged accounts?"
     kql:
       - title: URL clicks by the user (7d)
         platform: xdr
@@ -182,13 +180,23 @@ nodes:
     type: question
     text: Did the user confirm the sign-in from the suspect IP was theirs?
     why: With token indicators present, silence is not reassurance. Contain first if you cannot reach the user quickly.
-    yes: o-benign-user
+    yes: q-ip-attacking
     no: o-tp-contained
     unknown: o-tp-contained
     notes:
       yes: "{{user}} confirmed the sign-in from {{ip}} was theirs."
       no: "{{user}} did not recognise the sign-in from {{ip}}."
       unknown: I could not reach {{user}}, so I treated the session as compromised given the token indicators.
+
+  q-ip-attacking:
+    type: question
+    text: Has {{ip}} made failed sign-ins against other or privileged accounts?
+    why: A yes means {{ip}} is attacking the tenant, so the user's confirmation cannot be right and the session should be treated as stolen.
+    yes: o-tp-contained
+    no: o-benign-user
+    notes:
+      yes: I found failed sign-ins from {{ip}} against other or privileged accounts.
+      no: I found no failed sign-ins from {{ip}} against other accounts.
 
   o-fp-no-token-indicators:
     type: outcome

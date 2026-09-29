@@ -10,7 +10,7 @@ applies_to:
   - Mass Access to Sensitive Files
   - Suspicious OAuth app file download activities
 mitre: [T1530, T1213.002]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,9 +27,7 @@ nodes:
     text: Measure the downloads by site, client and IP.
     also_check:
       - "Did {{user}} search for or open sensitive content (passwords, finance, HR) outside their usual sites?"
-      - "Has {{user}} shared files externally or created anonymous links?"
       - "Has {{user}} emailed files to personal addresses?"
-      - "Has {{user}} copied files to removable media or uploaded them to personal cloud storage?"
     kql:
       - title: Downloads and syncs by the user (7d)
         platform: sentinel
@@ -47,11 +45,41 @@ nodes:
   q-sync:
     type: question
     text: Is it a first sync on a new managed device, or a known app, from the user's usual network?
-    yes: o-fp
+    yes: q-shared-out
     no: q-account-risk
     notes:
       yes: The downloads by {{user}} are a sync to a new managed device or a known app.
       no: The downloads by {{user}} came from an unusual client, IP or app.
+
+  q-shared-out:
+    type: question
+    text: Has {{user}} shared files externally or created anonymous links?
+    why: A yes means the files may be leaving the organisation after the sync, which a managed device does not explain.
+    yes: l-mass-external-sharing
+    no: q-removable-media
+    notes:
+      yes: I found that {{user}} shared files externally or created anonymous links.
+      no: I found no external sharing or anonymous links created by {{user}}.
+
+  l-mass-external-sharing:
+    type: link
+    text: Continue in Mass External or Anonymous Sharing
+    tree: mass-external-sharing
+
+  q-removable-media:
+    type: question
+    text: Has {{user}} copied files to removable media or uploaded them to personal cloud storage?
+    why: A yes means the synced files were moved off managed storage, which turns a routine sync into possible data theft.
+    yes: l-usb-data-transfer
+    no: o-fp
+    notes:
+      yes: I found that {{user}} copied files to removable media or uploaded them to personal cloud storage.
+      no: I found no copying of files to removable media and no uploads to personal cloud storage by {{user}}.
+
+  l-usb-data-transfer:
+    type: link
+    text: Continue in Large Copy to Removable Media
+    tree: usb-data-transfer
 
   q-account-risk:
     type: question

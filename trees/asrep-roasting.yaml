@@ -10,7 +10,7 @@ applies_to:
   - Possible AS-REP roasting attack
   - TGT request without pre-authentication (Event 4768, PreAuthType 0)
 mitre: [T1558.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -44,7 +44,6 @@ nodes:
     type: question
     text: Did one source request tickets for several no-preauth accounts, or for an account it never normally uses?
     also_check:
-      - "Has {{src_host}} also requested service tickets for many SPNs (Kerberoasting)?"
       - "Has {{src_host}} made failed authentications against multiple accounts (password spray)?"
     yes: q-approved
     no: q-legacy
@@ -55,13 +54,36 @@ nodes:
   q-legacy:
     type: question
     text: Is {{account}} a documented legacy account that needs pre-auth disabled, used from its own system?
-    also_check:
-      - "Was pre-authentication recently disabled on {{account}}, or its password or settings changed unexpectedly?"
-    yes: o-benign-config
+    yes: q-preauth-changed
     no: q-approved
     notes:
       yes: "{{account}} is a documented legacy account used from its own system."
       no: "{{account}} has no documented reason to skip pre-authentication."
+
+  q-preauth-changed:
+    type: question
+    text: Was pre-authentication recently disabled on {{account}}, or its password or settings changed unexpectedly?
+    why: A yes means the account was made roastable on purpose, which is targeted AS-REP roasting rather than a long-standing legacy setting.
+    yes: o-tp
+    no: q-kerberoast
+    notes:
+      yes: I found pre-authentication recently disabled on {{account}}, or its password or settings changed unexpectedly.
+      no: I found no recent change to pre-authentication, the password or the settings of {{account}}.
+
+  q-kerberoast:
+    type: question
+    text: Has {{src_host}} also requested service tickets for many SPNs (Kerberoasting)?
+    why: A yes means the source is harvesting crackable tickets across the domain, which a legacy system has no reason to do.
+    yes: l-kerberoasting
+    no: o-benign-config
+    notes:
+      yes: I found {{src_host}} requesting service tickets for many SPNs.
+      no: I found no service ticket requests for many SPNs from {{src_host}}.
+
+  l-kerberoasting:
+    type: link
+    text: Continue in Kerberoasting
+    tree: kerberoasting
 
   q-approved:
     type: question

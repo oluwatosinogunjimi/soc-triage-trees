@@ -10,7 +10,7 @@ applies_to:
   - DLL search order hijacking
   - Unsigned DLL loaded from user-writable path
 mitre: [T1574.002]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -27,7 +27,6 @@ nodes:
     type: check
     text: Identify the host executable, the DLL and where both live.
     also_check:
-      - "Were the executable and {{dll}} dropped by a browser, mail client, archive tool or script rather than an installer?"
       - "Was the copied executable started from an unexpected parent (script host, Office application, archive tool)?"
     kql:
       - title: DLL loads by name, path and signer (7d)
@@ -46,7 +45,7 @@ nodes:
     type: question
     text: Was the DLL loaded from a user-writable path (AppData, Temp, ProgramData, Downloads, Public) next to a copied signed EXE?
     yes: q-dll-signed
-    no: o-fp
+    no: q-dropped
     notes:
       yes: "{{dll}} was loaded from a user-writable folder next to a copied signed executable."
       no: "{{dll}} was loaded from its normal install location."
@@ -54,11 +53,21 @@ nodes:
   q-dll-signed:
     type: question
     text: Is the DLL signed by the same vendor as the executable and known to that product?
-    yes: o-fp
+    yes: q-dropped
     no: q-behaviour
     notes:
       yes: "{{dll}} is signed by the product vendor and known to that product."
       no: "{{dll}} is unsigned or not part of the product."
+
+  q-dropped:
+    type: question
+    text: Were the executable and {{dll}} dropped by a browser, mail client, archive tool or script rather than an installer?
+    why: A product installs its own files; a signed executable and DLL pair arriving by download, email or script is how sideloading payloads are delivered.
+    yes: l-edr
+    no: o-fp
+    notes:
+      yes: I found the executable and {{dll}} on {{device}} were dropped by a browser, mail client, archive tool or script.
+      no: I found the executable and {{dll}} on {{device}} were written by the product's installer or updater.
 
   q-behaviour:
     type: question

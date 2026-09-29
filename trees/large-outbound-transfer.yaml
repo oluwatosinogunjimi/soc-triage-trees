@@ -10,7 +10,7 @@ applies_to:
   - Behavior:EC2/TrafficVolumeUnusual
   - Possible data exfiltration
 mitre: [T1048, T1567.002]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,13 +52,21 @@ nodes:
   q-known-dest:
     type: question
     text: Is the destination a sanctioned service (backup provider, the customer's cloud tenant, a partner SFTP) used by the expected process?
-    also_check:
-      - "Is {{dst_ip}} flagged in threat intelligence or linked to known C2 infrastructure?"
-    yes: o-fp
+    yes: q-dest-intel
     no: q-tool
     notes:
       yes: "{{dst_ip}} is a sanctioned service used by the expected process."
       no: "{{dst_ip}} is not a sanctioned destination."
+
+  q-dest-intel:
+    type: question
+    text: Is {{dst_ip}} flagged in threat intelligence or linked to known C2 infrastructure?
+    why: A yes means the destination that looked sanctioned is attacker infrastructure, so the transfer can't close as a backup or sync.
+    yes: o-tp
+    no: o-fp
+    notes:
+      yes: I found {{dst_ip}} flagged in threat intelligence or linked to known C2 infrastructure.
+      no: I found no threat intelligence flag or C2 link for {{dst_ip}}.
 
   q-tool:
     type: question

@@ -10,7 +10,7 @@ applies_to:
   - VPN brute force followed by success
   - Concurrent VPN sessions from different locations
 mitre: [T1133, T1078]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -43,24 +43,46 @@ nodes:
     type: question
     text: Does the VPN enforce MFA, and did this session complete it?
     also_check:
-      - "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
       - "Did the password or sign-in settings of {{user}} change unexpectedly before the session?"
-    yes: q-baseline
-    no: q-baseline
+    yes: q-mfa-change
+    no: q-mfa-change
     notes:
       yes: The VPN session from {{ip}} completed MFA.
       no: The VPN session from {{ip}} did not use MFA.
 
+  q-mfa-change:
+    type: question
+    text: Has {{user}} registered or changed an MFA method from an unrecognised IP?
+    why: A yes means someone may have added their own MFA method, so a completed MFA prompt or a familiar pattern does not prove it was the user.
+    yes: l-suspicious-mfa-registration
+    no: q-baseline
+    notes:
+      yes: I found an MFA method registered or changed for {{user}} from an unrecognised IP.
+      no: I found no MFA method changes for {{user}} from unrecognised IPs.
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: "Continue in Suspicious MFA Method Registration"
+    tree: suspicious-mfa-registration
+
   q-baseline:
     type: question
     text: Is the source consistent with the user (known country or ISP, travel confirmed, usual hours)?
-    also_check:
-      - "Did {{user}} have concurrent sessions from other locations at the same time?"
-    yes: o-benign
+    yes: q-concurrent
     no: q-preceded
     notes:
       yes: "{{ip}} is consistent with the normal VPN use of {{user}}."
       no: "{{ip}} is inconsistent with the normal VPN use of {{user}}."
+
+  q-concurrent:
+    type: question
+    text: Did {{user}} have concurrent sessions from other locations at the same time?
+    why: A yes means two people may be using the account, so a familiar source does not clear the session.
+    yes: o-inconclusive
+    no: o-benign
+    notes:
+      yes: I found concurrent sessions for {{user}} from other locations at the same time as the session from {{ip}}.
+      no: I found no concurrent sessions for {{user}} from other locations.
 
   q-preceded:
     type: question

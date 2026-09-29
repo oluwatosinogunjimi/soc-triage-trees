@@ -12,7 +12,7 @@ applies_to:
   - Suspicious Kerberos SPN request
   - Multiple RC4 service ticket requests (4769)
 mitre: [T1558.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -56,12 +56,26 @@ nodes:
     why: A normal user requests tickets for the handful of services they use, with AES. Dozens of SPNs, or RC4 in an AES environment, is roasting.
     also_check:
       - "Has {{account}} signed in to other endpoints or opened remote sessions on hosts it does not normally use?"
-      - "Has {{account}} recently been given a privileged role or changed group memberships without an approved request?"
     yes: q-tooling
-    no: o-fp
+    no: q-group-change
     notes:
       yes: "{{account}} requested tickets for many service accounts in a short window, with RC4 encryption."
       no: The requests by {{account}} match normal service use.
+
+  q-group-change:
+    type: question
+    text: "Has {{account}} recently been given a privileged role or changed group memberships without an approved request?"
+    why: An unapproved privilege change on the requesting account means someone is escalating with it, whatever the ticket volume looks like.
+    yes: l-ad-privileged-group-change
+    no: o-fp
+    notes:
+      yes: "I found an unapproved privileged role or group membership change for {{account}}."
+      no: "I found no unapproved privileged role or group membership change for {{account}}."
+
+  l-ad-privileged-group-change:
+    type: link
+    text: Continue in On-Premises Privileged Group Membership Change.
+    tree: ad-privileged-group-change
 
   q-tooling:
     type: question

@@ -11,7 +11,7 @@ applies_to:
   - Diagnostic settings deleted
   - DefenseEvasion:IAMUser/BedrockLoggingDisabled
 mitre: [T1562.008]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,12 +54,26 @@ nodes:
     text: Is it a planned change (log pipeline migration, trail consolidation, decommissioning a resource) with a ticket?
     also_check:
       - "Were new users, access keys or role assignments created after the logging change?"
-      - "Were storage objects made public or data copied out during the logging gap?"
-    yes: q-replacement
+    yes: q-data-gap
     no: l-cloud
     notes:
       yes: The logging change by {{principal}} was planned with a ticket.
       no: No planned change covers the logging change by {{principal}}.
+
+  q-data-gap:
+    type: question
+    text: Were storage objects made public or data copied out during the logging gap?
+    why: A yes means the gap was used to expose or take data, so the ticket does not make the change benign.
+    yes: l-cloud-storage-exfil
+    no: q-replacement
+    notes:
+      yes: I found storage objects made public or data copied out during the logging gap left by {{principal}}.
+      no: I found no storage objects made public and no data copied out during the logging gap left by {{principal}}.
+
+  l-cloud-storage-exfil:
+    type: link
+    text: Continue in Mass Download or Deletion from Cloud Storage
+    tree: cloud-storage-exfil
 
   q-replacement:
     type: question

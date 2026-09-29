@@ -10,7 +10,7 @@ applies_to:
   - Scheduled task created by unusual process
   - Persistence via scheduled task (Event 4698)
 mitre: [T1053.005]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -45,20 +45,38 @@ nodes:
   q-known-software:
     type: question
     text: Does the task belong to known software (updater, management agent, backup) with a signed binary in Program Files or System32?
-    yes: o-fp
+    yes: q-tamper
     no: q-action-suspicious
     notes:
       yes: Task "{{task}}" belongs to known software with a signed binary.
       no: Task "{{task}}" does not belong to any known software.
+
+  q-tamper:
+    type: question
+    text: Has anyone tried to disable security monitoring (antivirus, EDR, logging) on {{device}}?
+    why: A yes means someone is working against the host, so a task from known software cannot be closed on its own merits.
+    yes: l-security-tool-tampering
+    no: q-lsass
+    notes:
+      yes: I found an attempt to disable security monitoring on {{device}}.
+      no: I found no attempt to disable security monitoring on {{device}}.
+
+  q-lsass:
+    type: question
+    text: Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?
+    why: A yes means credential theft on the host, which is a compromise whatever the task turns out to be.
+    yes: l-lsass-credential-dumping
+    no: o-fp
+    notes:
+      yes: I found an attempt to dump credentials from LSASS or credential stores on {{device}}.
+      no: I found no attempt to dump credentials from LSASS or credential stores on {{device}}.
 
   q-action-suspicious:
     type: question
     text: Does the action run a script host, encoded command, LOLBin, or a binary from a user-writable path?
     also_check:
       - "Were other autostart entries changed on {{device}} around the same time (Run keys, services, WMI subscriptions)?"
-      - "Has anyone tried to disable security monitoring (antivirus, EDR, logging) on {{device}}?"
       - "Was a new local account created or added to a privileged group on {{device}}?"
-      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
     yes: q-executed
     no: o-inconclusive
     notes:
@@ -79,6 +97,16 @@ nodes:
     text: The payload ran. Continue in the EDR tree.
     tree: edr-malware-detection
     node: q-behaviour
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
 
   o-fp:
     type: outcome

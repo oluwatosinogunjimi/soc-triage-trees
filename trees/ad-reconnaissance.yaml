@@ -12,7 +12,7 @@ applies_to:
   - Possible Active Directory enumeration via ADWS
   - Suspected account enumeration (Kerberos, NTLM)
 mitre: [T1087.002, T1069.002, T1482]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -29,9 +29,7 @@ nodes:
     type: check
     text: See what was queried, by whom and with which tool.
     also_check:
-      - "Were the recon tools launched by an unexpected parent process, such as Office, a browser or a script host?"
       - "Did {{src_host}} run obfuscated or encoded PowerShell commands?"
-      - "Has anyone tried to disable AV, EDR or logging on {{src_host}}?"
     kql:
       - title: Directory queries from the host (24h)
         platform: xdr
@@ -60,11 +58,36 @@ nodes:
       - "Did {{account}} run the queries from a host it does not normally use?"
       - "Has {{src_host}} been accessed from an unusual or untrusted source?"
       - "Has {{src_host}} connected to previously unseen external domains or IPs, or shown beaconing?"
-    yes: o-benign
+    yes: q-odd-parent
     no: q-scope
     notes:
       yes: The queries came from approved IT or security activity by {{account}}.
       no: "{{account}} has no role that explains the queries."
+
+  q-odd-parent:
+    type: question
+    text: Were the recon tools launched by an unexpected parent process, such as Office, a browser or a script host?
+    why: A yes means the enumeration came from a document, browser or script rather than an admin running a tool, which points to malware using the account.
+    yes: o-tp-recon
+    no: q-tampering
+    notes:
+      yes: I found the recon tools on {{src_host}} launched by an unexpected parent process.
+      no: I found the recon tools on {{src_host}} launched by their normal parent process.
+
+  q-tampering:
+    type: question
+    text: Has anyone tried to disable AV, EDR or logging on {{src_host}}?
+    why: A yes means someone is hiding activity on the host, which approved IT or security work has no reason to do.
+    yes: l-security-tool-tampering
+    no: o-benign
+    notes:
+      yes: I found attempts to disable AV, EDR or logging on {{src_host}}.
+      no: I found no attempts to disable AV, EDR or logging on {{src_host}}.
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
 
   q-scope:
     type: question

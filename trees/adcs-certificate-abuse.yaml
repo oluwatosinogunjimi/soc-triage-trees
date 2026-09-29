@@ -12,7 +12,7 @@ applies_to:
   - Suspicious login attempt using possibly compromised account certificate
   - Certificate issued with SAN different from requester (Event 4887)
 mitre: [T1649]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -36,7 +36,6 @@ nodes:
     also_check:
       - "Has {{src_host}} been accessed from an unusual or untrusted source?"
       - "Did {{account}} run domain reconnaissance (net group, BloodHound) before the request?"
-      - "Has {{src_host}} shown credential dumping or access to credential stores (LSASS, SAM, NTDS.dit)?"
     kql:
       - title: Certificate requests and issuances on the CA (Events 4886/4887, 7d)
         platform: sentinel
@@ -63,7 +62,6 @@ nodes:
     also_check:
       - "Was an account created or added to a privileged group after the certificate was issued?"
       - "Did {{account}} open remote sessions on hosts it does not normally use?"
-      - "Were security logs cleared or auditing changed on the CA or {{src_host}}?"
     yes: q-approved
     no: q-auth-use
     notes:
@@ -74,10 +72,40 @@ nodes:
     type: question
     text: Was the certificate used to authenticate (PKINIT) from an unusual host?
     yes: o-tp
-    no: o-fp
+    no: q-cred-dump
     notes:
       yes: The certificate was used to authenticate from an unusual host.
       no: The certificate has not been used from any unusual host.
+
+  q-cred-dump:
+    type: question
+    text: Has {{src_host}} shown credential dumping or access to credential stores (LSASS, SAM, NTDS.dit)?
+    why: A yes means the requesting host is being used for credential theft, so a normal-looking enrollment from it cannot be trusted.
+    yes: l-lsass-credential-dumping
+    no: q-logs-cleared
+    notes:
+      yes: I found credential dumping or access to credential stores on {{src_host}}.
+      no: I found no credential dumping or access to credential stores on {{src_host}}.
+
+  q-logs-cleared:
+    type: question
+    text: Were security logs cleared or auditing changed on the CA or {{src_host}}?
+    why: A yes means someone tried to hide activity on the CA or the requesting host, which a normal enrollment never needs.
+    yes: l-event-log-cleared
+    no: o-fp
+    notes:
+      yes: I found security logs cleared or auditing changed on the CA or {{src_host}}.
+      no: I found no log clearing or auditing changes on the CA or {{src_host}}.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
+
+  l-event-log-cleared:
+    type: link
+    text: Continue in Event Log Cleared
+    tree: event-log-cleared
 
   q-approved:
     type: question

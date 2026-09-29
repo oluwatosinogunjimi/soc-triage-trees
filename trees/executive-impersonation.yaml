@@ -10,7 +10,7 @@ applies_to:
   - Domain impersonation detected
   - Display name spoofing of executive
 mitre: [T1656, T1566.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,13 +47,21 @@ nodes:
   q-exec-own:
     type: question
     text: Is the address actually the executive's own personal account (confirmed with the executive or their assistant)?
-    also_check:
-      - "Does the real mailbox of {{executive}} show sign-ins from an unrecognised IP, or new inbox rules or forwarding?"
-    yes: o-fp
+    yes: q-exec-mailbox
     no: q-engaged
     notes:
       yes: "{{sender}} is a personal address that {{executive}} confirmed as theirs."
       no: "{{sender}} is not an address {{executive}} uses."
+
+  q-exec-mailbox:
+    type: question
+    text: Does the real mailbox of {{executive}} show sign-ins from an unrecognised IP, or new inbox rules or forwarding?
+    why: A yes means the executive's own accounts may be in an attacker's hands, so a request from a confirmed address still cannot be trusted.
+    yes: o-exec-account-suspect
+    no: o-fp
+    notes:
+      yes: I found sign-ins from an unrecognised IP, or new inbox rules or forwarding, on the real mailbox of {{executive}}.
+      no: I found no sign-ins from an unrecognised IP and no new inbox rules or forwarding on the real mailbox of {{executive}}.
 
   q-engaged:
     type: question
@@ -83,6 +91,20 @@ nodes:
     actions:
       - Close
       - Suggest the executive uses corporate mail for business requests
+
+  o-exec-account-suspect:
+    type: outcome
+    verdict: inconclusive
+    title: Genuine address, executive account under suspicion
+    anchor: "{{sender}} belongs to {{executive}}, but the executive's real mailbox shows unrecognised sign-ins or new rules or forwarding."
+    risk: The risk here is an attacker inside the executive's accounts sending requests that staff will trust; it stays open until the mailbox activity is explained.
+    actions:
+      - Escalate to the customer and the executive's office
+      - Hold any payment or data request from {{sender}} until it is verified by phone
+      - Ask {{executive}} to confirm the sign-ins, rules and forwarding
+      - Run the inbox rule tree for any new rules or forwarding found
+    escalate: true
+    monitor: I will monitor the mailbox of {{executive}} for new sign-ins, rules and forwarding over the next 7 days.
 
   o-tp:
     type: outcome

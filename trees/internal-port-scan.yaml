@@ -10,7 +10,7 @@ applies_to:
   - Network discovery activity
   - Impact:EC2/PortSweep
 mitre: [T1046, T1018]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -24,7 +24,6 @@ nodes:
     type: check
     text: Measure the scan and identify the process doing it.
     also_check:
-      - "Did {{src_ip}} follow the scan with RDP, SMB, WinRM or WMI connections to the hosts it found?"
       - "Has {{src_ip}} run domain enumeration commands (net group, nltest, AD queries)?"
       - "Is {{src_ip}} communicating with known command-and-control infrastructure or beaconing?"
     kql:
@@ -55,7 +54,6 @@ nodes:
     also_check:
       - "Was {{src_ip}} accessed from an unusual or untrusted source before the scan?"
       - "Has the account that ran the tool signed in to endpoints it does not normally use?"
-      - "Has anyone tried to dump credentials on {{src_ip}} (LSASS, SAM)?"
       - "Has anyone tried to disable security monitoring on {{src_ip}} (AV, EDR, logging)?"
     yes: q-user-explains
     no: o-inconclusive
@@ -66,11 +64,41 @@ nodes:
   q-user-explains:
     type: question
     text: Can the device owner explain it with an approved task (IT troubleshooting with a ticket)?
-    yes: o-benign
+    yes: q-follow-on
     no: o-tp
     notes:
       yes: The device owner explained the scan with an approved task.
       no: Nobody can explain the scan from {{src_ip}}.
+
+  q-follow-on:
+    type: question
+    text: Did {{src_ip}} follow the scan with RDP, SMB, WinRM or WMI connections to the hosts it found?
+    why: A yes means the scan was used to pick targets for remote access, which goes beyond the ticketed task.
+    yes: l-remote-execution-lateral
+    no: q-cred-dump
+    notes:
+      yes: I found RDP, SMB, WinRM or WMI connections from {{src_ip}} to hosts found by the scan.
+      no: I found no remote access connections from {{src_ip}} to the hosts found by the scan.
+
+  q-cred-dump:
+    type: question
+    text: Has anyone tried to dump credentials on {{src_ip}} (LSASS, SAM)?
+    why: A yes means someone on the host is collecting credentials, which no troubleshooting task needs.
+    yes: l-lsass-credential-dumping
+    no: o-benign
+    notes:
+      yes: I found attempts to dump credentials on {{src_ip}}.
+      no: I found no attempts to dump credentials on {{src_ip}}.
+
+  l-remote-execution-lateral:
+    type: link
+    text: "Continue in Remote Execution (PsExec, WMI, WinRM, RDP)"
+    tree: remote-execution-lateral
+
+  l-lsass-credential-dumping:
+    type: link
+    text: "Continue in LSASS Credential Dumping"
+    tree: lsass-credential-dumping
 
   o-fp:
     type: outcome

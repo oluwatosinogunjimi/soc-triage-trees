@@ -10,7 +10,7 @@ applies_to:
   - DLP removable media policy match
   - USB mass storage device mounted (policy violation)
 mitre: [T1052.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,7 +26,6 @@ nodes:
     text: Measure what was copied and to which device.
     also_check:
       - "Were the files compressed, archived or renamed before they were copied to the drive?"
-      - "Did {{user}} access an unusual number of files, or shares and repositories outside their normal role, before the copy?"
     kql:
       - title: USB mounts and files written to removable drives (7d)
         platform: xdr
@@ -44,7 +43,17 @@ nodes:
           | summarize Files = count(), SizeMB = round(sum(FileSize) / 1048576.0, 1), Types = make_set(tostring(split(FileName, ".")[-1]), 20),
                       Samples = make_set(FileName, 20) by Drive, Product, Serial, InitiatingProcessAccountName
     note: I measured the files {{user}} copied to removable media on {{device}}.
-    next: q-business
+    next: q-unusual-access
+
+  q-unusual-access:
+    type: question
+    text: Did {{user}} access an unusual number of files, or shares and repositories outside their normal role, before the copy?
+    why: Gathering data from outside the user's role before a USB copy is the collection step of insider theft, so a yes means the copy cannot be treated as routine.
+    yes: q-hr-context
+    no: q-business
+    notes:
+      yes: I found {{user}} accessed an unusual number of files, or shares and repositories outside their normal role, before the copy.
+      no: I found no unusual file, share or repository access by {{user}} before the copy.
 
   q-business:
     type: question

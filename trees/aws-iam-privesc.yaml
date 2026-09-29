@@ -11,7 +11,7 @@ applies_to:
   - AttachUserPolicy AdministratorAccess
   - UpdateAssumeRolePolicy to external account
 mitre: [T1098.003, T1098.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,20 +47,43 @@ nodes:
     type: question
     text: Is it infrastructure-as-code or an identity admin working a ticket, from the usual pipeline or network?
     also_check:
-      - "Is the source IP of the changes flagged in threat intelligence or hosted on a VPS or anonymising provider?"
       - "Did {{principal}} use a console session without MFA where MFA is required?"
-    yes: o-benign
+    yes: q-flagged-source
     no: q-escalates
     notes:
       yes: The IAM changes by {{principal}} came from the usual pipeline or an admin working a ticket.
       no: The IAM changes by {{principal}} have no pipeline or ticket behind them.
+
+  q-flagged-source:
+    type: question
+    text: Is the source IP of the changes flagged in threat intelligence or hosted on a VPS or anonymising provider?
+    why: A yes means the pipeline or admin explanation does not match where the changes came from, so they can't be closed as managed.
+    yes: o-flagged-source
+    no: q-logging
+    notes:
+      yes: I found that the IAM changes by {{principal}} came from an IP flagged in threat intelligence or hosted on a VPS or anonymising provider.
+      no: I found that the IAM changes by {{principal}} did not come from a flagged, VPS or anonymising IP.
+
+  q-logging:
+    type: question
+    text: Did {{principal}} or a new identity stop or change CloudTrail, GuardDuty or Config after the changes?
+    why: A yes means the IAM changes were followed by changes to monitoring, which needs its own review.
+    yes: l-cloud-logging-disabled
+    no: o-benign
+    notes:
+      yes: I found that {{principal}} or a new identity stopped or changed CloudTrail, GuardDuty or Config after the IAM changes.
+      no: I found no changes to CloudTrail, GuardDuty or Config by {{principal}} or a new identity after the IAM changes.
+
+  l-cloud-logging-disabled:
+    type: link
+    text: Continue in Cloud Logging or Monitoring Disabled
+    tree: cloud-logging-disabled
 
   q-escalates:
     type: question
     text: Did the principal grant itself or a new identity more privilege, or trust an external account?
     also_check:
       - "Did {{principal}} or a new identity assume roles in other AWS accounts after the changes?"
-      - "Did {{principal}} or a new identity stop or change CloudTrail, GuardDuty or Config after the changes?"
       - "Did {{principal}} or a new identity read secrets or passwords (GetSecretValue, GetPasswordData)?"
       - "Did {{principal}} or a new identity access S3 data or make storage public after the changes?"
     yes: o-tp
@@ -87,6 +110,18 @@ nodes:
     actions:
       - Ask the principal's owner to explain the changes
     monitor: I will monitor {{principal}} for further IAM changes.
+
+  o-flagged-source:
+    type: outcome
+    verdict: inconclusive
+    title: Managed-looking change from a flagged source
+    anchor: "{{principal}} made IAM changes that look managed, but from an IP flagged in threat intelligence or hosted on a VPS or anonymising provider."
+    risk: The risk here is stolen pipeline or admin credentials used to escalate in AWS; it stays open until the owner confirms the source.
+    actions:
+      - Ask the pipeline or admin owner to confirm the source IP belongs to them
+      - If not confirmed, revoke sessions for {{principal}} and revert the IAM changes
+      - Escalate to the customer's cloud team
+    monitor: I will monitor {{principal}} for IAM changes and activity from the same source.
 
   o-tp:
     type: outcome

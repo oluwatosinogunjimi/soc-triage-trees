@@ -10,7 +10,7 @@ applies_to:
   - Process hollowing detected
   - A process was injected with potentially malicious code
 mitre: [T1055, T1055.012]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,9 +26,7 @@ nodes:
     type: check
     text: Identify the injecting process, the target and what the target did after.
     also_check:
-      - "Did {{source}} run from a temporary or user-writable directory, or start from an unexpected parent?"
       - "Were new scheduled tasks, services or Run keys created on {{device}} that launch {{source}}?"
-      - "Has anyone tried to disable AV, EDR or logging on {{device}}?"
     kql:
       - title: Remote thread and memory API calls (48h)
         platform: xdr
@@ -51,11 +49,36 @@ nodes:
   q-known:
     type: question
     text: Is the injecting process a known, signed security, accessibility or management product that routinely injects?
-    yes: o-fp
+    yes: q-source-path
     no: q-target-behaviour
     notes:
       yes: "{{source}} is a known signed product that routinely injects."
       no: "{{source}} is not a known product that injects."
+
+  q-source-path:
+    type: question
+    text: Did {{source}} run from a temporary or user-writable directory, or start from an unexpected parent?
+    why: A real security or management product runs from its install folder under its own service; the same name in Temp or AppData is malware borrowing a trusted name.
+    yes: l-edr
+    no: q-tamper
+    notes:
+      yes: I found {{source}} ran from a temporary or user-writable directory, or from an unexpected parent, on {{device}}.
+      no: I found {{source}} ran from its install location under its expected parent on {{device}}.
+
+  q-tamper:
+    type: question
+    text: Has anyone tried to disable AV, EDR or logging on {{device}}?
+    why: Injection alongside attempts to blind security tools is defence evasion, not normal product behaviour.
+    yes: l-security-tool-tampering
+    no: o-fp
+    notes:
+      yes: I found attempts to disable AV, EDR or logging on {{device}}.
+      no: I found no attempts to disable AV, EDR or logging on {{device}}.
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
 
   q-target-behaviour:
     type: question

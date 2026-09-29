@@ -9,7 +9,7 @@ applies_to:
   - WMI event subscription created
   - Suspicious WMI persistence (CommandLineEventConsumer / ActiveScriptEventConsumer)
 mitre: [T1546.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,19 +47,47 @@ nodes:
   q-agent:
     type: question
     text: Was it created by a known management or monitoring agent (SCCM, monitoring tool) with a recognisable consumer?
-    yes: o-fp
+    yes: q-tamper
     no: q-fired
     notes:
       yes: The WMI subscription on {{device}} belongs to a known management agent.
       no: The WMI subscription on {{device}} does not belong to any known agent.
+
+  q-tamper:
+    type: question
+    text: Has anyone tried to disable security monitoring or clear logs on {{device}}?
+    why: A yes means someone is working against the host, so a subscription from known software cannot be closed on its own merits.
+    yes: l-security-tool-tampering
+    no: q-lsass
+    notes:
+      yes: I found an attempt to disable security monitoring or clear logs on {{device}}.
+      no: I found no attempt to disable security monitoring or clear logs on {{device}}.
+
+  q-lsass:
+    type: question
+    text: Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?
+    why: A yes means credential theft on the host, which is a compromise whatever the subscription turns out to be.
+    yes: l-lsass-credential-dumping
+    no: o-fp
+    notes:
+      yes: I found an attempt to dump credentials from LSASS or credential stores on {{device}}.
+      no: I found no attempt to dump credentials from LSASS or credential stores on {{device}}.
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
 
   q-fired:
     type: question
     text: Has the consumer already executed a payload (scrcons.exe or WmiPrvSE spawning processes, outbound connections)?
     also_check:
       - "Were other autostart entries changed on {{device}} around the same time (scheduled tasks, Run keys, services)?"
-      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
-      - "Has anyone tried to disable security monitoring or clear logs on {{device}}?"
       - "Was a new local account created or added to a privileged group on {{device}}?"
     yes: o-tp-active
     no: o-tp

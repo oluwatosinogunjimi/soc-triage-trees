@@ -10,7 +10,7 @@ applies_to:
   - Anomalous activity following Global Administrator elevation
   - Owner role assigned at subscription or management group
 mitre: [T1098.003, T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,7 +28,6 @@ nodes:
     text: Pull the elevation or assignment and what followed.
     also_check:
       - "Did {{actor}} or {{assignee}} assign further roles, or add credentials to service principals, after the change?"
-      - "Did {{actor}} or {{assignee}} change or delete diagnostic settings, activity log exports or Defender plans?"
       - "Did {{assignee}} read Key Vault secrets or list storage account keys after the change?"
       - "Did {{assignee}} run commands or extensions on virtual machines after the change?"
       - "Did {{assignee}} delete resources, backups or resource locks after the change?"
@@ -55,14 +54,43 @@ nodes:
     type: question
     text: Is there a ticket (break-fix on a lost subscription, onboarding a cloud admin) and was the actor's session clean?
     also_check:
-      - "Did {{actor}} register or change an MFA method shortly before the change?"
       - "Was {{actor}} given Global Administrator or another privileged Entra role recently and unexpectedly?"
       - "Is {{assignee}} a guest, a newly created account or a service principal?"
-    yes: q-reverted
+    yes: q-mfa-change
     no: o-tp
     notes:
       yes: The change by {{actor}} is ticketed and came from a clean session.
       no: The change by {{actor}} has no ticket or came from a risky session.
+
+  q-mfa-change:
+    type: question
+    text: Did {{actor}} register or change an MFA method shortly before the change?
+    why: A yes suggests the actor's account was taken over and the ticket or clean session may not reflect who made the change.
+    yes: l-suspicious-mfa-registration
+    no: q-diagnostics
+    notes:
+      yes: I found that {{actor}} registered or changed an MFA method shortly before the change.
+      no: I found no MFA method registered or changed by {{actor}} shortly before the change.
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration
+    tree: suspicious-mfa-registration
+
+  q-diagnostics:
+    type: question
+    text: Did {{actor}} or {{assignee}} change or delete diagnostic settings, activity log exports or Defender plans?
+    why: A yes means the new rights were used to reduce monitoring, which a ticketed task does not explain.
+    yes: l-cloud-logging-disabled
+    no: q-reverted
+    notes:
+      yes: I found that {{actor}} or {{assignee}} changed or deleted diagnostic settings, activity log exports or Defender plans.
+      no: I found no changes to diagnostic settings, activity log exports or Defender plans by {{actor}} or {{assignee}}.
+
+  l-cloud-logging-disabled:
+    type: link
+    text: Continue in Cloud Logging or Monitoring Disabled
+    tree: cloud-logging-disabled
 
   q-reverted:
     type: question

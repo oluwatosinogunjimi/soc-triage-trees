@@ -11,7 +11,7 @@ applies_to:
   - CredentialAccess:Kubernetes/AnomalousBehavior.SecretsAccessed
   - Policy:Kubernetes/AnonymousAccessGranted
 mitre: [T1609, T1610, T1611, T1552.007]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,9 +47,7 @@ nodes:
   q-platform:
     type: question
     text: Is the principal a platform component or CI/CD identity doing its normal job (GitOps controller, monitoring agent, a known SRE)?
-    also_check:
-      - "Did the API calls come from an IP outside the cluster, CI/CD or admin networks, or one flagged in threat intelligence?"
-    yes: o-fp
+    yes: q-external-source
     no: q-escalation
     notes:
       yes: "{{principal}} is a platform or CI/CD identity doing its normal job."
@@ -63,12 +61,48 @@ nodes:
       - "Did {{principal}} create CronJobs or DaemonSets?"
       - "Was anonymous or unauthenticated access to the API server granted or used?"
       - "Did a pod query the cloud instance metadata service for node or cloud credentials?"
-      - "Did pods started by {{principal}} connect to mining pools or unusual external domains or IPs?"
     yes: o-tp
     no: o-inconclusive
     notes:
       yes: "{{principal}} created privileged workloads or bindings, or read secrets across namespaces."
       no: "{{principal}} did not escalate privilege."
+
+  q-external-source:
+    type: question
+    text: Did the API calls come from an IP outside the cluster, CI/CD or admin networks, or one flagged in threat intelligence?
+    why: A yes means the platform identity's token or kubeconfig may be in someone else's hands, even if the calls look like its normal job.
+    yes: o-external-token
+    no: q-mining
+    notes:
+      yes: I found API calls by {{principal}} in {{cluster}} from an IP outside the cluster, CI/CD or admin networks, or flagged in threat intelligence.
+      no: I found that the API calls by {{principal}} in {{cluster}} came from the cluster, CI/CD or admin networks, with no threat intelligence match.
+
+  q-mining:
+    type: question
+    text: Did pods started by {{principal}} connect to mining pools or unusual external domains or IPs?
+    why: A yes means the workloads are abusing the cluster or talking to attacker infrastructure, whoever deployed them.
+    yes: l-cryptomining-traffic
+    no: o-fp
+    notes:
+      yes: I found pods started by {{principal}} in {{cluster}} connecting to mining pools or unusual external domains or IPs.
+      no: I found no connections from pods started by {{principal}} in {{cluster}} to mining pools or unusual external domains or IPs.
+
+  l-cryptomining-traffic:
+    type: link
+    text: Continue in Cryptomining Pool Traffic
+    tree: cryptomining-traffic
+
+  o-external-token:
+    type: outcome
+    verdict: inconclusive
+    title: Platform identity used from outside
+    anchor: "{{principal}} did its normal job in {{cluster}}, but some API calls came from an IP outside the cluster, CI/CD or admin networks."
+    risk: The risk here is a stolen service account token or kubeconfig used to act as a trusted platform identity; it stays open until the platform team confirms the source.
+    actions:
+      - Ask the platform team to confirm the source IP belongs to them
+      - If not confirmed, revoke and reissue the token for {{principal}} and review everything it did from that IP
+      - Escalate to the customer's platform or cloud team
+    monitor: I will monitor {{principal}} for API calls from outside the cluster, CI/CD and admin networks.
 
   o-fp:
     type: outcome

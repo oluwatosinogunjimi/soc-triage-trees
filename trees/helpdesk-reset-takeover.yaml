@@ -11,7 +11,7 @@ applies_to:
   - Suspicious MFA tampering activity by admin account
   - Suspicious sign-in to a web app following MFA phone number tampering activity
 mitre: [T1656, T1098.005, T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -29,8 +29,6 @@ nodes:
     type: check
     text: Put the reset, the method changes and the next sign-ins on one timeline.
     also_check:
-      - "Has {{user}} created inbox rules or external forwarding since the reset?"
-      - "Has {{user}} granted OAuth consent or added app credentials since the reset?"
       - "Has {{user}} downloaded or shared an unusual volume of files or mail since the reset?"
       - "Has {{user}} been assigned a privileged role since the reset?"
       - "Did {{user}} send unusual messages to many colleagues or external contacts since the reset?"
@@ -78,11 +76,41 @@ nodes:
     also_check:
       - "Is {{ip}} flagged in threat intelligence for malicious activity?"
       - "Has {{ip}} signed in to other accounts in the tenant?"
-    yes: o-benign
+    yes: q-inbox-rules
     no: o-inconclusive
     notes:
       yes: The sign-in after the reset came from the usual location and device of {{user}}.
       no: The sign-in after the reset came from {{ip}}, which is unfamiliar for {{user}}.
+
+  q-inbox-rules:
+    type: question
+    text: Has {{user}} created inbox rules or external forwarding since the reset?
+    why: A yes means the new credentials were used to set up mail theft, which the real user rarely does straight after a reset.
+    yes: l-inbox-rule-forwarding
+    no: q-oauth
+    notes:
+      yes: I found inbox rules or external forwarding created by {{user}} since the reset.
+      no: I found no inbox rules or external forwarding created by {{user}} since the reset.
+
+  q-oauth:
+    type: question
+    text: Has {{user}} granted OAuth consent or added app credentials since the reset?
+    why: A yes means someone set up access that survives another password reset, a common step after helpdesk social engineering.
+    yes: l-oauth-consent-grant
+    no: o-benign
+    notes:
+      yes: I found OAuth consent granted or app credentials added by {{user}} since the reset.
+      no: I found no OAuth consent grants or app credentials added by {{user}} since the reset.
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
+
+  l-oauth-consent-grant:
+    type: link
+    text: Continue in OAuth App Consent Grant
+    tree: oauth-consent-grant
 
   o-benign:
     type: outcome

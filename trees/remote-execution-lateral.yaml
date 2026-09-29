@@ -11,7 +11,7 @@ applies_to:
   - Lateral movement using PsExec / Impacket
   - Suspicious RDP session from unusual host
 mitre: [T1021.002, T1021.006, T1047, T1021.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -32,8 +32,6 @@ nodes:
       - "Did the remote session run discovery commands on {{device}} (whoami, net group, nltest, AD queries)?"
       - "Did the remotely started process on {{device}} run encoded or obfuscated commands?"
       - "Was a scheduled task, service or startup entry created on {{device}} after the remote execution?"
-      - "Has anyone tried to dump credentials from LSASS, SAM or NTDS.dit on {{device}}?"
-      - "Was security monitoring disabled or were event logs cleared on {{device}} after the logon?"
     kql:
       - title: Remote logons and processes started through remote channels (24h)
         platform: xdr
@@ -54,13 +52,42 @@ nodes:
     type: question
     text: Is it an admin account from a known admin host or jump server, doing something that matches a ticket or routine task?
     also_check:
-      - "Was {{account}} recently added to a privileged group or given admin rights without an approved request?"
       - "Has {{account}} had repeated failed logons across several hosts before this execution?"
-    yes: o-benign
+    yes: q-cred-dump
     no: q-source-compromised
     notes:
       yes: The execution by {{account}} came from a known admin host for a routine task.
       no: The execution by {{account}} from {{src_host}} does not match how IT works.
+
+  q-cred-dump:
+    type: question
+    text: Has anyone tried to dump credentials from LSASS, SAM or NTDS.dit on {{device}}?
+    why: Routine administration never dumps credentials, so a yes means the admin session is being used for an intrusion.
+    yes: o-tp
+    no: q-tamper-logs
+    notes:
+      yes: I found an attempt to dump credentials from LSASS, SAM or NTDS.dit on {{device}}.
+      no: I found no attempt to dump credentials from LSASS, SAM or NTDS.dit on {{device}}.
+
+  q-tamper-logs:
+    type: question
+    text: Was security monitoring disabled or were event logs cleared on {{device}} after the logon?
+    why: A ticketed admin task does not need to blind the host, so a yes means someone is hiding what they did.
+    yes: o-tp
+    no: q-priv-no-request
+    notes:
+      yes: I found security monitoring was disabled or event logs were cleared on {{device}} after the logon by {{account}}.
+      no: I found no security monitoring changes or log clearing on {{device}} after the logon by {{account}}.
+
+  q-priv-no-request:
+    type: question
+    text: Was {{account}} recently added to a privileged group or given admin rights without an approved request?
+    why: An admin pattern only proves routine work if the admin rights themselves are legitimate; unapproved rights mean the account was set up by an attacker.
+    yes: o-tp
+    no: o-benign
+    notes:
+      yes: I found {{account}} was recently given admin rights without an approved request.
+      no: I found no recent unapproved privilege change for {{account}}.
 
   q-source-compromised:
     type: question

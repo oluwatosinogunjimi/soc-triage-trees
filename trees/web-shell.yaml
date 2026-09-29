@@ -10,7 +10,7 @@ applies_to:
   - Suspicious process launched by web server (w3wp.exe spawning cmd)
   - Web shell detected (Backdoor:ASP/Webshell)
 mitre: [T1505.003, T1190]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -59,18 +59,36 @@ nodes:
     type: question
     text: Does the web server process spawn shells or recon commands, or does the file contain command execution code (eval, Process.Start, cmd /c)?
     also_check:
-      - "Did the web server process access LSASS memory or dump credentials on {{device}}?"
-      - "Was a new local or domain account created, or added to a privileged group, from {{device}}?"
       - "Has {{device}} connected to internal hosts it does not normally talk to (RDP, SMB, WinRM)?"
       - "Has {{device}} downloaded tools or connected to previously unseen external domains or IPs?"
       - "Were scheduled tasks, services or startup entries created on {{device}}?"
       - "Were security tools disabled or event logs cleared on {{device}}?"
       - "Has a large volume of data left {{device}}, or was data staged or compressed on it?"
     yes: o-tp
-    no: o-fp
+    no: q-lsass
     notes:
       yes: The web server runs commands or {{file}} contains command execution code.
       no: The web server shows no command execution and {{file}} contains normal application code.
+
+  q-lsass:
+    type: question
+    text: Did the web server process access LSASS memory or dump credentials on {{device}}?
+    why: A web server has no reason to read LSASS, so a yes means it is running attacker code even if the shell file itself looks clean.
+    yes: o-tp
+    no: q-new-account
+    notes:
+      yes: I found the web server process accessed LSASS memory or dumped credentials on {{device}}.
+      no: I found no LSASS access or credential dumping by the web server process on {{device}}.
+
+  q-new-account:
+    type: question
+    text: Was a new local or domain account created, or added to a privileged group, from {{device}}?
+    why: Account creation from a web server is a common web shell follow-up for persistence, so a yes means the server is compromised.
+    yes: o-tp
+    no: o-fp
+    notes:
+      yes: I found a new local or domain account was created, or added to a privileged group, from {{device}}.
+      no: I found no account creation or privileged group changes from {{device}}.
 
   o-fp:
     type: outcome

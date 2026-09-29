@@ -11,7 +11,7 @@ applies_to:
   - Impact:S3/AnomalousBehavior.Delete
   - Unusual volume of blob reads or deletes
 mitre: [T1530, T1485, T1537]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -55,11 +55,21 @@ nodes:
     also_check:
       - "Is the source IP flagged in threat intelligence or hosted on a VPS or anonymising provider?"
       - "Did {{principal}} list or enumerate buckets or containers before the reads?"
-    yes: o-fp
+    yes: q-ransom-note
     no: q-destination
     notes:
       yes: The activity on {{bucket}} is a known job from its usual source.
       no: The activity on {{bucket}} is not a known job.
+
+  q-ransom-note:
+    type: question
+    text: Was a ransom note or unexpected object uploaded to {{bucket}}?
+    why: A yes points to extortion using the deletions or reads, which a known job does not explain.
+    yes: o-tp
+    no: o-fp
+    notes:
+      yes: I found a ransom note or unexpected object uploaded to {{bucket}}.
+      no: I found no ransom note or unexpected object uploaded to {{bucket}}.
 
   q-destination:
     type: question
@@ -68,7 +78,6 @@ nodes:
       - "Was {{bucket}} or its objects made public, or were presigned URLs or SAS tokens generated?"
       - "Were versioning, object lock, soft delete or lifecycle rules on {{bucket}} changed or disabled?"
       - "Was access logging or data event logging for {{bucket}} turned off?"
-      - "Was a ransom note or unexpected object uploaded to {{bucket}}?"
     yes: o-tp
     no: l-cloud
     notes:

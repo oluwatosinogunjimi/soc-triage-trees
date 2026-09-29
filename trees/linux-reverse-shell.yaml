@@ -11,7 +11,7 @@ applies_to:
   - Web server process spawned shell on Linux
   - Unexpected SSH authorized_keys modification
 mitre: [T1059.004, T1098.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,7 +28,6 @@ nodes:
     type: check
     text: Read the command, its parent and any connection it opened.
     also_check:
-      - "Has {{device}} talked to previously unseen external IPs or domains, or shown beaconing?"
       - "Did the shell run discovery commands (id, uname, ps, netstat, cat /etc/passwd)?"
     kql:
       - title: Suspicious shell commands and parents (48h)
@@ -46,11 +45,36 @@ nodes:
   q-admin:
     type: question
     text: Is it an admin or automation doing a known task (configuration management, installer script from a trusted repo, a developer on a dev box)?
-    yes: o-benign
+    yes: q-new-egress
     no: q-service-parent
     notes:
       yes: The command on {{device}} came from known administration or automation.
       no: No admin task explains the command on {{device}}.
+
+  q-new-egress:
+    type: question
+    text: Has {{device}} talked to previously unseen external IPs or domains, or shown beaconing?
+    why: Known automation talks to known repositories and servers; a new external destination or regular beaconing means the shell may be calling out to an attacker.
+    yes: o-inconclusive
+    no: q-tamper
+    notes:
+      yes: I found {{device}} connecting to previously unseen external IPs or domains, or beaconing.
+      no: I found no connections from {{device}} to previously unseen external IPs or domains, and no beaconing.
+
+  q-tamper:
+    type: question
+    text: Were logs or shell history cleared, or auditd or the EDR sensor stopped, on {{device}}?
+    why: No admin task needs to hide its tracks; clearing history or stopping monitoring is defence evasion.
+    yes: l-security-tool-tampering
+    no: o-benign
+    notes:
+      yes: I found logs or shell history cleared, or auditd or the EDR sensor stopped, on {{device}}.
+      no: I found no cleared logs or shell history and no stopped monitoring on {{device}}.
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
 
   q-service-parent:
     type: question
@@ -60,7 +84,6 @@ nodes:
       - "Were systemd units, shell profile files or /etc/ld.so.preload changed on {{device}}?"
       - "Did anyone read /etc/shadow, SSH private keys, cloud credential files or application secrets on {{device}}?"
       - "Has {{device}} opened SSH or other connections to many internal hosts since the shell started?"
-      - "Were logs or shell history cleared, or auditd or the EDR sensor stopped, on {{device}}?"
       - "Has a large volume of data left {{device}} since the shell started?"
     yes: o-tp-exploit
     no: q-ssh
@@ -92,7 +115,7 @@ nodes:
     type: outcome
     verdict: inconclusive
     title: Unexplained interactive command
-    anchor: "{{account}} ran a suspicious command on {{device}} from a known source with no persistence added."
+    anchor: "{{account}} ran a suspicious command on {{device}} that no admin task or known source fully explains."
     risk: The risk here is misuse of the account or a mistake that opened a shell, which stays open until the owner explains it.
     actions:
       - Ask the account owner or system owner to explain the command

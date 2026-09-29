@@ -12,7 +12,7 @@ applies_to:
   - Verified threat actor IP (nationStateIP)
   - Activity from a TOR IP address
 mitre: [T1078.004, T1090.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -49,7 +49,6 @@ nodes:
     text: Is the IP flagged as malicious or threat-actor infrastructure (not merely anonymising)?
     also_check:
       - "Does {{ip}} appear in historical logs of unauthorised access or earlier incidents in the tenant?"
-      - "Has {{ip}} appeared in Azure activity or M365 audit logs beyond sign-ins, suggesting token use?"
     yes: q-success-malicious
     no: q-success
     notes:
@@ -73,10 +72,25 @@ nodes:
     also_check:
       - "Did {{user}} authenticate without MFA where MFA is required?"
     yes: q-user-vpn
-    no: o-fp-failed
+    no: q-token-use
     notes:
       yes: The sign-in by {{user}} from {{ip}} succeeded.
       no: The sign-in from {{ip}} failed.
+
+  q-token-use:
+    type: question
+    text: "Has {{ip}} appeared in Azure activity or M365 audit logs beyond sign-ins, suggesting token use?"
+    why: Activity from an IP whose sign-ins all failed means it holds a stolen token, which a failed sign-in does not rule out.
+    yes: l-aitm-token-theft
+    no: o-fp-failed
+    notes:
+      yes: "I found activity from {{ip}} in Azure or M365 audit logs beyond sign-ins, consistent with token use."
+      no: "I found no activity from {{ip}} in Azure or M365 audit logs beyond the sign-ins."
+
+  l-aitm-token-theft:
+    type: link
+    text: Continue in Token Theft or AiTM Phishing.
+    tree: aitm-token-theft
 
   q-user-vpn:
     type: question

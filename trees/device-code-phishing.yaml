@@ -10,7 +10,7 @@ applies_to:
   - Suspicious sign-in using device code flow
   - Sign-in with authentication protocol deviceCode
 mitre: [T1528, T1566.002]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -32,7 +32,6 @@ nodes:
       - IP of the sign-in versus the user's usual IPs
     also_check:
       - "Is {{ip}} flagged in threat intelligence for malicious activity?"
-      - "Was a new device or MFA method registered for {{user}} after the device code sign-in?"
       - "Has {{user}} been assigned a privileged role or changed directory permissions since the sign-in?"
     kql:
       - title: Device code sign-ins for the user (14d)
@@ -59,11 +58,26 @@ nodes:
   q-ip-known:
     type: question
     text: Did the device code sign-in come from the user's usual network or a known device?
-    yes: o-benign
+    yes: q-new-device
     no: q-lure
     notes:
       yes: The device code sign-in came from a network and device {{user}} normally uses.
       no: The device code sign-in came from {{ip}}, which is unfamiliar for {{user}}.
+
+  q-new-device:
+    type: question
+    text: Was a new device or MFA method registered for {{user}} after the device code sign-in?
+    why: A yes means the token was used to plant lasting access, a common next step in device code phishing even from a familiar-looking network.
+    yes: l-suspicious-mfa-registration
+    no: o-benign
+    notes:
+      yes: I found a new device or MFA method registered for {{user}} after the device code sign-in.
+      no: I found no new device or MFA method registered for {{user}} after the device code sign-in.
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration
+    tree: suspicious-mfa-registration
 
   q-lure:
     type: question

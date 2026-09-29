@@ -11,7 +11,7 @@ applies_to:
   - Logging disabled on firewall
   - Admin login to network device from unusual source
 mitre: [T1562.004, T1098]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,14 +54,31 @@ nodes:
   q-source:
     type: question
     text: Did the admin connect from the management network or jump host, with their named account?
-    also_check:
-      - "Did {{admin}} authenticate without MFA where MFA is required?"
-      - "Has {{admin}} recently been given higher privileges or had its password changed unexpectedly?"
-    yes: o-benign
+    yes: q-no-mfa
     no: q-impact
     notes:
       yes: "{{admin}} connected from the management network with a named account."
       no: "{{admin}} connected from {{ip}}, outside the management network, or with a shared account."
+
+  q-no-mfa:
+    type: question
+    text: Did {{admin}} authenticate without MFA where MFA is required?
+    why: A yes means the session bypassed a required control, so the ticket alone does not prove the admin made the change.
+    yes: o-account-doubt
+    no: q-account-changed
+    notes:
+      yes: I found that {{admin}} authenticated to {{device}} without MFA where MFA is required.
+      no: I found that {{admin}} completed MFA as required.
+
+  q-account-changed:
+    type: question
+    text: Has {{admin}} recently been given higher privileges or had its password changed unexpectedly?
+    why: A yes suggests the account was taken over before the change, even though a ticket exists.
+    yes: o-account-doubt
+    no: o-benign
+    notes:
+      yes: I found an unexpected privilege or password change on {{admin}} before the session.
+      no: I found no unexpected privilege or password changes on {{admin}}.
 
   q-impact:
     type: question
@@ -83,6 +100,19 @@ nodes:
     risk: The risk here is an attacker opening access through network devices; it doesn't apply given the ticket and source.
     actions:
       - Close referencing the ticket
+
+  o-account-doubt:
+    type: outcome
+    verdict: inconclusive
+    title: Ticketed change from a doubtful admin account
+    anchor: "{{admin}} changed {{device}} under a change ticket, but the account shows signs of misuse around the session."
+    risk: The risk here is an attacker using a taken-over admin account inside a legitimate change window, which stays open until the account owner confirms the session.
+    actions:
+      - Ask the owner of {{admin}} and the network team to confirm they made the change from {{ip}}
+      - Compare the change on {{device}} with the ticket line by line
+      - Review how {{admin}} authenticated and any recent password or privilege changes
+      - Escalate to a senior analyst, and reset the account if the owner does not confirm
+    monitor: I will monitor {{admin}} for logons to network devices and {{device}} for further changes.
 
   o-inconclusive:
     type: outcome

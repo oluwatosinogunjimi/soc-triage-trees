@@ -11,7 +11,7 @@ applies_to:
   - New local user account created (4720)
   - Member added to security-enabled local group (4732)
 mitre: [T1136.001, T1098, T1546.008]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -56,11 +56,41 @@ nodes:
   q-it-process:
     type: question
     text: Is it IT tooling or an admin action with a ticket (LAPS, Intune, SCCM, a known admin account)?
-    yes: o-benign
+    yes: q-cred-access
     no: q-used
     notes:
       yes: The change was made by IT tooling or an approved admin action.
       no: No IT process or ticket explains the change.
+
+  q-cred-access:
+    type: question
+    text: Was LSASS or the SAM database accessed on {{device}} after the change?
+    why: IT tooling does not read credential stores; credential access after a new admin appears means the change was a step in an attack.
+    yes: l-lsass-credential-dumping
+    no: q-defence-evasion
+    notes:
+      yes: I found LSASS or the SAM database accessed on {{device}} after the change.
+      no: I found no access to LSASS or the SAM database on {{device}} after the change.
+
+  q-defence-evasion:
+    type: question
+    text: Were security logs cleared, or AV, EDR or logging disabled, on {{device}}?
+    why: An approved admin change has no reason to hide; cleared logs or disabled protection mean someone is covering the change.
+    yes: l-security-tool-tampering
+    no: o-benign
+    notes:
+      yes: I found security logs cleared, or AV, EDR or logging disabled, on {{device}}.
+      no: I found no cleared logs and no disabled AV, EDR or logging on {{device}}.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
 
   q-used:
     type: question
@@ -68,10 +98,8 @@ nodes:
     also_check:
       - "Did {{account}} run administrative tools, scripts or discovery commands after logging on?"
       - "Has {{account}} been used to log on to other devices?"
-      - "Was LSASS or the SAM database accessed on {{device}} after the change?"
       - "Was RDP enabled or were firewall rules changed on {{device}} around the time of the change?"
       - "Were new scheduled tasks or services created on {{device}} around the time of the change?"
-      - "Were security logs cleared, or AV, EDR or logging disabled, on {{device}}?"
     kql:
       - title: Logons by the account (7d)
         platform: xdr

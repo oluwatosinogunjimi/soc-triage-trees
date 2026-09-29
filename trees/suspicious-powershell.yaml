@@ -11,7 +11,7 @@ applies_to:
   - Suspicious process executed via mshta, rundll32 or regsvr32
   - Suspicious download using certutil or bitsadmin
 mitre: [T1059.001, T1027, T1105, T1218]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -63,7 +63,7 @@ nodes:
           | where ProcessCommandLine has "{{command}}"
           | summarize Devices = dcount(DeviceName), Executions = count(), Parents = make_set(InitiatingProcessFileName, 10),
                       Accounts = make_set(AccountName, 10), First = min(Timestamp), Last = max(Timestamp)
-    yes: o-fp-admin
+    yes: q-lsass
     no: q-offensive-traits
     unknown: q-offensive-traits
     notes:
@@ -93,18 +93,41 @@ nodes:
     type: question
     text: Is it rare for this device, user and estate (first seen recently, very low prevalence)?
     yes: q-succeeded
-    no: o-fp-admin
+    no: q-lsass
     notes:
       yes: The command is new and rare for {{device}} and the estate.
       no: The command is established and routine for {{device}}.
+
+  q-lsass:
+    type: question
+    text: Did the script access LSASS memory or credential stores on {{device}}?
+    why: No legitimate management script reads LSASS, so a yes means credential theft even when the command looks like known tooling.
+    yes: l-lsass-credential-dumping
+    no: q-uac-bypass
+    notes:
+      yes: I found the script accessed LSASS memory or credential stores on {{device}}.
+      no: I found no access to LSASS memory or credential stores by the script on {{device}}.
+
+  q-uac-bypass:
+    type: question
+    text: Did the script follow a known UAC bypass path to start a process at high integrity?
+    why: Management tooling runs elevated by design and has no need to bypass UAC, so a yes means the script ran with malicious intent.
+    yes: o-tp-executed
+    no: o-fp-admin
+    notes:
+      yes: I found the script followed a known UAC bypass path to start a process at high integrity on {{device}}.
+      no: I found no UAC bypass by the script on {{device}}.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
 
   q-succeeded:
     type: question
     text: Did it succeed (outbound connection, file written, child processes, payload run) rather than being blocked by AMSI, ASR or the EDR?
     also_check:
-      - "Did the script access LSASS memory or credential stores on {{device}}?"
       - "Did the script create a scheduled task, service, Run key or WMI subscription for persistence?"
-      - "Did the script start a process at high integrity or follow a known UAC bypass path?"
       - "Did the script connect to other internal hosts or use remote execution (WinRM, WMI, SMB)?"
       - "Did the script compress or stage files, or send a large volume of data out of {{device}}?"
     kql:

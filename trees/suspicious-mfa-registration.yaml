@@ -11,7 +11,7 @@ applies_to:
   - Malicious registration of an attacker controlled MFA device
   - User registered security info
 mitre: [T1098.005, T1556.006]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -33,7 +33,6 @@ nodes:
       - Whether an admin or the user registered it
       - Other methods removed or changed at the same time
     also_check:
-      - "Has {{user}} created inbox rules or enabled forwarding to an external address since the registration?"
       - "Has {{user}} consented to an OAuth app or registered a new device since the registration?"
       - "Has {{user}} downloaded or shared an unusual volume of files since the registration?"
       - "Has {{user}} sent unusual mail to many colleagues since the registration, possibly spreading phishing?"
@@ -80,7 +79,6 @@ nodes:
     text: Was the registering session preceded by risk (phishing click, risky sign-in, AiTM or token anomaly)?
     why: Registration straight after a phishing click or an AiTM sign-in is the classic persistence step.
     also_check:
-      - "Were there multiple failed sign-ins or MFA prompts for {{user}} before the registration?"
       - "Did the password for {{user}} change unexpectedly before the registration?"
     kql:
       - title: Risk detections for the user (14d)
@@ -99,13 +97,33 @@ nodes:
   q-user-confirm:
     type: question
     text: Does the user confirm they registered this method (new phone, re-setup)?
-    yes: o-benign
+    yes: q-prior-prompts
     no: o-tp-persistence
     unknown: o-inconclusive
     notes:
       yes: "{{user}} confirmed registering the new method."
       no: "{{user}} did not register the new method."
       unknown: I have not yet received confirmation from {{user}}.
+
+  q-prior-prompts:
+    type: question
+    text: "Were there multiple failed sign-ins or MFA prompts for {{user}} before the registration?"
+    why: Failures or prompt bursts just before the registration show someone else working the account, which a user's confirmation does not outweigh.
+    yes: o-tp-persistence
+    no: q-inbox-rules
+    notes:
+      yes: "I found multiple failed sign-ins or MFA prompts for {{user}} before the registration."
+      no: "I found no burst of failed sign-ins or MFA prompts for {{user}} before the registration."
+
+  q-inbox-rules:
+    type: question
+    text: "Has {{user}} created inbox rules or enabled forwarding to an external address since the registration?"
+    why: Inbox rules or forwarding after a new method is the usual next step of a takeover, so the registration was not the user's.
+    yes: o-tp-persistence
+    no: o-benign
+    notes:
+      yes: "I found inbox rules or external forwarding created for {{user}} since the registration."
+      no: "I found no inbox rules or external forwarding created for {{user}} since the registration."
 
   o-benign:
     type: outcome

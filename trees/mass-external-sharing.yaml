@@ -9,7 +9,7 @@ applies_to:
   - Anonymous link created for sensitive file
   - Unusual external user file activity
 mitre: [T1567, T1537]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -41,11 +41,41 @@ nodes:
   q-partner:
     type: question
     text: Are the recipients a known partner domain for an active project, and the files non-sensitive?
-    yes: o-benign
+    yes: q-inbox-rules
     no: q-personal
     notes:
       yes: "{{user}} shared non-sensitive files with a known partner domain."
       no: The sharing went to unknown or personal recipients, or involved sensitive files.
+
+  q-inbox-rules:
+    type: question
+    text: Has {{user}} created inbox rules that forward or delete mail?
+    why: A yes suggests the account is controlled by someone hiding mail from the user, so the partner sharing may not be the user's own.
+    yes: l-inbox-rule-forwarding
+    no: q-oauth-app
+    notes:
+      yes: I found inbox rules created by {{user}} that forward or delete mail.
+      no: I found no inbox rules created by {{user}} that forward or delete mail.
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
+
+  q-oauth-app:
+    type: question
+    text: Has {{user}} consented to a new OAuth app with file access?
+    why: A yes means an app may be reading or sharing files as the user, which the partner explanation does not cover.
+    yes: l-oauth-consent-grant
+    no: o-benign
+    notes:
+      yes: I found that {{user}} consented to a new OAuth app with file access.
+      no: I found no new OAuth app with file access consented to by {{user}}.
+
+  l-oauth-consent-grant:
+    type: link
+    text: Continue in OAuth App Consent Grant
+    tree: oauth-consent-grant
 
   q-personal:
     type: question
@@ -65,8 +95,6 @@ nodes:
     text: Was the sharing done from a suspicious session (unfamiliar IP, risky sign-in)?
     also_check:
       - "Has {{user}} registered or changed an MFA method recently?"
-      - "Has {{user}} created inbox rules that forward or delete mail?"
-      - "Has {{user}} consented to a new OAuth app with file access?"
     yes: o-tp
     no: o-inconclusive
     notes:

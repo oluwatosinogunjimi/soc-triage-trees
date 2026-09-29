@@ -11,7 +11,7 @@ applies_to:
   - Add or update named location
   - MFA disabled for user or tenant
 mitre: [T1556.009, T1562.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -51,7 +51,6 @@ nodes:
     text: Does the change weaken protection (policy disabled or deleted, report-only, new user or group exclusion, new trusted IP, grant control removed)?
     also_check:
       - "Have accounts signed in without MFA since the change where {{policy}} previously required it?"
-      - "Is any newly trusted IP or location flagged in threat intelligence?"
       - "Was a newly excluded account recently created or given a privileged role?"
     yes: q-approved
     no: o-benign-tightening
@@ -63,17 +62,55 @@ nodes:
     type: question
     text: Is it approved (change ticket) and was the actor's session clean?
     also_check:
-      - "Did {{actor}} register or change an MFA method from an unrecognised IP before the change?"
       - "Has {{actor}} assigned privileged roles or created accounts around the time of the change?"
       - "Has {{actor}} added credentials to app registrations or granted OAuth consent?"
-      - "Has {{actor}} changed audit, diagnostic or log export settings?"
-    yes: q-scope
+    yes: q-actor-mfa
     no: o-tp
     unknown: o-inconclusive
     notes:
       yes: The change was approved and {{actor}} made it from a clean session.
       no: The change was not approved, or {{actor}} made it from a risky session.
       unknown: I could not confirm approval for the change.
+
+  q-actor-mfa:
+    type: question
+    text: Did {{actor}} register or change an MFA method from an unrecognised IP before the change?
+    why: A yes means the admin account may have been taken over before the change, so a ticket does not prove who made it.
+    yes: l-suspicious-mfa-registration
+    no: q-trusted-ip-ti
+    notes:
+      yes: I found an MFA method registered or changed for {{actor}} from an unrecognised IP before the change.
+      no: I found no MFA method changes for {{actor}} from an unrecognised IP before the change.
+
+  q-trusted-ip-ti:
+    type: question
+    text: Is any newly trusted IP or location flagged in threat intelligence?
+    why: A yes means the change trusts attacker infrastructure, which no approved change should do.
+    yes: o-tp
+    no: q-log-settings
+    notes:
+      yes: I found a newly trusted IP or location in "{{policy}}" flagged in threat intelligence.
+      no: I found no newly trusted IP or location in "{{policy}}" flagged in threat intelligence.
+
+  q-log-settings:
+    type: question
+    text: Has {{actor}} changed audit, diagnostic or log export settings?
+    why: A yes means the actor also reduced visibility, which together with weaker access controls points to an attacker covering tracks.
+    yes: l-cloud-logging-disabled
+    no: q-scope
+    notes:
+      yes: I found changes to audit, diagnostic or log export settings by {{actor}}.
+      no: I found no changes to audit, diagnostic or log export settings by {{actor}}.
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration
+    tree: suspicious-mfa-registration
+
+  l-cloud-logging-disabled:
+    type: link
+    text: Continue in Cloud Logging or Monitoring Disabled
+    tree: cloud-logging-disabled
 
   q-scope:
     type: question

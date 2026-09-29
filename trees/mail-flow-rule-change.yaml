@@ -10,7 +10,7 @@ applies_to:
   - Set-TransportRule
   - Mail flow rule redirecting mail externally
 mitre: [T1114.003, T1562]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,7 +28,6 @@ nodes:
     text: Pull the rule's conditions and actions.
     also_check:
       - "Did {{actor}} change other email security settings (anti-spam, anti-phishing, connectors or outbound spam policy) around the same time?"
-      - "Did {{actor}} disable audit logging or alert policies around the same time?"
     kql:
       - title: Transport rule changes (90d)
         platform: sentinel
@@ -46,25 +45,49 @@ nodes:
     also_check:
       - "Has mail matching {{rule_name}} already been delivered to an external address?"
     yes: q-approved
-    no: o-benign
+    no: q-audit-tampering
     notes:
       yes: Rule "{{rule_name}}" moves mail externally or weakens filtering.
       no: Rule "{{rule_name}}" only applies disclaimers, routing or tagging internally.
+
+  q-audit-tampering:
+    type: question
+    text: Did {{actor}} disable audit logging or alert policies around the same time?
+    why: A yes means someone was blinding the tenant alongside the rule change, so the change cannot be closed as routine.
+    yes: o-inconclusive-tampering
+    no: o-benign
+    notes:
+      yes: I found that {{actor}} disabled audit logging or alert policies around the time of the rule change.
+      no: I found no audit logging or alert policy changes by {{actor}} around the time of the rule change.
 
   q-approved:
     type: question
     text: Is it approved (journaling to an archive vendor, a third-party filter, a change ticket) and made from the admin's normal session?
     also_check:
       - "Was {{actor}} given an Exchange Administrator or Global Administrator role recently or unexpectedly?"
-      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
       - "Were multiple failed sign-ins for {{actor}} seen before the session that made the change?"
       - "Has {{actor}} consented to a new OAuth app or added app credentials?"
       - "Has {{actor}} changed mailbox permissions or forwarding on other users' mailboxes?"
-    yes: o-benign-approved
+    yes: q-actor-mfa
     no: o-tp
     notes:
       yes: The rule is approved and was made from a normal admin session.
       no: The rule has no approval or was made from an unusual session.
+
+  q-actor-mfa:
+    type: question
+    text: Has {{actor}} registered or changed an MFA method from an unrecognised IP?
+    why: A yes means the admin account may be controlled by someone else, so an approved-looking change cannot be trusted.
+    yes: l-suspicious-mfa-registration
+    no: o-benign-approved
+    notes:
+      yes: I found an MFA method registered or changed for {{actor}} from an unrecognised IP.
+      no: I found no MFA method registered or changed for {{actor}} from an unrecognised IP.
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration
+    tree: suspicious-mfa-registration
 
   o-benign:
     type: outcome
@@ -97,3 +120,16 @@ nodes:
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor for further transport rule changes.
+
+  o-inconclusive-tampering:
+    type: outcome
+    verdict: inconclusive
+    title: Rule change alongside audit or alert tampering
+    anchor: Mail flow rule "{{rule_name}}" looks low risk on its own, but {{actor}} disabled audit logging or alert policies around the same time.
+    risk: The risk here is an attacker blinding the tenant before or after changing mail flow; it stays open until the logging change is explained and reversed.
+    actions:
+      - Re-enable audit logging and the affected alert policies
+      - Escalate to the customer and confirm whether {{actor}} made both changes on purpose
+      - Review other admin actions by {{actor}} in the same period
+    escalate: true
+    monitor: I will monitor for further audit, alert policy and transport rule changes by {{actor}}.

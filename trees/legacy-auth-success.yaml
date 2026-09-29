@@ -10,7 +10,7 @@ applies_to:
   - IMAP/POP sign-in from unusual location
   - SMTP AUTH client submission from unknown IP
 mitre: [T1078.004, T1110]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -55,10 +55,40 @@ nodes:
     also_check:
       - "Is {{ip}} flagged in threat intelligence for malicious activity?"
     yes: q-spray-context
-    no: o-benign-client
+    no: q-inbox-rules
     notes:
       yes: "{{ip}} is a new or suspicious source for {{user}}."
       no: "{{ip}} is a source {{user}} has used before with the same client."
+
+  q-inbox-rules:
+    type: question
+    text: "Has {{user}} enabled forwarding to an external address or created inbox rules that move or delete mail?"
+    why: Forwarding or hiding rules on a mailbox reachable without MFA mean the password is in someone else's hands, even from a familiar source.
+    yes: l-inbox-rule-forwarding
+    no: q-mfa-method
+    notes:
+      yes: "I found external forwarding or inbox rules that move or delete mail for {{user}}."
+      no: "I found no external forwarding or inbox rules that move or delete mail for {{user}}."
+
+  q-mfa-method:
+    type: question
+    text: "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
+    why: An MFA method added from an unknown IP means an attacker is securing access beyond the legacy protocol.
+    yes: l-suspicious-mfa-registration
+    no: o-benign-client
+    notes:
+      yes: "I found an MFA method registered or changed for {{user}} from an unrecognised IP."
+      no: "I found no MFA method registered or changed for {{user}} from an unrecognised IP."
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding.
+    tree: inbox-rule-forwarding
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration.
+    tree: suspicious-mfa-registration
 
   q-spray-context:
     type: question
@@ -81,8 +111,6 @@ nodes:
     type: question
     text: Was mail read, synced or sent over the legacy session?
     also_check:
-      - "Has {{user}} enabled forwarding to an external address or created inbox rules that move or delete mail?"
-      - "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
       - "Has {{user}} signed in to other M365 apps from {{ip}} beyond the legacy protocol?"
     kql:
       - title: Mailbox activity from the IP (7d)

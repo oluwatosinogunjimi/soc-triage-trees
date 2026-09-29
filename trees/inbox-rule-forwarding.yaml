@@ -11,7 +11,7 @@ applies_to:
   - New inbox rule created with suspicious name or actions
   - Mail forwarding to external domain
 mitre: [T1564.008, T1114.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -92,7 +92,6 @@ nodes:
       lookback will make the rule's IP look like the only odd event.
     also_check:
       - "Were multiple failed sign-ins for {{user}} seen before the successful sign-in that preceded the rule?"
-      - "Has {{user}} registered or changed an MFA method from an unrecognised IP?"
       - "Has {{user}} consented to a new OAuth app or created new app credentials?"
       - "Is {{ip}} flagged in threat intelligence for malicious activity?"
       - "Has {{ip}} signed in to, or attempted sign-ins against, other accounts in the tenant?"
@@ -120,16 +119,35 @@ nodes:
     type: question
     text: Does the user confirm they created the rule for a legitimate purpose?
     also_check:
-      - "Did {{user}} send unusual messages to many colleagues or external contacts around the time of the rule?"
       - "Has the mailbox of {{user}} sent confidential or sensitive data outside the organisation?"
       - "Did {{user}} export mail, contacts or files in bulk around the time of the rule?"
-    yes: q-external-policy
+    yes: q-mfa-unrecognised
     no: o-tp-bec
     unknown: o-inconclusive
     notes:
       yes: "{{user}} confirmed creating rule \"{{rule_name}}\" and explained its purpose."
       no: "{{user}} did not create rule \"{{rule_name}}\"."
       unknown: I have not yet received confirmation from {{user}} about rule "{{rule_name}}".
+
+  q-mfa-unrecognised:
+    type: question
+    text: Has {{user}} registered or changed an MFA method from an unrecognised IP?
+    why: A yes means someone other than the user has taken hold of the account, whatever the rule itself is for.
+    yes: o-tp-account
+    no: q-unusual-sends
+    notes:
+      yes: I found an MFA method registered or changed for {{user}} from an unrecognised IP.
+      no: I found no MFA method registered or changed for {{user}} from an unrecognised IP.
+
+  q-unusual-sends:
+    type: question
+    text: Did {{user}} send unusual messages to many colleagues or external contacts around the time of the rule?
+    why: A yes means the mailbox is being used to send lures or fraud, which points to takeover even when the user owns the rule.
+    yes: o-tp-account
+    no: q-external-policy
+    notes:
+      yes: I found unusual messages sent by {{user}} to many colleagues or external contacts around the time of the rule.
+      no: I found no unusual messages sent by {{user}} to many colleagues or external contacts around the time of the rule.
 
   q-external-policy:
     type: question
@@ -182,6 +200,21 @@ nodes:
       - Escalate to the customer, including finance if invoices or payments were targeted
     escalate: true
     monitor: I will monitor {{user}} for new rules, forwarding changes and sign-ins from {{ip}}.
+
+  o-tp-account:
+    type: outcome
+    verdict: true_positive
+    title: Rule confirmed, account compromised
+    anchor: "{{user}} confirmed rule \"{{rule_name}}\", but the account shows takeover activity alongside it."
+    risk: The risk here is an attacker holding the account of {{user}} to add MFA persistence or send lures from a trusted address; the legitimate rule does not change that, so containment is required now.
+    actions:
+      - Revoke sessions and refresh tokens, then reset the password
+      - Remove MFA methods the user did not register
+      - Review sent items and purge any lures or fraud emails sent from the mailbox
+      - Run the internal phishing tree if the mailbox sent unusual mail
+      - Escalate to the customer
+    escalate: true
+    monitor: I will monitor {{user}} for new MFA methods, rules, forwarding and unusual outbound mail.
 
   o-inconclusive:
     type: outcome

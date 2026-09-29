@@ -10,7 +10,7 @@ applies_to:
   - Suspicious driver load (known vulnerable driver blocklist)
   - Possible EDR killer activity
 mitre: [T1068, T1562.001, T1543.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -30,7 +30,6 @@ nodes:
     text: Identify the driver, where it was dropped and how it was loaded.
     also_check:
       - "Has {{device}} been accessed from an unusual or untrusted source before the driver was dropped?"
-      - "Did a process request administrative privileges unexpectedly or use a UAC bypass on {{device}} before the load?"
     kql:
       - title: Driver drops, service creation and loads (7d)
         platform: xdr
@@ -49,17 +48,36 @@ nodes:
   q-legit-product:
     type: question
     text: Did it come from an installed product (hardware utility, overclocking or gaming tool) in its normal install path?
-    yes: o-benign-risky
+    yes: q-uac-bypass
     no: q-edr-impact
     notes:
       yes: "{{driver}} was installed by a known product in its normal path."
       no: "{{driver}} was dropped outside any product install, often in a temp or user folder."
 
+  q-uac-bypass:
+    type: question
+    text: Did a process request administrative privileges unexpectedly or use a UAC bypass on {{device}} before the load?
+    why: Attackers install legitimate products to bring in their vulnerable drivers, so an unexpected elevation just before the load means the product is being abused.
+    yes: o-tp-abused-product
+    no: q-lsass
+    notes:
+      yes: I found an unexpected elevation or UAC bypass on {{device}} before {{driver}} loaded.
+      no: I found no unexpected elevation or UAC bypass on {{device}} before {{driver}} loaded.
+
+  q-lsass:
+    type: question
+    text: Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?
+    why: A yes means credential theft on the host, so the driver cannot be treated as a harmless product component.
+    yes: l-lsass-credential-dumping
+    no: o-benign-risky
+    notes:
+      yes: I found an attempt to dump credentials from LSASS or credential stores on {{device}}.
+      no: I found no attempt to dump credentials from LSASS or credential stores on {{device}}.
+
   q-edr-impact:
     type: question
     text: After the load, did security processes stop or the sensor go quiet, or did other attack activity follow?
     also_check:
-      - "Has anyone tried to dump credentials from LSASS or credential stores on {{device}}?"
       - "Were shadow copies or backup data deleted or changed on {{device}}?"
       - "Were security or event logs cleared on {{device}}?"
       - "Has {{device}} connected to many other internal hosts or used remote execution (WMI, RDP, SMB)?"
@@ -68,6 +86,11 @@ nodes:
     notes:
       yes: Security tools on {{device}} stopped or went quiet after {{driver}} loaded.
       no: Security tools on {{device}} kept working after {{driver}} loaded.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
 
   o-benign-risky:
     type: outcome
@@ -92,6 +115,21 @@ nodes:
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same driver hash.
+
+  o-tp-abused-product:
+    type: outcome
+    verdict: true_positive
+    title: Product driver loaded after privilege escalation
+    anchor: "{{driver}} came from an installed product, but it loaded on {{device}} straight after an unexpected elevation."
+    risk: The risk here is an attacker installing a legitimate product to bring in its vulnerable driver and kill security tools; the elevation before the load shows the install was theirs.
+    actions:
+      - Isolate {{device}}
+      - Confirm security tools on {{device}} are still running and reporting
+      - Remove the product, the driver and its service
+      - Investigate the process behind the elevation and how the attacker reached the host
+      - Raise an incident and escalate
+    escalate: true
+    monitor: I will monitor the estate for the same driver hash and the same product being installed.
 
   o-tp-edr-killed:
     type: outcome

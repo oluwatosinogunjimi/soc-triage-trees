@@ -10,7 +10,7 @@ applies_to:
   - Secure web gateway malware category hit
   - Access to phishing category allowed
 mitre: [T1071.001, T1189]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,29 +54,51 @@ nodes:
   q-repeated:
     type: question
     text: Are the blocked requests repeating at intervals or from a non-browser user agent?
-    also_check:
-      - "Has the device used by {{user}} contacted other suspicious or previously unseen domains?"
     yes: l-domain
-    no: o-blocked
+    no: q-other-domains
     notes:
       yes: The blocked requests repeat regularly or come from a non-browser agent, suggesting malware.
       no: The blocked requests were a one-off from a browser.
+
+  q-other-domains:
+    type: question
+    text: Has the device used by {{user}} contacted other suspicious or previously unseen domains?
+    why: A yes suggests malware on the device reaching out to several domains, not a one-off visit.
+    yes: l-domain
+    no: o-blocked
+    notes:
+      yes: I found the device used by {{user}} contacting other suspicious or previously unseen domains.
+      no: I found no other suspicious or previously unseen domains contacted by the device used by {{user}}.
 
   q-what:
     type: question
     text: Did the allowed request download a file or present a login page?
     also_check:
       - "Did {{user}} receive unexpected authentication prompts or MFA requests after the visit?"
-      - "Has {{user}} signed in from an unrecognised location or device since the visit?"
     yes: l-click
-    no: o-benign
+    no: q-new-signin
     notes:
       yes: The allowed request downloaded a file or presented a login page.
       no: The allowed request returned only page content with no download or form.
 
+  q-new-signin:
+    type: question
+    text: Has {{user}} signed in from an unrecognised location or device since the visit?
+    why: A yes suggests credentials or a session token were taken through the site, even though no login page was logged.
+    yes: l-aitm-token-theft
+    no: o-benign
+    notes:
+      yes: I found sign-ins by {{user}} from an unrecognised location or device after the visit.
+      no: I found no sign-ins by {{user}} from unrecognised locations or devices after the visit.
+
+  l-aitm-token-theft:
+    type: link
+    text: "Continue in Token Theft or AiTM Phishing"
+    tree: aitm-token-theft
+
   l-domain:
     type: link
-    text: Beacon-like traffic. Continue in the suspicious domain tree.
+    text: Possible malware traffic. Continue in the suspicious domain tree.
     tree: suspicious-domain-lookup
     node: q-process
 

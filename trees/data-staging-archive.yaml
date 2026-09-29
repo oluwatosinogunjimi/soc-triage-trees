@@ -10,7 +10,7 @@ applies_to:
   - Data compressed with password (7z -p / rar -hp)
   - Large archive created in staging directory
 mitre: [T1560.001, T1074.001]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -49,13 +49,37 @@ nodes:
     type: question
     text: Is it a routine job (backup, log rotation, a user zipping their own project) by the expected account?
     also_check:
-      - "Was {{account}} used on {{device}} from an unfamiliar source IP or remote session?"
       - "Has {{account}} recently been added to a privileged group or given local admin rights?"
-    yes: o-benign
+    yes: q-remote-session
     no: q-signals
     notes:
       yes: The archiving on {{device}} is a routine job by the expected account.
       no: The archiving on {{device}} does not match any routine job.
+
+  q-remote-session:
+    type: question
+    text: Was {{account}} used on {{device}} from an unfamiliar source IP or remote session around the archiving?
+    why: A routine job run from an unfamiliar source means someone else may be using the account, so the routine explanation no longer holds.
+    yes: o-inconclusive
+    no: q-shadow-copies
+    notes:
+      yes: I found {{account}} used on {{device}} from an unfamiliar source IP or remote session around the archiving.
+      no: I found {{account}} used on {{device}} only from its usual sources around the archiving.
+
+  q-shadow-copies:
+    type: question
+    text: Were shadow copies or backups deleted, or files mass-encrypted, on {{device}}?
+    why: Archiving followed by shadow copy deletion or encryption is the ransomware pattern of steal then encrypt.
+    yes: l-ransomware-behaviour
+    no: o-benign
+    notes:
+      yes: I found shadow copies or backups deleted, or files mass-encrypted, on {{device}}.
+      no: I found no shadow copy or backup deletion and no mass encryption on {{device}}.
+
+  l-ransomware-behaviour:
+    type: link
+    text: Continue in Ransomware Behaviour
+    tree: ransomware-behaviour
 
   q-signals:
     type: question
@@ -66,7 +90,6 @@ nodes:
       - "Has {{device}} shown beaconing or connections to previously unseen domains or IPs?"
       - "Was LSASS or another credential store accessed on {{device}} around the same time?"
       - "Has anyone tried to disable AV, EDR or logging on {{device}}?"
-      - "Were shadow copies or backups deleted, or files mass-encrypted, on {{device}}?"
     kql:
       - title: Exfiltration tools and large uploads after archiving (48h)
         platform: xdr
@@ -95,8 +118,8 @@ nodes:
     type: outcome
     verdict: inconclusive
     title: Unexplained archive, no upload
-    anchor: "{{account}} created archives on {{device}} that no routine job explains, with no upload seen."
-    risk: The risk here is data staged for theft that has not left yet, which stays open until the owner explains it.
+    anchor: "{{account}} created archives on {{device}} that no routine job fully explains, and no upload has been confirmed."
+    risk: The risk here is data staged for theft that has not been seen leaving yet, which stays open until the owner explains it.
     actions:
       - Ask the account owner about the archive
       - Check whether the archive still exists and what it contains

@@ -10,7 +10,7 @@ applies_to:
   - Suspicious service creation (Event 7045 / 4697)
   - PsExec service installed
 mitre: [T1543.003, T1569.002]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,8 +28,6 @@ nodes:
     text: Read the service binary path and the install context.
     also_check:
       - "Were other persistence entries created on {{device}} around the same time (scheduled tasks, Run keys, WMI subscriptions)?"
-      - "Were security tools disabled or event logs cleared on {{device}} around the install?"
-      - "Has anyone tried to dump credentials from LSASS, SAM or NTDS.dit on {{device}}?"
     kql:
       - title: Service installs on the device (7d)
         platform: xdr
@@ -49,7 +47,27 @@ nodes:
           | where DeviceName =~ "{{device}}" and LogonType == "Network" and ActionType == "LogonSuccess"
           | project Timestamp, AccountName, RemoteIP, RemoteDeviceName, Protocol
     note: I read service "{{service}}" on {{device}} and its install context.
-    next: q-known
+    next: q-lsass
+
+  q-lsass:
+    type: question
+    text: Has anyone tried to dump credentials from LSASS, SAM or NTDS.dit on {{device}}?
+    why: A yes means credential theft on the host, which rules out a benign close however ordinary the service looks.
+    yes: l-lsass-credential-dumping
+    no: q-tamper
+    notes:
+      yes: I found an attempt to dump credentials from LSASS, SAM or NTDS.dit on {{device}}.
+      no: I found no attempt to dump credentials from LSASS, SAM or NTDS.dit on {{device}}.
+
+  q-tamper:
+    type: question
+    text: Were security tools disabled or event logs cleared on {{device}} around the install?
+    why: Product installers and admin tooling do not blind the host, so a yes means the install is part of an attack.
+    yes: l-security-tool-tampering
+    no: q-known
+    notes:
+      yes: I found security tools were disabled or event logs cleared on {{device}} around the install.
+      no: I found no security tool changes or log clearing on {{device}} around the install.
 
   q-known:
     type: question
@@ -72,13 +90,21 @@ nodes:
   q-admin-tooling:
     type: question
     text: Is the remote install explained by an admin's normal remote tooling from their usual host, with a ticket?
-    also_check:
-      - "Was the account behind the install recently added to a privileged group without an approved request?"
-    yes: o-benign-admin
+    yes: q-priv-no-request
     no: l-lateral
     notes:
       yes: The remote install came from normal admin tooling from a known admin host.
       no: The remote install has no admin explanation.
+
+  q-priv-no-request:
+    type: question
+    text: Was the account behind the install recently added to a privileged group without an approved request?
+    why: Normal admin tooling only explains the install if the admin rights are legitimate; unapproved rights mean the account is being abused for lateral movement.
+    yes: l-lateral
+    no: o-benign-admin
+    notes:
+      yes: I found the account behind service "{{service}}" was recently added to a privileged group without an approved request.
+      no: I found no recent unapproved privilege change for the account behind service "{{service}}".
 
   q-binary:
     type: question
@@ -102,6 +128,16 @@ nodes:
     text: Continue in the EDR tree for the service binary.
     tree: edr-malware-detection
     node: q-executed
+
+  l-lsass-credential-dumping:
+    type: link
+    text: Continue in LSASS Credential Dumping
+    tree: lsass-credential-dumping
+
+  l-security-tool-tampering:
+    type: link
+    text: Continue in Antivirus or EDR Tampering
+    tree: security-tool-tampering
 
   o-fp:
     type: outcome

@@ -11,7 +11,7 @@ applies_to:
   - Multiple failed RDP logons from external IP
   - Suspected brute-force attack (Kerberos, NTLM) from external source
 mitre: [T1110.001, T1133]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -67,14 +67,37 @@ nodes:
     also_check:
       - "Did the session on {{host}} run system, network or domain enumeration commands?"
       - "Were new accounts, scheduled tasks or services created on {{host}} after the logon?"
-      - "Has anyone tried to dump credentials on {{host}} (LSASS, SAM)?"
-      - "Has anyone tried to disable security monitoring or clear logs on {{host}}?"
       - "Has {{host}} opened RDP, SMB or WinRM sessions to other internal hosts since the logon?"
-    yes: q-exposure
+    yes: q-cred-dump
     no: o-tp
     notes:
       yes: The successful logon was an expected user from an expected location.
       no: The successful logon was not an expected user or location.
+
+  q-cred-dump:
+    type: question
+    text: Has anyone tried to dump credentials on {{host}} (LSASS, SAM) since the logon?
+    why: A yes means the session went after credentials, which an expected admin or vendor logon has no reason to do.
+    yes: l-lsass-credential-dumping
+    no: q-defence-evasion
+    notes:
+      yes: I found attempts to dump credentials on {{host}} after the logon.
+      no: I found no attempts to dump credentials on {{host}} after the logon.
+
+  q-defence-evasion:
+    type: question
+    text: Has anyone tried to disable security monitoring or clear logs on {{host}}?
+    why: A yes means the session is hiding its tracks, so the logon was not the expected user it appeared to be.
+    yes: o-tp
+    no: q-exposure
+    notes:
+      yes: I found attempts to disable security monitoring or clear logs on {{host}}.
+      no: I found no attempts to disable security monitoring or clear logs on {{host}}.
+
+  l-lsass-credential-dumping:
+    type: link
+    text: "Continue in LSASS Credential Dumping"
+    tree: lsass-credential-dumping
 
   q-exposure:
     type: question

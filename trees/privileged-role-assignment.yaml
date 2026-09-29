@@ -11,7 +11,7 @@ applies_to:
   - Risky sign in followed by privilege role grant
   - PIM role activation outside business hours
 mitre: [T1098.003, T1078.004]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,7 +52,6 @@ nodes:
     type: question
     text: Was the actor's session clean (usual IP and device, no risk detections, not a newly created or recently compromised account)?
     also_check:
-      - "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
       - "Were there multiple failed sign-ins or MFA denials for {{actor}} before the session that granted the role?"
     kql:
       - title: The actor's sign-ins and risk (7d)
@@ -65,11 +64,21 @@ nodes:
             (AADUserRiskEvents | where TimeGenerated > ago(7d) | where UserPrincipalName =~ "{{actor}}"
                | summarize SignIns = count(), Risk = make_set(RiskEventType) by IPAddress = IpAddress
                | extend Country = "", Source = "Risk")
-    yes: q-change-approved
+    yes: q-actor-mfa
     no: o-tp-takeover
     notes:
       yes: The session of {{actor}} was clean, from a usual network and device.
       no: The session of {{actor}} was risky or unusual when the role was granted.
+
+  q-actor-mfa:
+    type: question
+    text: "Has {{actor}} registered or changed an MFA method from an unrecognised IP?"
+    why: A new MFA method on the granting account from an unknown IP means its session cannot be trusted, however clean the sign-in looked.
+    yes: o-tp-takeover
+    no: q-change-approved
+    notes:
+      yes: "I found an MFA method registered or changed for {{actor}} from an unrecognised IP."
+      no: "I found no MFA method registered or changed for {{actor}} from an unrecognised IP."
 
   q-change-approved:
     type: question
@@ -84,7 +93,6 @@ nodes:
     type: question
     text: Has the new admin done anything unexpected (created users, apps or credentials, changed Conditional Access, federation or MFA settings)?
     also_check:
-      - "Has {{user}} disabled or changed audit logging, diagnostic settings or security alerts?"
       - "Has {{user}} elevated access to Azure subscriptions or read secrets from Azure Key Vault?"
       - "Has {{user}} run eDiscovery or content searches, or exported mailboxes or files in bulk?"
       - "Has {{user}} deleted users, groups or other critical resources?"
@@ -100,10 +108,25 @@ nodes:
           | summarize Count = count(), First = min(TimeGenerated) by OperationName
           | order by Count desc
     yes: o-inconclusive
-    no: o-benign
+    no: q-audit-logging
     notes:
       yes: "{{user}} performed unexpected administrative actions after receiving the role."
       no: "{{user}} performed only expected actions after receiving the role."
+
+  q-audit-logging:
+    type: question
+    text: "Has {{user}} disabled or changed audit logging, diagnostic settings or security alerts?"
+    why: A new admin weakening logging is defence evasion, which no approved role grant covers.
+    yes: l-cloud-logging-disabled
+    no: o-benign
+    notes:
+      yes: "I found changes by {{user}} to audit logging, diagnostic settings or security alerts."
+      no: "I found no changes by {{user}} to audit logging, diagnostic settings or security alerts."
+
+  l-cloud-logging-disabled:
+    type: link
+    text: Continue in Cloud Logging or Monitoring Disabled.
+    tree: cloud-logging-disabled
 
   o-benign:
     type: outcome

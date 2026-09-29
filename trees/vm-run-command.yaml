@@ -10,7 +10,7 @@ applies_to:
   - Suspicious Custom Script Extension deployed
   - SSM SendCommand from unusual principal
 mitre: [T1651]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,14 +52,29 @@ nodes:
     type: question
     text: Is it a routine operation (patching, monitoring agent install, configuration management) by the usual automation or ops account?
     also_check:
-      - "Did {{principal}} act from an unfamiliar IP or one flagged in threat intelligence?"
       - "Was {{principal}} given VM contributor or other new rights shortly before the command?"
       - "Were new credentials (MFA method, client secret or access key) added to {{principal}} recently?"
-    yes: o-fp
+    yes: q-unfamiliar-source
     no: q-content
     notes:
       yes: The command on {{vm}} was a routine operation by the usual automation.
       no: The command on {{vm}} was not routine.
+
+  q-unfamiliar-source:
+    type: question
+    text: Did {{principal}} act from an unfamiliar IP or one flagged in threat intelligence?
+    why: A yes means the automation or ops account may be in someone else's hands, even if the command looks routine.
+    yes: l-cloud-control-plane
+    no: o-fp
+    notes:
+      yes: I found that {{principal}} ran the command on {{vm}} from an unfamiliar IP or one flagged in threat intelligence.
+      no: I found that {{principal}} ran the command on {{vm}} from a familiar IP with no threat intelligence match.
+
+  l-cloud-control-plane:
+    type: link
+    text: Continue in Cloud Control-Plane Anomaly (Azure / AWS)
+    tree: cloud-control-plane
+    node: q-source
 
   q-content:
     type: question

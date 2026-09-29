@@ -10,7 +10,7 @@ applies_to:
   - UnauthorizedAccess:EC2/TorRelay
   - Connection to TOR network detected
 mitre: [T1090.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -26,7 +26,6 @@ nodes:
     type: check
     text: Find the process making TOR connections.
     also_check:
-      - "Has a large volume of data left {{host}} over TOR or to other rare destinations?"
       - "Is there evidence of data being compressed or staged on {{host}} before transfer?"
       - "Has {{host}} talked to other suspicious or previously unseen domains or IPs?"
     kql:
@@ -47,15 +46,53 @@ nodes:
     type: question
     text: Is it the TOR Browser started by the user from their profile?
     also_check:
-      - "Have new scheduled tasks or services been created on {{host}} to keep a TOR client running?"
       - "Has anyone tried to disable security monitoring on {{host}} (AV, EDR, logging)?"
       - "Has {{host}} connected to many other internal hosts?"
-      - "Is there evidence of ransomware activity on {{host}}, such as mass file changes or shadow copy deletion?"
-    yes: o-policy
+    yes: q-ransomware
     no: o-tp
     notes:
       yes: The TOR traffic from {{host}} came from TOR Browser started by the user.
       no: The TOR traffic from {{host}} came from a standalone TOR client or unknown process.
+
+  q-ransomware:
+    type: question
+    text: Is there evidence of ransomware activity on {{host}}, such as mass file changes or shadow copy deletion?
+    why: A yes means TOR is likely the ransomware operator's channel, which the ransomware playbook covers.
+    yes: l-ransomware-behaviour
+    no: q-tor-persist
+    notes:
+      yes: I found ransomware activity on {{host}}, such as mass file changes or shadow copy deletion.
+      no: I found no mass file changes, shadow copy deletion or other ransomware activity on {{host}}.
+
+  q-tor-persist:
+    type: question
+    text: Have new scheduled tasks or services been created on {{host}} to keep a TOR client running?
+    why: A yes means something beyond a user-launched browser is keeping TOR alive, which is how malware holds its channel.
+    yes: o-tp
+    no: q-data-out
+    notes:
+      yes: I found new scheduled tasks or services on {{host}} that keep a TOR client running.
+      no: I found no scheduled tasks or services on {{host}} that keep a TOR client running.
+
+  q-data-out:
+    type: question
+    text: Has a large volume of data left {{host}} over TOR or to other rare destinations?
+    why: A yes means TOR may be hiding data theft, which the large outbound transfer playbook covers.
+    yes: l-large-outbound-transfer
+    no: o-policy
+    notes:
+      yes: I found a large volume of data sent from {{host}} over TOR or to other rare destinations.
+      no: I found no unusual outbound data volume from {{host}} over TOR or to rare destinations.
+
+  l-ransomware-behaviour:
+    type: link
+    text: "Continue in Ransomware Behaviour"
+    tree: ransomware-behaviour
+
+  l-large-outbound-transfer:
+    type: link
+    text: "Continue in Large or Unusual Outbound Data Transfer"
+    tree: large-outbound-transfer
 
   o-policy:
     type: outcome

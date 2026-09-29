@@ -10,7 +10,7 @@ applies_to:
   - Email sending limit exceeded
   - Suspicious email sending patterns detected
 mitre: [T1534, T1114]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -41,11 +41,41 @@ nodes:
   q-legit:
     type: question
     text: Is the volume explained by a legitimate send (newsletter, app using the mailbox, mail merge) with normal content?
-    yes: o-benign
+    yes: q-oauth-app
     no: q-compromise
     notes:
       yes: The volume came from a legitimate send by {{user}} or an app using the mailbox.
       no: The messages are spam or phishing that {{user}} would not send.
+
+  q-oauth-app:
+    type: question
+    text: Has {{user}} consented to a new OAuth app or granted an app permission to send mail?
+    why: A yes means the "app using the mailbox" may be a malicious consent grant sending on the user's behalf, not a legitimate sender.
+    yes: l-oauth-consent-grant
+    no: q-external-forwarding
+    notes:
+      yes: I found a new OAuth app consent or send-mail permission granted by {{user}}.
+      no: I found no new OAuth app consent or send-mail permission granted by {{user}}.
+
+  q-external-forwarding:
+    type: question
+    text: Has external forwarding been enabled on the mailbox of {{user}}?
+    why: A yes means mail is leaving the mailbox automatically, which points to takeover rather than a one-off legitimate send.
+    yes: l-inbox-rule-forwarding
+    no: o-benign
+    notes:
+      yes: I found external forwarding enabled on the mailbox of {{user}}.
+      no: I found no external forwarding on the mailbox of {{user}}.
+
+  l-oauth-consent-grant:
+    type: link
+    text: Continue in OAuth App Consent Grant
+    tree: oauth-consent-grant
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
 
   q-compromise:
     type: question
@@ -53,8 +83,6 @@ nodes:
     also_check:
       - "Did {{user}} receive a phishing message with a malicious link or attachment shortly before the sends started?"
       - "Were multiple failed sign-ins for {{user}} seen before a successful one?"
-      - "Has {{user}} consented to a new OAuth app or granted an app permission to send mail?"
-      - "Has external forwarding been enabled on the mailbox of {{user}}?"
       - "Did {{user}} export mail, contacts or files in bulk before the restriction?"
       - "Did {{user}} try to access other mailboxes, accounts or systems in the tenant?"
     yes: o-tp

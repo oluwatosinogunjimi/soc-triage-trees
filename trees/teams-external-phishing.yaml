@@ -10,7 +10,7 @@ applies_to:
   - Teams phishing message detected
   - Email bombing followed by Teams contact
 mitre: [T1566.003, T1656, T1219]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,17 +52,31 @@ nodes:
     text: Is the external contact a known partner or supplier the user works with?
     also_check:
       - "Is the external tenant or domain newly created rather than long established?"
-    yes: o-fp
+    yes: q-shared-creds
     no: q-remote-access
     notes:
       yes: The external contact is a known partner of {{user}}.
       no: The external contact is unknown and posed as IT support or a trusted brand.
 
+  q-shared-creds:
+    type: question
+    text: Did {{user}} share sign-in details or approve an MFA prompt during the chat or call?
+    why: A yes means the contact harvested credentials or a session, which a genuine partner never needs, so the partner account itself may be compromised.
+    yes: l-aitm-token-theft
+    no: o-fp
+    notes:
+      yes: "{{user}} shared sign-in details or approved an MFA prompt during the chat or call."
+      no: "{{user}} did not share sign-in details or approve an MFA prompt during the chat or call."
+
+  l-aitm-token-theft:
+    type: link
+    text: Continue in Token Theft or AiTM Phishing
+    tree: aitm-token-theft
+
   q-remote-access:
     type: question
     text: Did the user start Quick Assist or another remote tool, or download a file after the chat?
     also_check:
-      - "Did {{user}} share sign-in details or approve an MFA prompt during the chat or call?"
       - "Has {{user}} signed in from an unrecognised IP or device since the chat?"
       - "Has {{user}} registered or changed an MFA method since the chat?"
       - "Has {{device}} been accessed from an unusual or untrusted source since the chat?"

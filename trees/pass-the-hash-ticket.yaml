@@ -11,7 +11,7 @@ applies_to:
   - Suspicious NTLM authentication
   - Logon with LogonType 9 (NewCredentials) by admin tools
 mitre: [T1550.002, T1550.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,7 +52,6 @@ nodes:
     type: question
     text: Does the account normally log on from {{src_host}} (it is the user's workstation, an admin jump host or a PAW)?
     also_check:
-      - "Has {{account}} recently been given a privileged role or been added to a privileged group without an approved request?"
       - "Has {{account}} accessed or changed another user's credentials or account?"
       - "Has {{account}} run reconnaissance such as net group, whoami or BloodHound?"
     yes: q-protocol
@@ -64,11 +63,26 @@ nodes:
   q-protocol:
     type: question
     text: Is the authentication pattern normal (Kerberos from a domain-joined host, no RC4 downgrade, no type 9 logons from mimikatz-style tooling)?
-    yes: o-fp
+    yes: q-group-change
     no: q-user-present
     notes:
       yes: The authentication pattern for {{account}} is normal.
       no: The authentication pattern for {{account}} is abnormal, with NTLM, RC4 or NewCredentials logons.
+
+  q-group-change:
+    type: question
+    text: "Has {{account}} recently been given a privileged role or been added to a privileged group without an approved request?"
+    why: An unapproved privilege grant means the account is being escalated by someone, even if its logons look normal.
+    yes: l-ad-privileged-group-change
+    no: o-fp
+    notes:
+      yes: "I found an unapproved privileged role or group membership for {{account}}."
+      no: "I found no unapproved privileged role or group membership for {{account}}."
+
+  l-ad-privileged-group-change:
+    type: link
+    text: Continue in On-Premises Privileged Group Membership Change.
+    tree: ad-privileged-group-change
 
   q-user-present:
     type: question

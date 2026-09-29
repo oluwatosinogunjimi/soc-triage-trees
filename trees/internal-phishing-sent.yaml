@@ -10,7 +10,7 @@ applies_to:
   - Internal phishing campaign detected
   - Suspicious email sending patterns (suspiciousSendingPatterns)
 mitre: [T1534, T1566.002]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,10 +47,25 @@ nodes:
     also_check:
       - "Did {{sender}} receive a phishing message with a similar lure shortly before the burst?"
     yes: q-signin
-    no: o-fp
+    no: q-inbox-rules
     notes:
       yes: The messages from {{sender}} are phishing lures.
       no: The messages from {{sender}} are a legitimate bulk send.
+
+  q-inbox-rules:
+    type: question
+    text: Has the mailbox of {{sender}} got new inbox rules or forwarding that delete, hide or send mail externally?
+    why: A yes means someone is hiding or stealing mail from the account, so the burst cannot be written off as a genuine bulk send.
+    yes: l-inbox-rule-forwarding
+    no: o-fp
+    notes:
+      yes: I found new inbox rules or forwarding on the mailbox of {{sender}} that delete, hide or send mail externally.
+      no: I found no new inbox rules or forwarding on the mailbox of {{sender}} that delete, hide or send mail externally.
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
 
   q-signin:
     type: question
@@ -59,7 +74,6 @@ nodes:
       - "Were multiple failed sign-ins for {{sender}} seen before the successful sign-in?"
       - "Has {{sender}} registered or changed an MFA method from an unrecognised IP?"
       - "Has {{sender}} consented to a new OAuth app or created new app credentials?"
-      - "Has the mailbox of {{sender}} got new inbox rules or forwarding that delete, hide or send mail externally?"
       - "Did {{sender}} try to access other mailboxes, accounts or systems in the tenant?"
     kql:
       - title: Send operations and their client IPs (7d)

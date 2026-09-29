@@ -12,7 +12,7 @@ applies_to:
   - New access key created for IAM user
   - Unusual instance type launched
 mitre: [T1078.004, T1562.008, T1098.001, T1496, T1578]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -146,7 +146,6 @@ nodes:
     also_check:
       - "Has {{ip}} been used by any other principal in the tenant or account?"
       - "Were there failed sign-ins or MFA attempts for {{principal}} from {{ip}} before the call?"
-      - "Have credentials for {{principal}} been exposed recently in a repository, log or paste?"
     yes: o-tp-cloud
     no: q-owner-confirm
     unknown: q-owner-confirm
@@ -158,13 +157,28 @@ nodes:
   q-owner-confirm:
     type: question
     text: Does the principal's owner or the cloud team confirm the action was intended?
-    yes: o-benign-confirmed
+    yes: q-creds-exposed
     no: o-tp-cloud
     unknown: o-inconclusive
     notes:
       yes: The owner of {{principal}} confirmed the action was intended.
       no: The owner of {{principal}} did not recognise the action.
       unknown: I have not yet received confirmation from the owner of {{principal}}.
+
+  q-creds-exposed:
+    type: question
+    text: Have credentials for {{principal}} been exposed recently in a repository, log or paste?
+    why: A yes means someone else may hold working credentials for the principal, so the owner's confirmation of this action does not close the exposure.
+    yes: l-secret-exposed-repo
+    no: o-benign-confirmed
+    notes:
+      yes: I found that credentials for {{principal}} were exposed recently in a repository, log or paste.
+      no: I found no recent exposure of credentials for {{principal}} in a repository, log or paste.
+
+  l-secret-exposed-repo:
+    type: link
+    text: Continue in Secret Exposed in a Code Repository
+    tree: secret-exposed-repo
 
   o-fp-change:
     type: outcome

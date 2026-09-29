@@ -11,7 +11,7 @@ applies_to:
   - Suspicious on-premises account enablement after disruption
   - Sign-in by disabled account
 mitre: [T1078, T1098]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -33,8 +33,6 @@ nodes:
       - Whether the activity used an existing session or a fresh authentication
     also_check:
       - "Has {{user}} downloaded, synced or exported a large volume of files or mail since leaving?"
-      - "Has {{user}} sent mail or files to personal or external addresses since leaving?"
-      - "Have inbox rules or external forwarding been set on the mailbox of {{user}}?"
       - "Has {{user}} deleted files, mail or other resources since leaving?"
     kql:
       - title: Account enable, disable and sign-in timeline (30d)
@@ -55,7 +53,6 @@ nodes:
     type: question
     text: Was the account re-enabled after it was disabled?
     also_check:
-      - "Were the MFA methods, password or recovery details of {{user}} changed after the leave date?"
       - "Was {{user}} given a role or group membership after the leave date?"
       - "Has {{user}} added app credentials or granted OAuth consent since leaving?"
     yes: q-reenable-approved
@@ -88,11 +85,51 @@ nodes:
     also_check:
       - "Is {{ip}} flagged in threat intelligence for malicious activity?"
       - "Has {{ip}} signed in to other accounts in the tenant?"
-    yes: o-offboarding-gap
+    yes: q-inbox-rules
     no: o-tp
     notes:
       yes: The activity came from the leaver's known device or a documented shared use.
       no: The activity came from {{ip}}, which has no link to the leaver or a documented use.
+
+  q-inbox-rules:
+    type: question
+    text: Have inbox rules or external forwarding been set on the mailbox of {{user}}?
+    why: A yes means the leftover access is being used to siphon mail, not just an idle session that offboarding missed.
+    yes: l-inbox-rule-forwarding
+    no: q-sent-external
+    notes:
+      yes: I found inbox rules or external forwarding on the mailbox of {{user}}.
+      no: I found no inbox rules or external forwarding on the mailbox of {{user}}.
+
+  q-sent-external:
+    type: question
+    text: Has {{user}} sent mail or files to personal or external addresses since leaving?
+    why: A yes means company data left through the leaver account, which turns an offboarding gap into data theft.
+    yes: o-tp
+    no: q-creds-changed
+    notes:
+      yes: I found mail or files sent from {{user}} to personal or external addresses after the leave date.
+      no: I found no mail or files sent from {{user}} to personal or external addresses after the leave date.
+
+  q-creds-changed:
+    type: question
+    text: Were the MFA methods, password or recovery details of {{user}} changed after the leave date?
+    why: A yes means someone is securing their own access to the leaver account, which a stale session or device never does.
+    yes: l-suspicious-mfa-registration
+    no: o-offboarding-gap
+    notes:
+      yes: I found the MFA methods, password or recovery details of {{user}} changed after the leave date.
+      no: I found no changes to the MFA methods, password or recovery details of {{user}} after the leave date.
+
+  l-inbox-rule-forwarding:
+    type: link
+    text: Continue in Suspicious Inbox Rule or Mail Forwarding
+    tree: inbox-rule-forwarding
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration
+    tree: suspicious-mfa-registration
 
   o-fp-blocked:
     type: outcome

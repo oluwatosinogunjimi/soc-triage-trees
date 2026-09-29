@@ -11,7 +11,7 @@ applies_to:
   - Add user followed by Add member to role
   - OAuth app created a user
 mitre: [T1136.003, T1098.003]
-version: 1.1.0
+version: 1.2.0
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -28,7 +28,6 @@ nodes:
     type: check
     text: Pull the creation and every change to the new account.
     also_check:
-      - "Has {{user}} registered an MFA method from an unrecognised IP?"
       - "Has {{user}} added credentials to app registrations or service principals, or granted OAuth consent?"
       - "Has {{user}} assigned roles or changed permissions for other accounts?"
       - "Has {{user}} changed Conditional Access policies, audit logs or diagnostic settings?"
@@ -102,11 +101,26 @@ nodes:
           | where TimeGenerated > ago(30d)
           | where UserPrincipalName =~ "{{user}}"
           | summarize Attempts = count(), Success = countif(ResultType == "0") by IPAddress, Country = tostring(LocationDetails.countryOrRegion), AppDisplayName
-    yes: o-benign
+    yes: q-mfa-unrecognised
     no: o-tp-backdoor
     notes:
       yes: Sign-ins to {{user}} came only from expected locations.
       no: "{{user}} was used from unexpected locations."
+
+  q-mfa-unrecognised:
+    type: question
+    text: Has {{user}} registered an MFA method from an unrecognised IP?
+    why: A yes means someone outside the customer's environment may have taken control of the new admin before its owner did.
+    yes: l-suspicious-mfa-registration
+    no: o-benign
+    notes:
+      yes: I found an MFA method registered for {{user}} from an unrecognised IP.
+      no: I found no MFA method registered for {{user}} from an unrecognised IP.
+
+  l-suspicious-mfa-registration:
+    type: link
+    text: Continue in Suspicious MFA Method Registration
+    tree: suspicious-mfa-registration
 
   o-benign:
     type: outcome
