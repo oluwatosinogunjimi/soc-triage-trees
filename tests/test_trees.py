@@ -160,3 +160,27 @@ def test_repeated_also_check_is_caught(tmp_path):
 """)
     _, errors, _ = validate(tmp_path)
     assert any("also_check repeated" in e for e in errors), errors
+
+
+def test_detection_rules_validate_and_link_to_real_playbooks():
+    from validate import load_detections
+
+    trees, errors, _ = validate()
+    assert not errors
+    dets, det_errors = load_detections(trees)
+    assert not det_errors
+    assert dets, "expected at least one detection rule in detections/"
+    for d in dets.values():
+        assert all(pb in trees for pb in d["playbooks"])
+
+
+def test_detection_with_missing_playbook_is_caught(tmp_path):
+    import yaml
+    from validate import load_detections
+
+    trees, _, _ = validate()
+    rule = yaml.safe_load((ROOT / "detections" / "net-user-add.yaml").read_text())
+    rule["playbooks"] = ["no-such-playbook"]
+    (tmp_path / "net-user-add.yaml").write_text(yaml.safe_dump(rule))
+    _, errors = load_detections(trees, tmp_path)
+    assert any("no-such-playbook" in e for e in errors)

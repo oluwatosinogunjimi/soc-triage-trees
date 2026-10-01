@@ -12,6 +12,7 @@ Checks, in order:
   8. Every {{placeholder}} is declared in that tree's entities.
   9. No also_check question repeats within a tree.
  10. Warnings: unused entities, questions with an unknown edge but no unknown note.
+ 11. Detection rules in detections/ match schema/detection.schema.json and link to playbooks that exist.
 
 Usage: python tools/validate.py [trees_dir]
 Exit code 1 if any error.
@@ -216,6 +217,33 @@ def check_graphs(trees: dict[str, dict]) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
+DETECTION_SCHEMA_PATH = ROOT / "schema" / "detection.schema.json"
+
+
+def load_detections(trees: dict[str, dict], det_dir: Path = ROOT / "detections") -> tuple[dict[str, dict], list[str]]:
+    """Detection rules copied from the KQL-Query repo: schema, file name, and playbook links."""
+    validator = Draft202012Validator(json.loads(DETECTION_SCHEMA_PATH.read_text()))
+    dets: dict[str, dict] = {}
+    errors: list[str] = []
+    for path in sorted(det_dir.glob("*.y*ml")) if det_dir.exists() else []:
+        try:
+            data = yaml.load(path.read_text(encoding="utf-8"), Loader=UniqueKeyLoader)
+        except yaml.YAMLError as e:
+            errors.append(f"{path.name}: YAML error: {e}")
+            continue
+        problems = [f"{path.name}: {'/'.join(map(str, e.path)) or '(root)'}: {e.message}" for e in validator.iter_errors(data)]
+        if problems:
+            errors.extend(problems)
+            continue
+        if data["id"] != path.stem:
+            errors.append(f"{path.name}: id '{data['id']}' does not match the file name")
+        for pb in data["playbooks"]:
+            if pb not in trees:
+                errors.append(f"{path.name}: playbook '{pb}' does not exist in trees/")
+        dets[data["id"]] = data
+    return dets, errors
+
+
 def validate(trees_dir: Path = ROOT / "trees") -> tuple[dict[str, dict], list[str], list[str]]:
     trees, errors = load_trees(trees_dir)
     graph_errors, warnings = check_graphs(trees)
@@ -225,13 +253,15 @@ def validate(trees_dir: Path = ROOT / "trees") -> tuple[dict[str, dict], list[st
 def main() -> int:
     trees_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "trees"
     trees, errors, warnings = validate(trees_dir)
+    dets, det_errors = load_detections(trees) if len(sys.argv) == 1 else ({}, [])
+    errors += det_errors
     for w in warnings:
         print(f"warning: {w}")
     for e in errors:
         print(f"error: {e}")
     total_nodes = sum(len(t["nodes"]) for t in trees.values())
     status = "FAILED" if errors else "OK"
-    print(f"{status}: {len(trees)} trees, {total_nodes} nodes, {len(errors)} errors, {len(warnings)} warnings")
+    print(f"{status}: {len(trees)} trees, {total_nodes} nodes, {len(dets)} detection rules, {len(errors)} errors, {len(warnings)} warnings")
     return 1 if errors else 0
 
 
