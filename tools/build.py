@@ -10,10 +10,7 @@ Usage: python tools/build.py
 """
 from __future__ import annotations
 
-import base64
-import hashlib
 import json
-import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -25,31 +22,6 @@ from validate import ROOT, validate  # noqa: E402
 SITE = ROOT / "site"
 DIST = ROOT / "dist"
 MARKER = "/*__TREE_DATA__*/null"
-
-
-def csp(fragment: str) -> str:
-    """Content Security Policy for the published page.
-
-    Only the page's own inline script may run (pinned by its hash, so an injected
-    <script> or event handler is blocked), the only outside origins are Google Fonts,
-    and the page can make no network requests, so case data cannot leave the browser.
-    """
-    scripts = re.findall(r"<script>(.*?)</script>", fragment, flags=re.S)
-    hashes = " ".join(
-        "'sha256-" + base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).decode() + "'"
-        for s in scripts
-    )
-    return "; ".join([
-        "default-src 'none'",
-        f"script-src {hashes}",
-        "style-src 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src https://fonts.gstatic.com",
-        "img-src data:",
-        "connect-src 'none'",
-        "base-uri 'none'",
-        "form-action 'none'",
-        "object-src 'none'",
-    ])
 
 
 def main() -> int:
@@ -88,8 +60,6 @@ def main() -> int:
     page = (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
-        f'<meta http-equiv="Content-Security-Policy" content="{csp(fragment)}">\n'
-        '<meta name="referrer" content="no-referrer">\n'
         "</head>\n<body>\n" + fragment + "\n</body>\n</html>\n"
     )
     (DIST / "index.html").write_text(page, encoding="utf-8")

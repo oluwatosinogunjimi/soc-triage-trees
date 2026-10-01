@@ -160,17 +160,3 @@ def test_repeated_also_check_is_caught(tmp_path):
 """)
     _, errors, _ = validate(tmp_path)
     assert any("also_check repeated" in e for e in errors), errors
-
-
-def test_csp_pins_the_inline_script():
-    import base64
-    import hashlib
-
-    import build
-
-    body = "const x = 1;"
-    policy = build.csp("<div></div><script>" + body + "</script>")
-    digest = base64.b64encode(hashlib.sha256(body.encode()).digest()).decode()
-    assert f"script-src 'sha256-{digest}'" in policy
-    assert "connect-src 'none'" in policy
-    assert "unsafe-inline" not in policy.split("script-src")[1].split(";")[0]

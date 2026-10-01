@@ -733,7 +733,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     try { bundle = await (await fetch("trees.json")).json(); }
     catch (e) { document.getElementById("app").textContent = "Could not load trees.json. Run python tools/build.py first."; return; }
   }
-  const TREES = Object.create(null); // no prototype, so "#constructor" or "#__proto__" in the URL is not a playbook
+  const TREES = {};
   bundle.trees.forEach(t => { TREES[t.id] = t; });
   const CATS = [
     ["triage", "Start here", "It asks a few questions about what fired, then hands you to the right playbook."],
@@ -851,12 +851,6 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
   function fill(text) {
     return String(text || "").replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, k) => (S.entities[k] || "").trim() || "[" + labelFor(k) + "]");
-  }
-  // Every placeholder in a query sits inside a double-quoted KQL string, so escape \ and " in the value.
-  // Stops a value copied from an alert (a file path, a subject line) from breaking or rewriting the query.
-  const kqlStr = v => String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  function fillKql(text) {
-    return String(text || "").replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, k) => { const v = (S.entities[k] || "").trim(); return v ? kqlStr(v) : "[" + labelFor(k) + "]"; });
   }
   function missingIn(text, bag) {
     String(text || "").replace(/\{\{\s*([a-z][a-z0-9_]*)\s*\}\}/g, (_, k) => { if (!(S.entities[k] || "").trim()) bag.add(k); return ""; });
@@ -1146,10 +1140,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     return s;
   }
   function highlight(text, words) {
-    const ws = words.filter(w => w.length > 1).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    if (!ws.length) return esc(text);
-    // Match on the raw text and escape each piece, so a search never lands inside an entity or a <mark> tag.
-    return String(text).split(new RegExp("(" + ws.join("|") + ")", "ig")).map((part, i) => i % 2 ? "<mark>" + esc(part) + "</mark>" : esc(part)).join("");
+    let out = esc(text);
+    words.filter(w => w.length > 1).forEach(w => { out = out.replace(new RegExp("(" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig"), "<mark>$1</mark>"); });
+    return out;
   }
   function card(t, words) {
     const outs = Object.values(t.nodes).filter(n => n.type === "outcome").map(n => ({ node: n }));
@@ -1373,12 +1366,12 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         const m = p.match(/^\{\{\s*([a-z][a-z0-9_]*)\s*\}\}$/);
         if (!m) { pre.append(p); return; }
         const v = (S.entities[m[1]] || "").trim();
-        pre.append(h("span", { class: v ? "ph-set" : "ph-empty", title: labelFor(m[1]) }, v ? kqlStr(v) : "<" + m[1] + ">"));
+        pre.append(h("span", { class: v ? "ph-set" : "ph-empty", title: labelFor(m[1]) }, v || "<" + m[1] + ">"));
       });
       return h("details", { class: "kql", open: i === 0 ? true : null },
         h("summary", {}, h("span", { class: "plat" }, k.platform === "xdr" ? "Defender XDR" : k.platform === "sentinel" ? "Sentinel" : "Sentinel + XDR"),
           h("span", { class: "kql-title" }, k.title),
-          h("button", { class: "btn sm", type: "button", onclick: (e) => { e.preventDefault(); copy(fillKql(q)); } }, icon("copy"), "Copy")), pre);
+          h("button", { class: "btn sm", type: "button", onclick: (e) => { e.preventDefault(); copy(fill(q)); } }, icon("copy"), "Copy")), pre);
     });
   }
   function renderStep(n) {
@@ -1568,7 +1561,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
   let regenNote = null;
   function renderNoteEditor() {
-    const ticket = h("input", { class: "field", id: "note-ticket", type: "text", placeholder: "e.g. INC0012345", autocomplete: "off" }); ticket.value = S.ticket;
+    const ticket = h("input", { class: "field", id: "note-ticket", type: "text", placeholder: "e.g. INC0012345" }); ticket.value = S.ticket;
     const sign = h("input", { class: "field", id: "note-sign", type: "text", placeholder: "e.g. Kind regards, Your name" }); sign.value = S.signoff;
     const incA = h("input", { type: "checkbox", id: "note-actions" }); incA.checked = S.incActions;
     const incS = h("input", { type: "checkbox", id: "note-steps" }); incS.checked = S.incSteps;
