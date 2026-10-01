@@ -68,6 +68,17 @@ Declare the values an analyst fills in once under `entities`, then use them anyw
 - Cite where the checks come from in `sources`, with https links.
 - Bump `version` (semver) and `last_reviewed` whenever you change a tree.
 
+## Detection rules
+
+Detection rules live in `detections/`, one YAML file per rule, and show on the Detections page. They are written and tested in the [KQL detection library](https://github.com/oluwatosinogunjimi/KQL-Query) first, then copied here:
+
+```bash
+python tools/import_detections.py ../KQL-Query   # copies every rule; a rule it can't read is skipped, never half-written
+python tools/validate.py                         # checks each rule against schema/detection.schema.json
+```
+
+You can also add or edit a file in `detections/` by hand. The site reads only these files. `playbooks` lists the playbook ids to walk when the rule fires; the validator fails if one doesn't exist, so renaming a playbook means updating the rules that point at it.
+
 ## Review checklist
 
 - [ ] `python tools/validate.py` passes with no warnings

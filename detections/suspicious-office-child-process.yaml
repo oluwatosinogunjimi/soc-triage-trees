@@ -1,0 +1,95 @@
+# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/execution/suspicious-office-child-process.md
+# The site reads only this file. Edit it here by hand, or re-run tools/import_detections.py.
+id: suspicious-office-child-process
+title: Suspicious Office Child Process
+tactic: Execution
+technique: 'Command and Scripting Interpreter (T1059), User Execution (T1204), User Execution: Malicious File (T1204.002)'
+technique_ids:
+- T1059
+- T1204
+- T1204.002
+severity: High
+severity_why: Office spawning an interpreter is a well-established initial-access pattern with a low benign rate once known macros are baselined.
+goal: 'Catch a malicious document running code: an Office application spawning a command interpreter, script host or download utility.'
+description: Detects known attacker-favoured LOLBins and interpreter binaries spawned directly by a Microsoft Office application (Word, Excel, PowerPoint, Outlook, OneNote, Publisher, Visio). Office processes should not spawn command interpreters, scripting hosts, or download utilities under normal operation. This pattern is commonly associated with malicious macros, phishing document execution, and initial access via Office-based payloads.
+strategy: '`DeviceProcessEvents` where the parent is an Office application (Word, Excel, PowerPoint, Outlook, OneNote, Publisher, Visio) and the child is one of a list of interpreters and living-off-the-land binaries (LOLBins) attackers favour.'
+technical_context: A malicious macro, embedded object or exploit makes the Office process start cmd, PowerShell, mshta, a script host or a LOLBin to fetch and run the next stage. The child's command line usually carries a URL, an encoded payload or a path in `%Temp%`, and the document typically arrived by email or download shortly before. Follow-on network connections and new files on the same device confirm execution.
+blind_spots:
+- 'Indirect launches that break the parent-child link: macros that start processes through WMI (parent becomes WmiPrvSE.exe), scheduled tasks, COM/DCOM or services.'
+- Office applications not in the list, for example msaccess.exe and the new Outlook (olk.exe).
+- LOLBins not in the list (for example cmstp.exe, hh.exe, msxsl.exe, explorer.exe used as a launcher).
+- 'Renamed binaries: the match is on `FileName`; `ProcessVersionInfoOriginalFileName` would catch renames.'
+- Payloads that run entirely inside the Office process (in-memory shellcode, injected DLLs) without spawning a child.
+false_positives:
+- Line-of-business macros and add-ins that call cmd or PowerShell (finance and reporting workbooks are common).
+- Document management and printing plug-ins that shell out to helper commands.
+- Users opening attached scripts or installers directly from Outlook (parent outlook.exe).
+frequency: NRT
+lookback: NRT
+kql: |
+  // Detect suspicious child processes spawned by Microsoft Office applications
+  // Covers common LOLBin / attacker-favoured binaries launched from Office parents
+
+  DeviceProcessEvents
+  | where Timestamp > ago(1h)
+  | where InitiatingProcessFileName in~ (
+      "winword.exe", "excel.exe", "powerpnt.exe",
+      "outlook.exe", "onenote.exe", "mspub.exe", "visio.exe"
+    )
+  | where FileName in~ (
+      "cmd.exe", "powershell.exe", "pwsh.exe",
+      "wscript.exe", "cscript.exe",
+      "mshta.exe", "regsvr32.exe", "rundll32.exe",
+      "certutil.exe", "bitsadmin.exe",
+      "wmic.exe", "msiexec.exe",
+      "schtasks.exe", "at.exe",
+      "net.exe", "net1.exe",
+      "curl.exe", "wget.exe",
+      "odbcconf.exe", "regasm.exe", "regsvcs.exe",
+      "installutil.exe", "ieexec.exe", "forfiles.exe",
+      "pcalua.exe", "bash.exe", "msbuild.exe"
+    )
+  | project
+      Timestamp,
+      DeviceId,
+      DeviceName,
+      ReportId,
+      InitiatingProcessFileName,
+      InitiatingProcessCommandLine,
+      InitiatingProcessAccountName,
+      FileName,
+      ProcessCommandLine,
+      AccountName,
+      FolderPath,
+      SHA256,
+      InitiatingProcessParentFileName
+alert:
+  title: Suspicious child process launched by {{InitiatingProcessFileName}} on {{DeviceName}}
+  description: 'Office process {{InitiatingProcessFileName}} spawned {{FileName}} with command line: {{ProcessCommandLine}}'
+  custom_details:
+  - 'ParentProcess: InitiatingProcessFileName'
+  - 'CommandLine: ProcessCommandLine'
+  - 'Hash: SHA256'
+entity_mapping:
+  Account: AccountName
+  Host: DeviceName
+  File: FileName
+  Process: ProcessCommandLine
+validation:
+- date: —
+  method: Atomic Red Team
+  environment: Windows test device, Defender XDR
+  result: Custom rule fired
+playbooks:
+- office-child-process
+actions:
+- Review `ProcessCommandLine` for the spawned interpreter/utility and determine whether it references a remote URL, encoded payload, or suspicious arguments.
+- Confirm the Office document's origin (email attachment, download, network share) and whether macros were enabled.
+- Check `SHA256` and `FolderPath` of the spawned process against threat intelligence.
+- Search `DeviceNetworkEvents` and `DeviceFileEvents` on the same `DeviceId` for follow-on downloads or persistence artifacts.
+- Isolate the endpoint and treat as a confirmed phishing-initiated compromise if the child process establishes network connections or drops additional payloads.
+tuning:
+- date: '2026-09-15'
+  change: Initial version
+  reason: Baseline
+source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/execution/suspicious-office-child-process.md

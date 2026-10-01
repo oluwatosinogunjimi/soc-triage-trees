@@ -1,0 +1,68 @@
+# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/privilege-escalation/local-admin-group-modification.md
+# The site reads only this file. Edit it here by hand, or re-run tools/import_detections.py.
+id: local-admin-group-modification
+title: Local Administrators Group Modification via Command Line
+tactic: Privilege Escalation
+technique: Account Manipulation
+technique_ids:
+- T1098
+severity: High
+severity_why: Unauthorised admin rights give an attacker full control of the host; legitimate changes should be traceable to a ticket or known tooling.
+goal: Catch an account being added to the local Administrators group from the command line, a common step after initial access to gain or keep admin rights.
+description: Detects attempts to add accounts to the local Administrators group using command-line utilities. This behavior is commonly associated with privilege escalation during post-exploitation.
+strategy: '`DeviceProcessEvents` where the command line contains `net localgroup` (net.exe or net1.exe), the word `administrators` and `/add`.'
+technical_context: 'Attackers and some ransomware operators run `net localgroup administrators <user> /add` to give a new or compromised account admin rights, often right after creating that account. The parent process shows where it came from: a remote shell, PsExec, a script, or an admin''s interactive session. A matching account creation on the same host shortly before is a strong sign of attacker persistence.'
+blind_spots:
+- 'Other ways to add a member: PowerShell `Add-LocalGroupMember`, WMI or ADSI scripts, direct Windows API calls used by attack tools, and Group Policy Restricted Groups.'
+- Localised group names on non-English systems (for example Administratoren, Administrateurs).
+- Command-line obfuscation such as caret insertion (`n^et localgroup`).
+- The `DeviceEvents` ActionType `UserAccountAddedToLocalGroup` records the change itself whatever tool made it, and would close most of these gaps as a companion rule.
+false_positives:
+- IT provisioning scripts and helpdesk staff granting temporary admin rights.
+- Software installers that add a service account to Administrators.
+frequency: NRT
+lookback: NRT
+kql: |
+  DeviceProcessEvents
+  | where ActionType == "ProcessCreated"
+  | where ProcessCommandLine matches regex @"(?i)net1?(\.exe)?\s+localgroup"
+  | where ProcessCommandLine matches regex @"(?i)administrators"
+  | where ProcessCommandLine matches regex @"(?i)\/add"
+  | project
+      DeviceId,
+      Timestamp,
+      ReportId,
+      DeviceName,
+      AccountName,
+      InitiatingProcessFileName,
+      InitiatingProcessCommandLine,
+      FileName,
+      ProcessCommandLine
+  | order by Timestamp desc
+alert:
+  title: Local Admin Group Modified on {{DeviceName}}
+  description: '{{AccountName}} executed {{FileName}} to modify Administrators group on {{DeviceName}}'
+  custom_details:
+  - 'ParentProcess: InitiatingProcessFileName'
+  - 'CommandLine: ProcessCommandLine'
+entity_mapping:
+  Account: AccountName
+  Host: DeviceName
+  File: FileName
+  Process: ProcessCommandLine
+validation:
+- date: —
+  method: Atomic Red Team
+  environment: Windows test device, Defender XDR
+  result: Custom rule fired
+playbooks:
+- local-admin-added
+actions:
+- Validate whether the account addition was authorized by IT administration.
+- Investigate the parent process and related command history for suspicious activity.
+- Remove unauthorized accounts from the Administrators group and reset credentials as needed.
+tuning:
+- date: '2026-03-25'
+  change: Initial version
+  reason: Baseline
+source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/privilege-escalation/local-admin-group-modification.md

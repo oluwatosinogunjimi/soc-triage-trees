@@ -712,6 +712,56 @@ footer.foot { padding-top: 12px; }
 @media (max-width: 780px) { .search-wrap kbd { display: none; } }
 @media (max-width: 420px) { .bar .btn.sm { padding: 4px 7px; } }
 
+/* detection rules */
+.dets, .rule { max-width: 1300px; margin: 0 auto; padding-block: clamp(28px, 5vw, 52px) 56px; padding-inline: clamp(16px, 5vw, 64px); display: grid; gap: 44px; }
+.dets-head { display: grid; gap: 16px; max-width: 760px; justify-items: start; }
+.dets-head h1 { font-size: clamp(44px, 6.5vw, 76px); line-height: .98; letter-spacing: -.02em; }
+.dets-head h1 em, .crow .cname em { color: var(--accent); }
+.dets-head .lead, .rule-head .lead { font-family: var(--font-display); font-size: clamp(18px, 2vw, 21px); line-height: 1.45; color: var(--ink-2); max-width: 62ch; }
+.dets-head .muted a, .rule-head .src { color: var(--accent); }
+.rfoot { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.pb-link { flex-basis: 100%; }
+.rule-card .alerts { align-self: start; }
+.rule-cards { margin-top: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.sev { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; line-height: 1.5; }
+.sev-high { color: var(--tp); } .sev-medium { color: var(--inc); } .sev-low { color: var(--btp); } .sev-informational { color: var(--muted); }
+.tested { display: inline-flex; align-items: center; gap: 5px; color: var(--btp); font-size: 12.5px; }
+.tested svg { width: 14px; height: 14px; stroke-width: 2.4; }
+.untested { color: var(--muted); font-size: 12.5px; }
+.ci-rule { color: var(--accent); }
+.rule-head { display: grid; gap: 14px; max-width: 920px; }
+.rule-head h1 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.05; font-weight: 500; }
+.rule-head .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; color: var(--muted); }
+.rule-head .src { display: inline-flex; gap: 4px; align-items: center; }
+.rule-head .src svg { width: 13px; height: 13px; }
+.rule-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: clamp(28px, 4vw, 56px); align-items: start; }
+@media (max-width: 980px) { .rule-grid { grid-template-columns: minmax(0, 1fr); } .rule-side { order: -1; position: static !important; } }
+.rule-main { display: grid; gap: 36px; min-width: 0; }
+.rule-main section { display: grid; gap: 12px; min-width: 0; }
+.rule-main h2 { font-size: 26px; font-weight: 500; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.rule-main p, .rule-main li { color: var(--ink-2); max-width: 72ch; line-height: 1.6; margin: 0; }
+.rule-main ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.rule code, .rule-card code { font-family: var(--font-mono); font-size: .86em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.rule-side { display: grid; gap: 16px; position: sticky; top: 84px; min-width: 0; }
+.rule-side .panel { padding: 18px; display: grid; gap: 12px; }
+.rule-side .panel-title { font-family: var(--font-mono); font-weight: 400; letter-spacing: .14em; }
+.rule-side p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.rule-side .fires { border-color: var(--accent); }
+.rule-side .fires .card { padding: 14px; }
+.rule-side .fires .card h3 { font-size: 19px; }
+.mono-box { font-family: var(--font-mono); font-size: 12.5px; background: var(--code-bg); color: var(--code-ink); padding: 10px 12px; border-radius: var(--r); overflow-wrap: anywhere; line-height: 1.5; }
+.rule-side dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 13.5px; }
+.rule-side dt { color: var(--muted); }
+.rule-side dd { margin: 0; font-family: var(--font-mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.table-wrap { overflow-x: auto; }
+table.vt { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.vt th { text-align: left; font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 400; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--rule); }
+table.vt td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-2); min-width: 90px; }
+.det-links { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 8px; }
+.det-lead { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.chip.det-chip { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.chip.det-chip svg { width: 13px; height: 13px; color: var(--accent); }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -735,6 +785,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
   const TREES = {};
   bundle.trees.forEach(t => { TREES[t.id] = t; });
+  // Detection rules copied from the KQL library. Maps, so a rule id from the URL is only ever a lookup key.
+  const DETS = new Map((bundle.detections || []).map(d => [d.id, d]));
+  const DETS_FOR = new Map();
+  DETS.forEach(d => (d.playbooks || []).forEach(pb => { if (!DETS_FOR.has(pb)) DETS_FOR.set(pb, []); DETS_FOR.get(pb).push(d); }));
+  const TACTIC_ORDER = ["Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"];
   const CATS = [
     ["triage", "Start here", "It asks a few questions about what fired, then hands you to the right playbook."],
     ["email", "Email and collaboration", "Phishing, business email compromise, mailbox abuse and Teams."],
@@ -748,7 +803,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     linkedin: "https://www.linkedin.com/in/oluwatosin-ogunjimi/",
     medium: "https://medium.com/@OluwatosinOgunjimi",
     article: "https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7",
-    github: "https://github.com/oluwatosinogunjimi/soc-triage-trees"
+    github: "https://github.com/oluwatosinogunjimi/soc-triage-trees",
+    kql: "https://github.com/oluwatosinogunjimi/KQL-Query"
   };
   const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
   const VERDICTS = ["true_positive", "inconclusive", "benign_positive", "false_positive"];
@@ -780,6 +836,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   } else if (hashId && TREES[hashId]) S.view = "case";
   else if (hashId === "library") S.view = "home";
   else if (hashId === "about") S.view = "about";
+  else if (hashId === "detections" || hashId.startsWith("detections/")) S.view = "detections";
+  let ruleId = hashId.startsWith("detections/") && DETS.has(hashId.slice(11)) ? hashId.slice(11) : null;
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
 
   // Theme: follow the device until the analyst picks one, then remember it.
@@ -834,6 +892,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     endpoint: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>',
     network: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v4M12 11 6.5 16.5M12 11l5.5 5.5"/>',
     cloud: '<path d="M7 18a4 4 0 0 1-.5-7.97A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/>',
+    rule: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     v_false_positive: '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>',
     v_benign_positive: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
     v_true_positive: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
@@ -970,6 +1030,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     query = ""; goHome();
     requestAnimationFrame(() => { const el = document.getElementById("cat-" + cat); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
   }
+  function openDetections(id) {
+    S.view = "detections"; ruleId = id && DETS.has(id) ? id : null; save();
+    setHash(ruleId ? "detections/" + ruleId : "detections"); closeMap(); closeOverlays(); render(); window.scrollTo(0, 0);
+  }
   function openAbout() { S.view = "about"; save(); setHash("about"); closeMap(); closeOverlays(); render(); window.scrollTo(0, 0); }
   function closeOverlays() {
     document.querySelectorAll("details.browse[open]").forEach(d => { d.open = false; });
@@ -1009,6 +1073,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       h("nav", { class: "primary-nav", "aria-label": "Main" },
         h("button", { class: "nav-link", type: "button", onclick: goHome, "aria-current": S.view === "home" ? "page" : null }, "Library"),
         browse,
+        DETS.size ? h("button", { class: "nav-link", type: "button", onclick: () => openDetections(), "aria-current": S.view === "detections" ? "page" : null }, "Detections") : null,
         h("button", { class: "nav-link", type: "button", onclick: openAbout, "aria-current": S.view === "about" ? "page" : null }, "About")),
       h("span", { class: "grow" }),
       h("button", { class: "search-trigger", type: "button", onclick: openPalette, "aria-label": "Jump to a playbook" }, svg(ICON.search), h("span", { class: "lbl" }, "Jump to a playbook"), h("kbd", {}, IS_MAC ? "\u2318K" : "Ctrl K")),
@@ -1033,6 +1098,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       h("div", { class: "m-sub" }, "Browse"),
       CATS.map(([cat, label]) => h("button", { type: "button", onclick: go(() => goCategory(cat)) },
         h("span", {}, cat === "triage" ? "Universal Triage (start here)" : label), h("span", { class: "count" }, bundle.trees.filter(t => t.category === cat).length))),
+      DETS.size ? h("button", { type: "button", onclick: go(() => openDetections()) }, h("span", {}, "Detection rules"), h("span", { class: "count" }, DETS.size)) : null,
       h("hr"),
       h("button", { type: "button", onclick: go(openAbout) }, "About"),
       h("a", { href: LINKS.article, target: "_blank", rel: "noopener" }, "The article behind it", icon("ext")),
@@ -1054,7 +1120,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const list = h("ul", { class: "pal-list", id: "pal-list", role: "listbox" });
     const box = h("div", { class: "pal", role: "dialog", "aria-modal": "true", "aria-label": "Jump to a playbook" },
       h("div", { class: "pal-top" }, svg(ICON.search), input, h("kbd", {}, "Esc")), list,
-      h("div", { class: "pal-foot" }, h("span", {}, h("kbd", {}, "\u2191"), " ", h("kbd", {}, "\u2193"), " move"), h("span", {}, h("kbd", {}, "Enter"), " open"), h("span", {}, bundle.trees.length + " playbooks")));
+      h("div", { class: "pal-foot" }, h("span", {}, h("kbd", {}, "\u2191"), " ", h("kbd", {}, "\u2193"), " move"), h("span", {}, h("kbd", {}, "Enter"), " open"), h("span", {}, bundle.trees.length + " playbooks" + (DETS.size ? " \u00b7 " + DETS.size + " rules" : ""))));
     const ov = h("div", { class: "pal-ov", id: "pal", onclick: e => { if (e.target === ov) closePalette(); } }, box);
     let items = [];
     const actions = () => {
@@ -1062,6 +1128,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       if (S.view !== "case" && (S.path.length || S.started)) a.push({ kind: "action", title: "Resume: " + TREES[S.tree].title, sub: S.path.length + " steps answered", run: resume });
       a.push({ kind: "action", title: "Universal Triage", sub: "Not sure which playbook fits? Start here.", run: () => openTree("universal-triage") });
       a.push({ kind: "action", title: "Library", sub: "All playbooks by category", run: goHome });
+      if (DETS.size) a.push({ kind: "action", title: "Detection rules", sub: DETS.size + " custom rules for Defender XDR, linked to their playbooks", run: () => openDetections() });
       a.push({ kind: "action", title: "About Triage Trees", sub: "What it is, where it came from, who built it", run: openAbout });
       return a;
     };
@@ -1071,7 +1138,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       let groups;
       if (ws.length) {
         const hits = bundle.trees.map(t => [t, score(t, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1] || a[0].title.localeCompare(b[0].title));
-        groups = [["Playbooks", hits.map(([t]) => ({ kind: "tree", t }))]];
+        const rhits = [...DETS.values()].map(d => [d, scoreRule(d, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
+        groups = [["Playbooks", hits.map(([t]) => ({ kind: "tree", t }))], ["Detection rules", rhits.map(([d]) => ({ kind: "rule", d }))]];
       } else {
         groups = [["Go to", actions()]].concat(CATS.filter(c => c[0] !== "triage").map(([cat, label]) =>
           [label, bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title)).map(t => ({ kind: "tree", t }))]));
@@ -1082,14 +1150,14 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         list.append(h("li", { class: "pg", role: "presentation" }, label));
         arr.forEach(it => {
           const i = items.length; items.push(it);
-          const title = it.kind === "tree" ? it.t.title : it.title;
-          const sub = it.kind === "tree" ? (it.t.applies_to || []).slice(0, 3).join(" \u00b7 ") : it.sub;
+          const title = it.kind === "tree" ? it.t.title : it.kind === "rule" ? it.d.title : it.title;
+          const sub = it.kind === "tree" ? (it.t.applies_to || []).slice(0, 3).join(" \u00b7 ") : it.kind === "rule" ? [it.d.tactic].concat(it.d.technique_ids).join(" \u00b7 ") : it.sub;
           list.append(h("li", { class: "opt", role: "option", id: "pal-o-" + i, "aria-selected": "false", onmousemove: () => { if (palSel !== i) { palSel = i; mark(); } }, onclick: () => pick(i) },
-            h("span", { class: "pt", html: highlight(title, ws) }), h("span", { class: "pc" }, it.kind === "tree" ? CAT_NAME[it.t.category] : ""),
+            h("span", { class: "pt", html: highlight(title, ws) }), h("span", { class: "pc" }, it.kind === "tree" ? CAT_NAME[it.t.category] : it.kind === "rule" ? "Detection rule" : ""),
             sub ? h("span", { class: "ps", html: highlight(sub, ws) }) : null));
         });
       });
-      if (!items.length) list.append(h("li", { class: "pal-empty", role: "presentation" }, "No playbook matches. Try the alert name as your SIEM shows it, or a technique ID like T1110."));
+      if (!items.length) list.append(h("li", { class: "pal-empty", role: "presentation" }, "Nothing matches. Try the alert name as your SIEM shows it, or a technique ID like T1110."));
       palSel = 0; mark();
     };
     const mark = () => {
@@ -1106,7 +1174,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const pick = i => {
       const it = items[i]; if (!it) return;
       closePalette._ret = null; closePalette();
-      if (it.kind === "tree") openTree(it.t.id); else it.run();
+      if (it.kind === "tree") openTree(it.t.id); else if (it.kind === "rule") openDetections(it.d.id); else it.run();
     };
     input.addEventListener("input", draw);
     input.addEventListener("keydown", e => {
@@ -1137,6 +1205,12 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     for (const w of words) {
       if (title.startsWith(w)) s += 7; else if (title.includes(w)) s += 5; else if (alerts.includes(w)) s += 3; else if (rest.includes(w)) s += 1; else return 0;
     }
+    return s;
+  }
+  function scoreRule(d, words) {
+    const title = d.title.toLowerCase(), rest = [d.goal, d.tactic, d.technique, d.technique_ids.join(" "), d.id, d.description].join(" ").toLowerCase();
+    let s = 0;
+    for (const w of words) { if (title.startsWith(w)) s += 7; else if (title.includes(w)) s += 5; else if (rest.includes(w)) s += 1; else return 0; }
     return s;
   }
   function highlight(text, words) {
@@ -1186,7 +1260,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const setQ = q => () => { query = q; input.value = q; renderResults(); input.focus(); };
     const hero = h("div", { class: "hero-band" }, h("section", { class: "hero" },
       h("div", { class: "hero-text" },
-        h("div", { class: "eyebrow" }, "A field guide for SOC triage · " + bundle.trees.length + " playbooks"),
+        h("div", { class: "eyebrow" }, "A field guide for SOC triage · " + bundle.trees.length + " playbooks" + (DETS.size ? " · " + DETS.size + " detection rules" : "")),
         h("h1", {}, "What ", h("em", {}, "fired?")),
         h("p", { class: "lead" }, "Pick the alert and walk it to a verdict. One question at a time, the query that answers it, and a closure note written from what you found."),
         h("div", { class: "search-wrap" }, svg(ICON.search), input, h("kbd", {}, "/")),
@@ -1209,6 +1283,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
             !hits.length ? h("p", {}, "Try the alert name as your SIEM shows it, a technique ID like T1110, or start with Universal Triage.") : null,
             h("button", { class: "btn ghost sm", type: "button", onclick: () => { query = ""; input.value = ""; renderResults(); input.focus(); } }, "Clear search")),
           h("div", { class: "cards" }, hits.map(([t]) => card(t, ws)))));
+        const rhits = [...DETS.values()].map(d => [d, scoreRule(d, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
+        if (rhits.length) results.append(h("section", {},
+          h("div", { class: "section-head" }, svg(ICON.rule), h("h2", {}, rhits.length + " matching detection rule" + (rhits.length > 1 ? "s" : "")), h("span", { class: "count" }, "of " + DETS.size)),
+          h("div", { class: "cards" }, rhits.map(([d]) => ruleCard(d)))));
         return;
       }
       const count = c => bundle.trees.filter(t => t.category === c).length;
@@ -1216,7 +1294,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         CATS.map(([cat, label], i) => h("button", { class: "crow", type: "button", onclick: () => goCategory(cat) },
           h("span", { class: "cn" }, String(i).padStart(2, "0")), catIcon(cat),
           h("span", { class: "cname" }, cat === "triage" ? ["Universal Triage ", h("em", {}, "start here")] : label),
-          cat === "triage" ? null : h("span", { class: "cc" }, count(cat)))));
+          cat === "triage" ? null : h("span", { class: "cc" }, count(cat)))),
+        DETS.size ? h("button", { class: "crow", type: "button", onclick: () => openDetections() },
+          h("span", { class: "cn" }, String(CATS.length).padStart(2, "0")), svg(ICON.rule, "ci-rule"),
+          h("span", { class: "cname" }, "Detection rules ", h("em", {}, "what fires")), h("span", { class: "cc" }, DETS.size)) : null);
       const walked = h("section", { class: "walked", "aria-label": "Most walked" }, h("div", { class: "label-rule" }, "Most walked"),
         h("div", { class: "cards two" }, WALKED.filter(id => TREES[id]).map(id => card(TREES[id], []))));
       results.append(h("div", { class: "twocol" }, contents, walked));
@@ -1261,7 +1342,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         h("h1", {}, t.title),
         h("div", { class: "meta" },
           (t.mitre || []).map(id => h("a", { class: "chip mono", href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id)),
-          h("span", {}, "v" + t.version + " · reviewed " + t.last_reviewed), sources)),
+          h("span", {}, "v" + t.version + " · reviewed " + t.last_reviewed), sources),
+        (DETS_FOR.get(t.id) || []).length ? h("div", { class: "det-links" }, h("span", { class: "det-lead" }, "Detection rules that lead here"),
+          DETS_FOR.get(t.id).map(d => h("button", { class: "chip det-chip", type: "button", onclick: () => openDetections(d.id) }, svg(ICON.rule), d.title))) : null),
       h("div", { class: "actions" },
         h("button", { class: "btn", type: "button", onclick: openMap }, icon("map"), "Map", h("kbd", {}, "M")),
         h("button", { class: "btn", type: "button", onclick: () => { const el = document.getElementById("note-anchor") || document.getElementById("draft-panel"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, icon("note"), "Note")));
@@ -1862,7 +1945,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const nAlso = bundle.trees.reduce((a, t) => a + Object.values(t.nodes).reduce((b, n) => b + (n.also_check || []).length, 0), 0);
     app.append(h("main", { class: "about" },
       h("section", { style: "display:grid;gap:12px" }, h("h1", {}, "About Triage Trees"),
-        h("p", { style: "font-size:17px" }, "Question-driven investigation playbooks for SOC analysts. Pick the alert, answer yes or no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and copy a closure note written from the path you took.")),
+        h("p", { style: "font-size:17px" }, "Question-driven investigation playbooks for SOC analysts, and the detection rules behind some of the alerts. Pick the alert, answer yes or no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and copy a closure note written from the path you took.")),
       h("section", { class: "panel author" }, h("div", { class: "avatar", "aria-hidden": "true" }, "OO"),
         h("div", {}, h("h2", { style: "margin:0" }, "Oluwatosin Ogunjimi"),
           h("p", {}, "SOC analyst and cybersecurity writer. Triage Trees turns the questions from his article series into playbooks any analyst can walk."),
@@ -1880,23 +1963,106 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         h("ul", {},
           h("li", {}, bundle.trees.length + " playbooks across email, identity, endpoint, network and cloud."),
           h("li", {}, nQ + " decision questions and " + nAlso + " wider checks."),
-          h("li", {}, "KQL for Microsoft Sentinel and Defender XDR at the step it answers. Test queries in your own workspace before relying on them."))),
+          h("li", {}, "KQL for Microsoft Sentinel and Defender XDR at the step it answers. Test queries in your own workspace before relying on them."),
+          DETS.size ? h("li", {}, DETS.size + " custom detection rules for Defender XDR, each with its blind spots, false positives, test record and the playbook to walk when it fires. ",
+            h("a", { href: "#detections", onclick: e => { e.preventDefault(); openDetections(); } }, "See the detection rules"), ".") : null)),
       h("section", {}, h("h2", {}, "Privacy"),
         h("p", {}, "Case data stays in your browser's local storage and is never sent anywhere. Don't enter data your client's handling rules forbid storing on your workstation.")),
       h("section", {}, h("h2", {}, "Contribute"),
-        h("p", {}, "Each playbook is one YAML file, validated in CI. Suggest a new use case or improve a question on GitHub."),
+        h("p", {}, "Each playbook and each detection rule is one YAML file, validated in CI. Suggest a new use case or improve a question on GitHub."),
         h("div", { class: "link-row" }, ext(LINKS.github, "Open the repository"), h("button", { class: "btn", type: "button", onclick: goHome }, "Back to the library")))));
   }
 
   // ================= render =================
+  // ================= detection rules =================
+  // Inline `code` from the rule text, built as DOM nodes (never innerHTML).
+  const md = text => String(text || "").split(/(`[^`]+`)/g).filter(Boolean).map(p => p.length > 2 && p[0] === "`" && p[p.length - 1] === "`" ? h("code", {}, p.slice(1, -1)) : p);
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const fmtDate = d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ""); return m ? (+m[3]) + " " + MONTHS[+m[2] - 1] + " " + m[1] : null; };
+  const sevPill = sev => sev ? h("span", { class: "sev sev-" + String(sev).toLowerCase() }, sev) : null;
+  function testBadge(d) {
+    const v = (d.validation || []).find(r => /fired/i.test(r.result || ""));
+    if (!v) return h("span", { class: "untested" }, "Not yet tested");
+    const when = fmtDate(v.date);
+    return h("span", { class: "tested", title: [v.method, v.environment].filter(Boolean).join(", ") }, svg(ICON.check), "Fired in test" + (when ? " \u00b7 " + when : ""));
+  }
+  const playbooksOf = d => (d.playbooks || []).filter(id => TREES[id]);
+  function ruleCard(d) {
+    return h("button", { class: "card rule-card", type: "button", onclick: () => openDetections(d.id) },
+      h("span", { class: "cmeta" }, [d.tactic].concat(d.technique_ids || []).filter(Boolean).join(" \u00b7 ")),
+      h("h3", {}, d.title),
+      h("div", { class: "alerts" }, String(d.goal || "").replace(/`/g, "")),
+      h("div", { class: "rfoot" }, sevPill(d.severity), testBadge(d),
+        playbooksOf(d).length ? h("span", { class: "pb-link" }, "Playbook: " + playbooksOf(d).map(id => TREES[id].title).join(", ")) : null));
+  }
+  function renderDetections() {
+    const app = document.getElementById("app"); app.replaceChildren();
+    if (ruleId && DETS.has(ruleId)) { app.append(renderRule(DETS.get(ruleId))); return; }
+    const rules = [...DETS.values()];
+    const rank = t => { const i = TACTIC_ORDER.indexOf(t); return i < 0 ? 99 : i; };
+    rules.sort((a, b) => rank(a.tactic) - rank(b.tactic) || a.title.localeCompare(b.title));
+    app.append(h("main", { class: "dets" },
+      h("header", { class: "dets-head" },
+        h("div", { class: "eyebrow" }, "Detection rules \u00b7 " + rules.length + " custom rules for Defender XDR"),
+        h("h1", {}, "What makes it ", h("em", {}, "fire?")),
+        h("p", { class: "lead" }, "The custom detection rules behind some of the alerts in this library. Each one says what it catches, where it is blind, how it was tested, and which playbook to walk when it fires."),
+        h("p", { class: "muted" }, "Copied from the ", h("a", { href: LINKS.kql, target: "_blank", rel: "noopener" }, "KQL detection library"), ". Run any rule in your own tenant before you rely on it.")),
+      h("section", {}, h("div", { class: "label-rule" }, "Ordered by ATT&CK tactic"), h("div", { class: "cards rule-cards" }, rules.map(ruleCard)))));
+  }
+  function renderRule(d) {
+    const pbs = playbooksOf(d);
+    const list = arr => (arr && arr.length) ? h("ul", {}, arr.map(x => h("li", {}, md(x)))) : null;
+    const sec = (title, ...body) => body.flat().some(Boolean) ? h("section", {}, h("h2", {}, title), body) : null;
+    const table = (cols, rows, keys) => (rows && rows.length) ? h("div", { class: "table-wrap" }, h("table", { class: "vt" },
+      h("thead", {}, h("tr", {}, cols.map(c => h("th", { scope: "col" }, c)))),
+      h("tbody", {}, rows.map(r => h("tr", {}, keys.map(k => h("td", {}, md(r[k])))))))) : null;
+    const query = h("details", { class: "kql", open: true },
+      h("summary", {}, h("span", { class: "plat" }, "Defender XDR"), h("span", { class: "kql-title" }, "Custom detection query"),
+        h("button", { class: "btn sm", type: "button", onclick: e => { e.preventDefault(); copy(d.kql || ""); } }, icon("copy"), "Copy")),
+      h("pre", { class: "code" }, (d.kql || "").replace(/\s+$/, "")));
+    const alert = d.alert || {};
+    const ents = Object.entries(d.entity_mapping || {});
+    return h("main", { class: "rule" },
+      h("div", { class: "rule-head" },
+        h("nav", { class: "case-crumbs", "aria-label": "Breadcrumb" }, h("button", { type: "button", onclick: () => openDetections() }, "Detection rules"), h("span", { "aria-hidden": "true" }, "/"), h("span", {}, d.tactic || "")),
+        h("h1", {}, d.title),
+        d.goal ? h("p", { class: "lead" }, md(d.goal)) : null,
+        h("div", { class: "meta" },
+          (d.technique_ids || []).map(id => h("a", { class: "chip mono", href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id)),
+          sevPill(d.severity), testBadge(d),
+          (d.frequency || d.lookback) ? h("span", {}, [d.frequency, d.lookback ? "looks back " + d.lookback : ""].filter(Boolean).join(" \u00b7 ")) : null,
+          d.source ? h("a", { class: "src", href: d.source, target: "_blank", rel: "noopener" }, "View in the KQL library", icon("ext")) : null)),
+      h("div", { class: "rule-grid" },
+        h("div", { class: "rule-main" },
+          sec("The rule", d.description ? h("p", {}, md(d.description)) : null, query),
+          sec("How it works", d.strategy ? h("p", {}, md(d.strategy)) : null),
+          sec("What an attack looks like", d.technical_context ? h("p", {}, md(d.technical_context)) : null),
+          sec("Blind spots and assumptions", list(d.blind_spots)),
+          sec("False positives", list(d.false_positives)),
+          sec("When it fires", list(d.actions)),
+          sec("Validation", table(["Date", "Method", "Environment", "Result"], d.validation, ["date", "method", "environment", "result"])),
+          sec("Tuning history", table(["Date", "Change", "Reason"], d.tuning, ["date", "change", "reason"]))),
+        h("aside", { class: "rule-side" },
+          pbs.length ? h("div", { class: "panel fires" }, h("div", { class: "panel-title" }, "When it fires, walk"),
+            pbs.map(id => card(TREES[id], [])),
+            h("button", { class: "btn primary", type: "button", onclick: () => openTree(pbs[0]) }, "Start the playbook")) : null,
+          d.severity ? h("div", { class: "panel" }, h("div", { class: "panel-title" }, "Severity"), h("div", {}, sevPill(d.severity)), d.severity_why ? h("p", {}, md(d.severity_why)) : null) : null,
+          (alert.title || alert.description) ? h("div", { class: "panel" }, h("div", { class: "panel-title" }, "Alert"),
+            alert.title ? h("div", { class: "mono-box" }, alert.title) : null,
+            alert.description ? h("p", { class: "muted" }, alert.description) : null) : null,
+          ents.length ? h("div", { class: "panel" }, h("div", { class: "panel-title" }, "Entity mapping"),
+            h("dl", {}, ents.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)]))) : null)));
+  }
+
   function render() {
     renderBar();
-    if (S.view === "home") renderHome(); else if (S.view === "about") renderAbout(); else renderCase(false);
+    if (S.view === "home") renderHome(); else if (S.view === "about") renderAbout(); else if (S.view === "detections") renderDetections(); else renderCase(false);
   }
   window.addEventListener("hashchange", () => {
     const id = location.hash.slice(1);
     if (id === "library") { if (S.view !== "home") goHome(); return; }
     if (id === "about") { if (S.view !== "about") openAbout(); return; }
+    if (id === "detections" || id.startsWith("detections/")) { const r = id.slice(11) || null; if (S.view !== "detections" || r !== ruleId) openDetections(r); return; }
     if (TREES[id] && id !== S.tree) openTree(id);
   });
   render();

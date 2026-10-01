@@ -1,6 +1,6 @@
 # Triage Trees
 
-Question-driven investigation playbooks for SOC analysts. Pick the alert type, answer yes/no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and export a closure note written from the path you took.
+Question-driven investigation playbooks for SOC analysts, plus the custom detection rules behind some of the alerts. Pick the alert type, answer yes/no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and export a closure note written from the path you took.
 
 This project grew out of the article [Lessons from the SOC: How Analysts Can Triage Smarter, Tune Better, and Stop Drowning in Alerts](https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7). The article's question bank is now structured data, checked against vendor incident response playbooks and MITRE ATT&CK.
 
@@ -30,6 +30,20 @@ Every tree has:
 - **Outcomes with a verdict.** Each outcome is a false positive, benign true positive, true positive or inconclusive result, with a risk statement, recommended actions, a monitoring line and tuning advice.
 - **Closure note export.** Your path, the evidence you typed at each step and the outcome become a draft note you can paste into the ticket.
 
+## Detection rules
+
+The Detections page shows custom Defender XDR detection rules from the [KQL detection library](https://github.com/oluwatosinogunjimi/KQL-Query). Each rule shows its query, what it catches, its blind spots and false positives, how it was tested, and the playbook to walk when it fires. Playbooks link back to the rules that lead to them.
+
+| Rule | Tactic | Playbook |
+|---|---|---|
+| PowerShell DownloadString Remote Execution | Execution | Suspicious PowerShell or LOLBin Execution |
+| Suspicious Office Child Process | Execution | Office Application Spawned a Suspicious Process |
+| User Account Creation via Command Line | Persistence | Local Account Created or Added to Administrators |
+| Local Administrators Group Modification via Command Line | Privilege Escalation | Local Account Created or Added to Administrators |
+| Svchost Execution from Unusual Location | Defense Evasion | Malware or EDR Detection |
+
+The rules are copied into `detections/` as YAML, so the site never depends on the KQL repo. To refresh them after a rule changes there, run `python tools/import_detections.py ../KQL-Query`, or edit the YAML by hand. Either way, `python tools/validate.py` checks every rule and that its playbook exists.
+
 ## Using it
 
 Open the published site, or build it locally:
@@ -40,7 +54,7 @@ python tools/build.py          # validates, then writes dist/
 python -m http.server -d dist  # open http://localhost:8000
 ```
 
-`dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`. Press `Ctrl K` (`⌘K` on Mac) anywhere to jump to a playbook.
+`dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`, and to a detection rule with `#detections/rule-id`. Press `Ctrl K` (`⌘K` on Mac) anywhere to jump to a playbook.
 
 The site has a light mode (a field-guide look on paper) and a dark mode (a console look for long shifts). It follows your device setting until you use the sun/moon switch, then remembers your choice.
 
@@ -50,11 +64,14 @@ Case state (your path, evidence and entity values) stays in your own browser's l
 
 ```
 trees/                 one YAML file per playbook (this is the content)
+detections/            one YAML file per detection rule, copied from the KQL library
 schema/tree.schema.json  the contract every tree must meet
+schema/detection.schema.json  the contract every detection rule must meet
 tools/validate.py      schema plus graph checks (orphans, broken edges, cycles, placeholders)
 tools/build.py         validate, then bundle into dist/
 tools/new_tree.py      scaffold a new tree that already validates
 tools/gen_router.py    regenerate the Universal Triage menus and docs/CATALOGUE.md
+tools/import_detections.py  copy rules from the KQL library into detections/ (optional)
 site/viewer.html       the viewer (walkthrough, map, closure note)
 tests/                 pytest suite for the validator and build
 ```

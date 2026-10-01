@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Detection rule",
+  "description": "A custom detection rule copied from the KQL-Query repo by tools/import_detections.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "tactic", "technique", "technique_ids", "severity", "goal", "description", "kql", "playbooks", "source"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "title": { "type": "string", "minLength": 1 },
+    "tactic": { "type": "string" },
+    "technique": { "type": "string" },
+    "technique_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$" } },
+    "severity": { "enum": ["Informational", "Low", "Medium", "High"] },
+    "severity_why": { "type": "string" },
+    "goal": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "strategy": { "type": "string" },
+    "technical_context": { "type": "string" },
+    "blind_spots": { "type": "array", "items": { "type": "string" } },
+    "false_positives": { "type": "array", "items": { "type": "string" } },
+    "frequency": { "type": "string" },
+    "lookback": { "type": "string" },
+    "kql": { "type": "string", "minLength": 1 },
+    "alert": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" }, "description": { "type": "string" },
+        "custom_details": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "entity_mapping": { "type": "object", "additionalProperties": { "type": "string" } },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["date", "method", "environment", "result"],
+        "properties": { "date": { "type": "string" }, "method": { "type": "string" }, "environment": { "type": "string" }, "result": { "type": "string" } }
+      }
+    },
+    "playbooks": { "type": "array", "items": { "type": "string" } },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "tuning": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["date", "change", "reason"],
+        "properties": { "date": { "type": "string" }, "change": { "type": "string" }, "reason": { "type": "string" } }
+      }
+    },
+    "source": { "type": "string", "pattern": "^https://" }
+  }
+}
