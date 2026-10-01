@@ -52,7 +52,7 @@ The OSINT page lists 40 tools for the checks your own logs can't answer: IP and 
 - **Sends indicator**: the vendor sees and may log what you look up.
 - **Public by default**: creates a scan or analysis others can see. Never submit client files or internal URLs.
 
-Paste an IP, domain, URL, hash, email or CVE (defanged is fine) and the page builds one-click lookups for the tools that support it. Private addresses and internal names are refused. The indicator is never saved or put in the page URL. In a case, entity values that are public indicators get an **OSINT** link that opens the lookups in a new tab, so the case stays where you left it. The browser's Back button moves between pages.
+Paste an IP, domain, URL, hash, email or CVE (defanged is fine) and the page builds one-click lookups for the tools that support it. Private addresses and internal names are refused. The indicator is never saved or put in the page URL. In a case, entity values that are public indicators get an **OSINT** link that opens the lookups with the value filled in. **Back to your case** (or the browser's Back button) returns to the case as you left it, however you reached the OSINT page.
 
 Tools live in `osint/tools.yaml`. Every entry records when its links were last checked and how; the validator warns once a check is more than 180 days old.
 
