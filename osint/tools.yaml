@@ -1,0 +1,556 @@
+# OSINT tools for SOC checks. The site's OSINT page reads only this file.
+#
+# Each tool:
+#   id          lowercase-with-dashes, unique
+#   name, url   what it is and where it lives
+#   group       reputation | infrastructure | sandbox | email | vulnerability | reference | utility
+#   what        one line: what it tells you
+#   use_when    the triage question it answers
+#   watch_out   caveats that change how you read the result (optional)
+#   opsec       local     runs in your browser, nothing leaves it
+#               lookup    sends the indicator to the vendor, which may log it; searches existing data only
+#               submits   creates a new scan or sample the vendor may share publicly; never send client files or internal URLs
+#   access      free | free-account | freemium | paid
+#   lookups     optional map of indicator type to a URL template. Types: ip, domain, url, hash, sha256, cve.
+#               {value} is the indicator, encoded when it sits in a query string or fragment.
+#               {hashtype} (hash lookups) is md5, sha1 or sha256. {urlsha256} (url lookups) is the
+#               SHA-256 of the URL, which is how VirusTotal addresses URL reports.
+#               Only add a template you have opened yourself and seen return the right result.
+#   playbooks   tree ids where the tool answers a question (checked by tools/validate.py)
+#   verified    when the link and any lookup templates were last checked, and how
+#
+# Indicators are never put in the page URL. Private and internal values are never offered for lookup.
+
+tools:
+  # ---------------- reputation ----------------
+  - id: virustotal
+    name: VirusTotal
+    url: https://www.virustotal.com/
+    group: reputation
+    what: Verdicts from 70+ engines for files, URLs, domains and IPs, plus relations, passive DNS and community comments.
+    use_when: First stop for any hash, URL, domain or IP. Check the Relations tab to see what else the indicator connects to.
+    watch_out: Zero detections is not a clean bill of health for new infrastructure or targeted samples. Look up by hash; uploading a file shares it with every VirusTotal subscriber.
+    opsec: lookup
+    access: free-account
+    lookups:
+      ip: https://www.virustotal.com/gui/ip-address/{value}/details
+      domain: https://www.virustotal.com/gui/domain/{value}/details
+      url: https://www.virustotal.com/gui/url/{urlsha256}/details
+      hash: https://www.virustotal.com/gui/file/{value}/details
+    playbooks: [phishing-email, malicious-url-click, edr-malware-detection, infostealer, suspicious-domain-lookup, offensive-tool-detected, html-smuggling]
+    verified: {date: '2026-10-01', how: "Lookup paths match the maintained Mitaka extension (Aug 2026). The site blocks automated checks."}
+
+  - id: abuseipdb
+    name: AbuseIPDB
+    url: https://www.abuseipdb.com/
+    group: reputation
+    what: Crowd-sourced abuse reports for an IP, with categories (brute force, scanning, spam), confidence score, ISP and usage type.
+    use_when: A sign-in, brute force or IDS alert comes from an external IP and you need to know if others have seen it attack.
+    watch_out: Shared infrastructure (cloud, CDN, mobile carriers, VPN exits) collects reports for other tenants. Read the report dates and categories, not just the score.
+    opsec: lookup
+    access: free
+    lookups:
+      ip: https://www.abuseipdb.com/check/{value}
+    playbooks: [risky-ip-signin, inbound-brute-force, password-spray, atypical-signin, vpn-anomalous-login, network-ids-alert]
+    verified: {date: '2026-10-01', how: "Lookup URL opened and showed the report."}
+
+  - id: greynoise
+    name: GreyNoise Visualizer
+    url: https://viz.greynoise.io/
+    group: reputation
+    what: Whether an IP is an internet-wide scanner or a known benign service (search engines, research scanners), and what it scans for.
+    use_when: Deciding if inbound traffic or an exploit attempt is opportunistic background noise or aimed at you.
+    watch_out: Noise is not harmless. A mass scanner hitting an unpatched edge device is still an incident. Targeted attackers rarely show up here.
+    opsec: lookup
+    access: free-account
+    lookups:
+      ip: https://viz.greynoise.io/ip/{value}
+    playbooks: [inbound-brute-force, network-ids-alert, edge-device-exploitation, risky-ip-signin]
+    verified: {date: '2026-10-01', how: "Lookup URL opened and showed the IP page."}
+
+  - id: otx
+    name: AlienVault OTX
+    url: https://otx.alienvault.com/
+    group: reputation
+    what: Community threat pulses that mention an indicator, with linked malware families and campaigns.
+    use_when: You want context for an indicator, such as which campaign or report it appeared in.
+    watch_out: Pulses vary in quality and some are bulk imports. Check who wrote the pulse and when.
+    opsec: lookup
+    access: free-account
+    lookups:
+      ip: https://otx.alienvault.com/indicator/ip/{value}
+      domain: https://otx.alienvault.com/indicator/domain/{value}
+      url: https://otx.alienvault.com/indicator/url/{value}
+      hash: https://otx.alienvault.com/indicator/file/{value}
+      cve: https://otx.alienvault.com/indicator/cve/{value}
+    playbooks: [suspicious-domain-lookup, network-ids-alert, edr-malware-detection]
+    verified: {date: '2026-10-01', how: "Lookup paths match the maintained Mitaka extension (Aug 2026). The site blocks automated checks."}
+
+  - id: talos
+    name: Cisco Talos Reputation Center
+    url: https://talosintelligence.com/reputation_center
+    group: reputation
+    what: Email and web reputation for an IP or domain, with sender volume and content category.
+    use_when: Checking a sending IP or domain in a phishing or restricted-sender case, or a proxy category dispute.
+    opsec: lookup
+    access: free
+    lookups:
+      ip: https://talosintelligence.com/reputation_center/lookup?search={value}
+      domain: https://talosintelligence.com/reputation_center/lookup?search={value}
+    playbooks: [phishing-email, restricted-sender, proxy-malicious-category]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026). The site blocks automated checks."}
+
+  - id: xforce
+    name: IBM X-Force Exchange
+    url: https://exchange.xforce.ibmcloud.com/
+    group: reputation
+    what: IBM risk score and category for IPs, URLs and file hashes.
+    use_when: A second opinion on web category or IP risk, often the source behind proxy and firewall categories.
+    opsec: lookup
+    access: free-account
+    lookups:
+      ip: https://exchange.xforce.ibmcloud.com/ip/{value}
+      domain: https://exchange.xforce.ibmcloud.com/url/{value}
+      hash: https://exchange.xforce.ibmcloud.com/malware/{value}
+    playbooks: [proxy-malicious-category, network-ids-alert]
+    verified: {date: '2026-10-01', how: "Lookup paths match the maintained Mitaka extension (Aug 2026). The site blocks automated checks."}
+
+  - id: urlhaus
+    name: URLhaus (abuse.ch)
+    url: https://urlhaus.abuse.ch/
+    group: reputation
+    what: URLs and hosts currently or recently used to distribute malware, with payload hashes and tags.
+    use_when: A user clicked or downloaded from a link and you need to know if that host has served malware.
+    opsec: lookup
+    access: free
+    lookups:
+      ip: https://urlhaus.abuse.ch/host/{value}/
+      domain: https://urlhaus.abuse.ch/host/{value}/
+    playbooks: [malicious-url-click, html-smuggling, suspicious-domain-lookup]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026). The site blocks automated checks."}
+
+  - id: threatfox
+    name: ThreatFox (abuse.ch)
+    url: https://threatfox.abuse.ch/browse/
+    group: reputation
+    what: Indicators tied to named malware and C2 frameworks (Cobalt Strike, stealers, loaders), shared by researchers.
+    use_when: You suspect an IP or domain is C2, or want the IOCs that go with a malware family named in an alert.
+    opsec: lookup
+    access: free
+    playbooks: [offensive-tool-detected, infostealer, suspicious-domain-lookup]
+    verified: {date: '2026-10-01', how: "Site checked. No lookup template yet; use the search box."}
+
+  - id: google-safe-browsing
+    name: Google Safe Browsing status
+    url: https://transparencyreport.google.com/safe-browsing/search
+    group: reputation
+    what: Whether Google currently flags a site as unsafe (phishing, malware, unwanted software).
+    use_when: Confirming whether browsers would already warn users who click the link.
+    watch_out: Status is current only. A site cleaned up yesterday shows as safe today.
+    opsec: lookup
+    access: free
+    lookups:
+      domain: https://transparencyreport.google.com/safe-browsing/search?url={value}
+      url: https://transparencyreport.google.com/safe-browsing/search?url={value}
+    playbooks: [malicious-url-click, proxy-malicious-category]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  # ---------------- infrastructure ----------------
+  - id: ipinfo
+    name: IPinfo
+    url: https://ipinfo.io/
+    group: infrastructure
+    what: Geolocation, ASN, owner and hosting/VPN flags for an IP.
+    use_when: Placing a sign-in IP. Is it a residential ISP in the user's country, a cloud host, or a hosting provider abroad?
+    watch_out: IP geolocation is approximate, especially for mobile carriers and VPNs. Never close impossible travel on location alone.
+    opsec: lookup
+    access: free
+    lookups:
+      ip: https://ipinfo.io/{value}
+    playbooks: [atypical-signin, risky-ip-signin, vpn-anomalous-login, break-glass-signin]
+    verified: {date: '2026-10-01', how: "Lookup URL opened and showed location and ASN."}
+
+  - id: spur
+    name: Spur
+    url: https://spur.us/
+    group: infrastructure
+    what: Whether an IP belongs to a VPN, residential proxy or anonymiser, and which service.
+    use_when: An "anonymous IP" or impossible-travel alert. Residential proxies look like home broadband everywhere else.
+    opsec: lookup
+    access: freemium
+    playbooks: [atypical-signin, risky-ip-signin, vpn-anomalous-login, aitm-token-theft, password-spray]
+    verified: {date: '2026-10-01', how: "Site checked. No lookup template; use the search box on the home page."}
+
+  - id: shodan
+    name: Shodan
+    url: https://www.shodan.io/
+    group: infrastructure
+    what: Open ports, banners, software versions and known CVEs for an internet-facing IP.
+    use_when: Checking what a suspicious IP runs (C2 panel, proxy, RDP) or what your own edge device exposes.
+    opsec: lookup
+    access: free-account
+    lookups:
+      ip: https://www.shodan.io/host/{value}
+      domain: https://www.shodan.io/search?query=hostname%3A{value}
+    playbooks: [edge-device-exploitation, linux-reverse-shell, offensive-tool-detected]
+    verified: {date: '2026-10-01', how: "Lookup paths match the maintained Mitaka extension (Aug 2026)."}
+
+  - id: censys
+    name: Censys
+    url: https://platform.censys.io/
+    group: infrastructure
+    what: Internet scan data for hosts and certificates, similar to Shodan with stronger certificate search.
+    use_when: Pivoting from a C2 IP to other hosts with the same certificate or service fingerprint.
+    watch_out: Censys is moving users from the legacy search site to its new platform. Search from the home page.
+    opsec: lookup
+    access: free-account
+    playbooks: [edge-device-exploitation, offensive-tool-detected]
+    verified: {date: '2026-10-01', how: "Site checked. No lookup template while the platform migration settles."}
+
+  - id: bgp-he
+    name: Hurricane Electric BGP Toolkit
+    url: https://bgp.he.net/
+    group: infrastructure
+    what: Which network (ASN) announces an IP, the prefix, and the owner's other ranges.
+    use_when: Deciding whether a destination of large outbound traffic or mining traffic is a known provider or an unknown host.
+    opsec: lookup
+    access: free
+    lookups:
+      ip: https://bgp.he.net/ip/{value}
+      domain: https://bgp.he.net/dns/{value}
+    playbooks: [large-outbound-transfer, cryptomining-traffic]
+    verified: {date: '2026-10-01', how: "IP lookup opened and showed the ASN and prefix."}
+
+  - id: exonerator
+    name: ExoneraTor (Tor Project)
+    url: https://metrics.torproject.org/exonerator.html
+    group: infrastructure
+    what: Whether an IP was a Tor relay on a given date.
+    use_when: Confirming a "Tor IP" flag on a sign-in or connection at the time it happened, not today.
+    opsec: lookup
+    access: free
+    playbooks: [tor-traffic, risky-ip-signin]
+    verified: {date: '2026-10-01', how: "Site checked. It needs the date of the event, so there is no one-click template."}
+
+  - id: urlscan
+    name: urlscan.io
+    url: https://urlscan.io/
+    group: infrastructure
+    what: Screenshots, redirects, requested domains and page content from scans of a URL, including earlier scans by others.
+    use_when: Seeing what a phishing or AiTM link showed without opening it, and finding other scans of the same kit.
+    watch_out: Search existing scans first. A new scan is public by default and can alert the attacker or expose a client URL; set it to private or unlisted if you must scan.
+    opsec: lookup
+    access: free-account
+    lookups:
+      ip: https://urlscan.io/ip/{value}
+      domain: https://urlscan.io/domain/{value}
+      url: https://urlscan.io/search/#page.url%3A%22{value}%22
+    playbooks: [phishing-email, malicious-url-click, qr-code-phishing, aitm-token-theft, html-smuggling]
+    verified: {date: '2026-10-01', how: "Lookup paths match the maintained Mitaka extension (Aug 2026)."}
+
+  - id: crtsh
+    name: crt.sh
+    url: https://crt.sh/
+    group: infrastructure
+    what: Certificate transparency logs, showing every public TLS certificate issued for a domain and its subdomains.
+    use_when: Finding when a lookalike or phishing domain got its first certificate, and sister domains on the same certificate.
+    opsec: lookup
+    access: free
+    lookups:
+      domain: https://crt.sh/?q={value}
+    playbooks: [aitm-token-theft, phishing-email, executive-impersonation, vendor-email-compromise]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  - id: icann-lookup
+    name: ICANN Lookup
+    url: https://lookup.icann.org/
+    group: infrastructure
+    what: Registration data (RDAP) for a domain, including creation date and registrar.
+    use_when: Checking domain age. A sender or link domain registered days ago is a strong phishing signal.
+    watch_out: Most registrant details are redacted for privacy. The creation date and registrar are what you need.
+    opsec: lookup
+    access: free
+    lookups:
+      domain: https://lookup.icann.org/en/lookup?name={value}
+    playbooks: [vendor-email-compromise, suspicious-domain-lookup, phishing-email, executive-impersonation]
+    verified: {date: '2026-10-01', how: "Lookup URL opened on the ICANN lookup page."}
+
+  - id: wayback
+    name: Wayback Machine
+    url: https://web.archive.org/
+    group: infrastructure
+    what: Archived snapshots of a URL over time.
+    use_when: Seeing what a domain hosted before it turned malicious, or whether a "vendor" site existed before last month.
+    opsec: lookup
+    access: free
+    lookups:
+      url: https://web.archive.org/web/*/{value}
+      domain: https://web.archive.org/web/*/{value}
+    playbooks: [vendor-email-compromise, suspicious-domain-lookup]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  # ---------------- sandbox and malware ----------------
+  - id: malwarebazaar
+    name: MalwareBazaar (abuse.ch)
+    url: https://bazaar.abuse.ch/
+    group: sandbox
+    what: Malware samples by hash, with family, tags, first-seen date and YARA hits.
+    use_when: Naming the family behind a hash from an EDR alert, and when it was first seen.
+    opsec: lookup
+    access: free
+    lookups:
+      hash: https://bazaar.abuse.ch/browse.php?search={hashtype}%3A{value}
+    playbooks: [edr-malware-detection, infostealer, ransomware-behaviour]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026). The site blocks automated checks."}
+
+  - id: hybrid-analysis
+    name: Hybrid Analysis
+    url: https://www.hybrid-analysis.com/
+    group: sandbox
+    what: Public sandbox reports showing process tree, network activity and dropped files for a sample.
+    use_when: Seeing what a sample does when run, if someone has already submitted it.
+    watch_out: Search by hash. Submitting a file makes it public; never submit client documents.
+    opsec: lookup
+    access: free-account
+    lookups:
+      hash: https://www.hybrid-analysis.com/search?query={value}
+    playbooks: [edr-malware-detection, html-smuggling, office-child-process]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  - id: triage
+    name: Recorded Future Triage
+    url: https://tria.ge/
+    group: sandbox
+    what: Sandbox reports with extracted malware config (C2 addresses, campaign IDs) for many families.
+    use_when: Pulling C2 addresses out of a stealer or loader sample to hunt for in your network logs.
+    watch_out: Search by hash. Public submissions are visible to everyone.
+    opsec: lookup
+    access: free-account
+    lookups:
+      hash: https://tria.ge/s?q={value}
+      url: https://tria.ge/s?q=url%3A{value}
+    playbooks: [infostealer, edr-malware-detection, offensive-tool-detected]
+    verified: {date: '2026-10-01', how: "Lookup paths match the maintained Mitaka extension (Aug 2026)."}
+
+  - id: anyrun
+    name: ANY.RUN
+    url: https://app.any.run/
+    group: sandbox
+    what: Interactive sandbox. You can click through a phishing page or installer while it records activity.
+    use_when: A sample or link needs a human to interact (CAPTCHA, "enable content", multi-step lure) before it shows its behaviour.
+    watch_out: Free tier analyses are public. Search existing submissions by hash first.
+    opsec: submits
+    access: freemium
+    lookups:
+      hash: https://app.any.run/submissions/#filehash:{value}
+    playbooks: [html-smuggling, phishing-email, office-child-process]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  - id: joesandbox
+    name: Joe Sandbox
+    url: https://www.joesandbox.com/
+    group: sandbox
+    what: Deep sandbox reports with behaviour signatures and MITRE mappings.
+    use_when: A second sandbox when the first was evaded, especially for documents and scripts.
+    opsec: lookup
+    access: free-account
+    lookups:
+      hash: https://www.joesandbox.com/analysis/search?q={value}
+    playbooks: [edr-malware-detection, office-child-process]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  - id: opentip
+    name: Kaspersky OpenTIP
+    url: https://opentip.kaspersky.com/
+    group: sandbox
+    what: Kaspersky verdict and reputation for files, IPs, domains and URLs.
+    use_when: Another engine's view on a hash, useful when VirusTotal is split.
+    opsec: lookup
+    access: free
+    lookups:
+      hash: https://opentip.kaspersky.com/{value}
+    playbooks: [edr-malware-detection]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  - id: inquest
+    name: InQuest Labs
+    url: https://labs.inquest.net/
+    group: sandbox
+    what: Deep file inspection of Office documents, PDFs and other attachments, with extracted macros and IOCs.
+    use_when: An Office document spawned a child process and you want to see the macro or embedded payload.
+    opsec: lookup
+    access: free
+    lookups:
+      sha256: https://labs.inquest.net/dfi/sha256/{value}
+    playbooks: [office-child-process, phishing-email]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  # ---------------- email ----------------
+  - id: mha
+    name: Message Header Analyzer (Microsoft)
+    url: https://mha.azurewebsites.net/
+    group: email
+    what: Parses raw email headers into hops, delays, SPF, DKIM, DMARC and Microsoft anti-spam fields.
+    use_when: Reading where a phishing or impersonation email really came from, and why it passed or failed authentication.
+    watch_out: Headers contain client names and addresses. Prefer the Outlook add-in on client mailboxes over pasting into the web version.
+    opsec: lookup
+    access: free
+    playbooks: [phishing-email, executive-impersonation, vendor-email-compromise, restricted-sender]
+    verified: {date: '2026-10-01', how: "Site checked. Source is github.com/microsoft/MHA."}
+
+  - id: mxtoolbox
+    name: MXToolbox
+    url: https://mxtoolbox.com/SuperTool.aspx
+    group: email
+    what: MX, SPF, DMARC and blocklist checks for a domain or sending IP.
+    use_when: Checking if a vendor or lookalike domain has mail records, and whether its SPF or DMARC would let spoofing through.
+    opsec: lookup
+    access: free
+    playbooks: [vendor-email-compromise, executive-impersonation, restricted-sender]
+    verified: {date: '2026-10-01', how: "Site checked. No lookup template yet; pick the check from the SuperTool menu."}
+
+  - id: hibp
+    name: Have I Been Pwned
+    url: https://haveibeenpwned.com/
+    group: email
+    what: Which public data breaches an email address appears in.
+    use_when: Weighing a leaked-credentials or password-spray alert. Was this account in a known breach?
+    watch_out: Do not type client users' addresses into a public site unless the client allows it. Domain-wide search needs proof you control the domain.
+    opsec: lookup
+    access: freemium
+    playbooks: [leaked-credentials, password-spray, infostealer]
+    verified: {date: '2026-10-01', how: "Site and FAQ checked. No lookup template, by design."}
+
+  - id: dnstwist
+    name: dnstwist
+    url: https://github.com/elceef/dnstwist
+    group: email
+    what: Generates lookalike domains (typos, homoglyphs, swapped TLDs) and checks which ones are registered.
+    use_when: An impersonation or vendor-fraud email uses a near-miss domain, and you want the sister domains to block.
+    watch_out: It resolves DNS for every candidate domain. Run it from an analysis machine, not from a client network.
+    opsec: lookup
+    access: free
+    playbooks: [executive-impersonation, vendor-email-compromise]
+    verified: {date: '2026-10-01', how: "Repository checked. Command-line tool you run yourself."}
+
+  # ---------------- vulnerability ----------------
+  - id: nvd
+    name: NVD (NIST)
+    url: https://nvd.nist.gov/
+    group: vulnerability
+    what: CVE description, CVSS score, affected versions (CPE) and vendor references.
+    use_when: An IDS signature or edge-device alert names a CVE and you need to know what it affects.
+    watch_out: NVD analysis can lag publication. Check the vendor advisory linked from the page.
+    opsec: lookup
+    access: free
+    lookups:
+      cve: https://nvd.nist.gov/vuln/detail/{value}
+    playbooks: [edge-device-exploitation, network-ids-alert]
+    verified: {date: '2026-10-01', how: "Lookup URL opened and showed the CVE."}
+
+  - id: cve-org
+    name: CVE.org
+    url: https://www.cve.org/
+    group: vulnerability
+    what: The official CVE record, usually published before NVD enrichment.
+    use_when: A CVE is too new for NVD to have details.
+    opsec: lookup
+    access: free
+    lookups:
+      cve: https://www.cve.org/CVERecord?id={value}
+    playbooks: [edge-device-exploitation]
+    verified: {date: '2026-10-01', how: "Lookup path matches the maintained Mitaka extension (Aug 2026)."}
+
+  - id: cisa-kev
+    name: CISA Known Exploited Vulnerabilities
+    url: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+    group: vulnerability
+    what: CVEs confirmed exploited in the wild, with date added and known ransomware use.
+    use_when: Deciding how urgent an exploit attempt is. A KEV-listed CVE on an exposed device is treated as likely compromise until disproved.
+    opsec: lookup
+    access: free
+    playbooks: [edge-device-exploitation, network-ids-alert]
+    verified: {date: '2026-10-01', how: "Site checked. No lookup template yet; use the catalog search."}
+
+  - id: epss
+    name: FIRST EPSS
+    url: https://www.first.org/epss/
+    group: vulnerability
+    what: Probability that a CVE will be exploited in the next 30 days, with percentile.
+    use_when: Ranking several CVEs from one alert or scan when none are in KEV.
+    opsec: lookup
+    access: free
+    lookups:
+      cve: https://api.first.org/data/v1/epss?cve={value}
+    playbooks: [edge-device-exploitation]
+    verified: {date: '2026-10-01', how: "API URL opened and returned the score and percentile."}
+
+  # ---------------- reference ----------------
+  - id: lolbas
+    name: LOLBAS
+    url: https://lolbas-project.github.io/
+    group: reference
+    what: Windows binaries, scripts and libraries attackers use to download, execute or bypass controls, with example commands.
+    use_when: A signed Windows binary (certutil, mshta, rundll32, regsvr32) did something odd. Is that a known abuse?
+    opsec: local
+    access: free
+    playbooks: [suspicious-powershell, office-child-process, remote-execution-lateral]
+    verified: {date: '2026-10-01', how: "Site checked."}
+
+  - id: gtfobins
+    name: GTFOBins
+    url: https://gtfobins.org/
+    group: reference
+    what: Unix and Linux binaries that can spawn shells, read files or escalate privileges.
+    use_when: A Linux process tree shows a normal tool (find, awk, python) spawning a shell.
+    watch_out: The site moved from gtfobins.github.io to gtfobins.org.
+    opsec: local
+    access: free
+    playbooks: [linux-reverse-shell]
+    verified: {date: '2026-10-01', how: "Site checked at the new address."}
+
+  - id: loldrivers
+    name: LOLDrivers
+    url: https://www.loldrivers.io/
+    group: reference
+    what: Known vulnerable and malicious Windows drivers, with hashes and detection rules.
+    use_when: A driver load or service install alert. Is the driver a known BYOVD tool for killing EDR?
+    opsec: local
+    access: free
+    playbooks: [vulnerable-driver-byovd, security-tool-tampering, suspicious-service-install]
+    verified: {date: '2026-10-01', how: "Site checked."}
+
+  - id: lolrmm
+    name: LOLRMM
+    url: https://lolrmm.io/
+    group: reference
+    what: Remote monitoring and management tools attackers abuse, with their processes, domains and artifacts.
+    use_when: An unapproved remote access tool appears. Identify it and get its domains to check in proxy logs.
+    opsec: local
+    access: free
+    playbooks: [rmm-tool-unauthorised, callback-phishing, teams-external-phishing]
+    verified: {date: '2026-10-01', how: "Site checked. Project source is github.com/magicsword-io/LOLRMM."}
+
+  - id: hijacklibs
+    name: HijackLibs
+    url: https://hijacklibs.net/
+    group: reference
+    what: DLLs that legitimate executables will load from the wrong folder, mapped to the executables.
+    use_when: A signed executable loads a DLL from an unusual path. Is this pair a known sideloading combination?
+    opsec: local
+    access: free
+    playbooks: [dll-sideloading]
+    verified: {date: '2026-10-01', how: "Site checked."}
+
+  # ---------------- utility ----------------
+  - id: cyberchef
+    name: CyberChef
+    url: https://gchq.github.io/CyberChef/
+    group: utility
+    what: Decode and transform data, such as Base64, UTF-16LE PowerShell, XOR, URL encoding and defanging.
+    use_when: Reading an encoded PowerShell command, an obfuscated script or a smuggled HTML payload.
+    watch_out: It runs entirely in your browser, but the URL can carry your input after the hash. Clear it before sharing the link.
+    opsec: local
+    access: free
+    playbooks: [suspicious-powershell, html-smuggling, phishing-email]
+    verified: {date: '2026-10-01', how: "Site checked. It states input is processed in the browser."}

@@ -416,7 +416,7 @@ textarea { resize: vertical; min-height: 60px; }
 .file .panel { padding: 16px; display: grid; gap: 12px; }
 .ent { display: grid; gap: 4px; }
 .ent label { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--muted); }
-.ent label code { font-size: 11px; }
+.ent label code { font-size: 11px; margin-left: auto; }
 .ent input { font-family: var(--font-mono); font-size: 13px; padding: 7px 9px; }
 .ent.missing input { border-style: dashed; }
 .ent-count { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
@@ -762,6 +762,59 @@ table.vt td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); v
 .chip.det-chip { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .chip.det-chip svg { width: 13px; height: 13px; color: var(--accent); }
 
+/* OSINT tools */
+.osint .ioc { padding: clamp(16px, 3vw, 24px); display: grid; gap: 12px; max-width: 920px; }
+.osint .ioc .panel-title { font-family: var(--font-mono); font-weight: 400; letter-spacing: .14em; }
+.ioc-input { font-family: var(--font-mono); font-size: 15px; padding: 12px 14px; }
+.ioc-out { display: grid; gap: 18px; }
+.ioc-out:empty { display: none; }
+.ioc-type { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.ioc-type code, .ioc-label code, .ioc-stop code { font-family: var(--font-mono); font-size: .9em; overflow-wrap: anywhere; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.ioc-stop { padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--inc); background: var(--inc-soft); color: var(--ink); font-size: 14px; line-height: 1.5; }
+.ioc-block { display: grid; gap: 10px; }
+.ioc-block .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; justify-content: space-between; }
+.ioc-label { flex: 1 1 260px; min-width: 0; }
+.ioc-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ioc-list li { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.ioc-link { display: inline;  color: var(--accent); font-weight: 500; text-decoration: none; }
+.ioc-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ioc-link svg, .tool-card h3 svg { width: 13px; height: 13px; flex: none; vertical-align: -1px; margin-left: 4px; }
+.iwhat { color: var(--muted); font-size: 13px; line-height: 1.45; }
+@media (max-width: 640px) { .ioc-list li { grid-template-columns: minmax(0, 1fr) auto; } .iwhat { grid-column: 1 / -1; grid-row: 2; } }
+.opsec { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; line-height: 1.5; white-space: nowrap; }
+.opsec-local { color: var(--btp); } .opsec-lookup { color: var(--muted); } .opsec-submits { color: var(--tp); }
+.opsec-key dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; margin: 14px 0 0; align-items: baseline; max-width: 860px; }
+.opsec-key dt { margin: 0; } .opsec-key dd { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 26px; }
+.chip.filt .count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.chip.filt[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.pb-filter { margin-bottom: 12px; color: var(--ink-2); font-size: 14px; }
+.linkish { all: unset; cursor: pointer; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.linkish:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ogroup { display: grid; gap: 0; margin-bottom: 34px; }
+.ogroup .label-rule { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.ogroup .gq { font-family: var(--font-display); font-style: italic; text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--muted); }
+.tool-cards { margin-top: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.card.tool-card { cursor: default; display: flex; flex-direction: column; gap: 10px; }
+.tool-card .cmeta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.tool-card h3 a { color: inherit; text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+.tool-card h3 a:hover { color: var(--accent); }
+.tool-card h3 a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tool-card p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.tool-card .twhat { color: var(--ink); }
+.tool-card .tlab { display: block; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.tool-card .twatch { padding-left: 10px; border-left: 2px solid var(--inc); }
+.tool-card code { font-family: var(--font-mono); font-size: .86em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.tfoot { display: grid; gap: 10px; margin-top: auto; padding-top: 4px; }
+.tpbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tpbs .chip { font-size: 12px; padding: 2px 9px; }
+.tver { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--muted); }
+.tver svg { width: 13px; height: 13px; stroke-width: 2.4; color: var(--btp); }
+.ent-osint { all: unset; cursor: pointer; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); padding: 0 2px; }
+.ent-osint:hover { text-decoration: underline; }
+.ent-osint:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ent-osint[hidden] { display: none; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -787,6 +840,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   bundle.trees.forEach(t => { TREES[t.id] = t; });
   // Detection rules copied from the KQL library. Maps, so a rule id from the URL is only ever a lookup key.
   const DETS = new Map((bundle.detections || []).map(d => [d.id, d]));
+  // OSINT tools, edited by hand in osint/tools.yaml.
+  const OSINT = (bundle.osint || []).map(t => Object.assign({}, t, { playbooks: t.playbooks || [] }));
+  const OSINT_FOR = new Map();
+  OSINT.forEach(t => t.playbooks.forEach(pb => { if (!OSINT_FOR.has(pb)) OSINT_FOR.set(pb, []); OSINT_FOR.get(pb).push(t); }));
   const DETS_FOR = new Map();
   DETS.forEach(d => (d.playbooks || []).forEach(pb => { if (!DETS_FOR.has(pb)) DETS_FOR.set(pb, []); DETS_FOR.get(pb).push(d); }));
   const TACTIC_ORDER = ["Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"];
@@ -837,6 +894,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   else if (hashId === "library") S.view = "home";
   else if (hashId === "about") S.view = "about";
   else if (hashId === "detections" || hashId.startsWith("detections/")) S.view = "detections";
+  else if (hashId === "osint" && OSINT.length) S.view = "osint";
+  if (S.view === "osint" && !OSINT.length) S.view = "home";
   let ruleId = hashId.startsWith("detections/") && DETS.has(hashId.slice(11)) ? hashId.slice(11) : null;
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
 
@@ -1074,6 +1133,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         h("button", { class: "nav-link", type: "button", onclick: goHome, "aria-current": S.view === "home" ? "page" : null }, "Library"),
         browse,
         DETS.size ? h("button", { class: "nav-link", type: "button", onclick: () => openDetections(), "aria-current": S.view === "detections" ? "page" : null }, "Detections") : null,
+        OSINT.length ? h("button", { class: "nav-link", type: "button", onclick: () => openOsint(), "aria-current": S.view === "osint" ? "page" : null }, "OSINT") : null,
         h("button", { class: "nav-link", type: "button", onclick: openAbout, "aria-current": S.view === "about" ? "page" : null }, "About")),
       h("span", { class: "grow" }),
       h("button", { class: "search-trigger", type: "button", onclick: openPalette, "aria-label": "Jump to a playbook" }, svg(ICON.search), h("span", { class: "lbl" }, "Jump to a playbook"), h("kbd", {}, IS_MAC ? "\u2318K" : "Ctrl K")),
@@ -1099,6 +1159,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       CATS.map(([cat, label]) => h("button", { type: "button", onclick: go(() => goCategory(cat)) },
         h("span", {}, cat === "triage" ? "Universal Triage (start here)" : label), h("span", { class: "count" }, bundle.trees.filter(t => t.category === cat).length))),
       DETS.size ? h("button", { type: "button", onclick: go(() => openDetections()) }, h("span", {}, "Detection rules"), h("span", { class: "count" }, DETS.size)) : null,
+      OSINT.length ? h("button", { type: "button", onclick: go(() => openOsint()) }, h("span", {}, "OSINT tools"), h("span", { class: "count" }, OSINT.length)) : null,
       h("hr"),
       h("button", { type: "button", onclick: go(openAbout) }, "About"),
       h("a", { href: LINKS.article, target: "_blank", rel: "noopener" }, "The article behind it", icon("ext")),
@@ -1129,6 +1190,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       a.push({ kind: "action", title: "Universal Triage", sub: "Not sure which playbook fits? Start here.", run: () => openTree("universal-triage") });
       a.push({ kind: "action", title: "Library", sub: "All playbooks by category", run: goHome });
       if (DETS.size) a.push({ kind: "action", title: "Detection rules", sub: DETS.size + " custom rules for Defender XDR, linked to their playbooks", run: () => openDetections() });
+      if (OSINT.length) a.push({ kind: "action", title: "OSINT tools", sub: OSINT.length + " verified tools, with one-click lookups for an IP, domain, URL, hash or CVE", run: () => openOsint() });
       a.push({ kind: "action", title: "About Triage Trees", sub: "What it is, where it came from, who built it", run: openAbout });
       return a;
     };
@@ -1139,7 +1201,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       if (ws.length) {
         const hits = bundle.trees.map(t => [t, score(t, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1] || a[0].title.localeCompare(b[0].title));
         const rhits = [...DETS.values()].map(d => [d, scoreRule(d, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
-        groups = [["Playbooks", hits.map(([t]) => ({ kind: "tree", t }))], ["Detection rules", rhits.map(([d]) => ({ kind: "rule", d }))]];
+        const ohits = OSINT.map(t => [t, scoreTool(t, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
+        const ioc = detectIoc(input.value);
+        const lookAct = ioc && !ioc.internal ? [{ kind: "action", title: "Look up this " + IOC_NAME[ioc.type].toLowerCase(), sub: "Open the OSINT page with it filled in", run: () => openOsint(input.value) }] : [];
+        groups = [["Indicator", lookAct], ["Playbooks", hits.map(([t]) => ({ kind: "tree", t }))], ["Detection rules", rhits.map(([d]) => ({ kind: "rule", d }))],
+          ["OSINT tools", ohits.map(([t]) => ({ kind: "action", title: t.name, sub: t.what, run: () => { osintGroup = t.group; openOsint(); } }))]];
       } else {
         groups = [["Go to", actions()]].concat(CATS.filter(c => c[0] !== "triage").map(([cat, label]) =>
           [label, bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title)).map(t => ({ kind: "tree", t }))]));
@@ -1209,6 +1275,12 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
   function scoreRule(d, words) {
     const title = d.title.toLowerCase(), rest = [d.goal, d.tactic, d.technique, d.technique_ids.join(" "), d.id, d.description].join(" ").toLowerCase();
+    let s = 0;
+    for (const w of words) { if (title.startsWith(w)) s += 7; else if (title.includes(w)) s += 5; else if (rest.includes(w)) s += 1; else return 0; }
+    return s;
+  }
+  function scoreTool(t, words) {
+    const title = t.name.toLowerCase(), rest = [t.what, t.use_when, t.group, t.id].join(" ").toLowerCase();
     let s = 0;
     for (const w of words) { if (title.startsWith(w)) s += 7; else if (title.includes(w)) s += 5; else if (rest.includes(w)) s += 1; else return 0; }
     return s;
@@ -1344,7 +1416,10 @@ const EMBEDDED = /*__TREE_DATA__*/null;
           (t.mitre || []).map(id => h("a", { class: "chip mono", href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id)),
           h("span", {}, "v" + t.version + " · reviewed " + t.last_reviewed), sources),
         (DETS_FOR.get(t.id) || []).length ? h("div", { class: "det-links" }, h("span", { class: "det-lead" }, "Detection rules that lead here"),
-          DETS_FOR.get(t.id).map(d => h("button", { class: "chip det-chip", type: "button", onclick: () => openDetections(d.id) }, svg(ICON.rule), d.title))) : null),
+          DETS_FOR.get(t.id).map(d => h("button", { class: "chip det-chip", type: "button", onclick: () => openDetections(d.id) }, svg(ICON.rule), d.title))) : null,
+        (OSINT_FOR.get(t.id) || []).length ? h("div", { class: "det-links" }, h("span", { class: "det-lead" }, "OSINT for this playbook"),
+          OSINT_FOR.get(t.id).slice(0, 5).map(o => h("a", { class: "chip det-chip", href: o.url, target: "_blank", rel: "noopener noreferrer", title: o.use_when }, o.name, icon("ext"))),
+          h("button", { class: "chip det-chip", type: "button", onclick: () => openOsint(undefined, t.id) }, svg(ICON.search), "All " + OSINT_FOR.get(t.id).length + " with notes")) : null),
       h("div", { class: "actions" },
         h("button", { class: "btn", type: "button", onclick: openMap }, icon("map"), "Map", h("kbd", {}, "M")),
         h("button", { class: "btn", type: "button", onclick: () => { const el = document.getElementById("note-anchor") || document.getElementById("draft-panel"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, icon("note"), "Note")));
@@ -1688,9 +1763,12 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       const id = "ent-" + e.key;
       const inp = h("input", { class: "field", id, type: "text", placeholder: e.example || "", spellcheck: "false", autocomplete: "off" });
       inp.value = S.entities[e.key] || "";
-      const row = h("div", { class: "ent" + (inp.value.trim() ? "" : " missing") }, h("label", { for: id }, h("span", {}, e.label), h("code", {}, e.key)), inp);
+      const canLook = () => { const i = OSINT.length && detectIoc(inp.value); return !!(i && !i.internal); };
+      const look = h("button", { class: "ent-osint", type: "button", title: "Open the OSINT lookups for this value", onclick: () => openOsint(inp.value) }, "OSINT");
+      look.hidden = !canLook();
+      const row = h("div", { class: "ent" + (inp.value.trim() ? "" : " missing") }, h("label", { for: id }, h("span", {}, e.label), h("code", {}, e.key), look), inp);
       inp.addEventListener("input", () => {
-        S.entities[e.key] = inp.value; save(); row.classList.toggle("missing", !inp.value.trim()); counter.textContent = filled() + "/" + defs.length;
+        S.entities[e.key] = inp.value; save(); row.classList.toggle("missing", !inp.value.trim()); counter.textContent = filled() + "/" + defs.length; look.hidden = !canLook();
         clearTimeout(renderFile._t); renderFile._t = setTimeout(() => {
           refreshQueries(); refreshDraft(); if (regenNote && node(S.tree, S.node).type === "outcome") regenNote();
         }, 250);
@@ -1965,7 +2043,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
           h("li", {}, nQ + " decision questions and " + nAlso + " wider checks."),
           h("li", {}, "KQL for Microsoft Sentinel and Defender XDR at the step it answers. Test queries in your own workspace before relying on them."),
           DETS.size ? h("li", {}, DETS.size + " custom detection rules for Defender XDR, each with its blind spots, false positives, test record and the playbook to walk when it fires. ",
-            h("a", { href: "#detections", onclick: e => { e.preventDefault(); openDetections(); } }, "See the detection rules"), ".") : null)),
+            h("a", { href: "#detections", onclick: e => { e.preventDefault(); openDetections(); } }, "See the detection rules"), ".") : null,
+          OSINT.length ? h("li", {}, OSINT.length + " verified OSINT tools, each with when to use it, what can mislead you and what it does with your data, plus one-click lookups for an indicator. ",
+            h("a", { href: "#osint", onclick: e => { e.preventDefault(); openOsint(); } }, "Open the OSINT tools"), ".") : null)),
       h("section", {}, h("h2", {}, "Privacy"),
         h("p", {}, "Case data stays in your browser's local storage and is never sent anywhere. Don't enter data your client's handling rules forbid storing on your workstation.")),
       h("section", {}, h("h2", {}, "Contribute"),
@@ -2054,15 +2134,212 @@ const EMBEDDED = /*__TREE_DATA__*/null;
             h("dl", {}, ents.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)]))) : null)));
   }
 
+  // ================= OSINT tools =================
+  // The indicator lives only in this variable: never in the URL, never in local storage.
+  let osintValue = "", osintGroup = "all", osintPlaybook = null;
+  const OSINT_GROUPS = [
+    ["reputation", "Reputation", "Has anyone seen this do harm?"],
+    ["infrastructure", "Infrastructure", "Who owns it, what runs on it, how old is it?"],
+    ["sandbox", "Sandbox and malware", "What does the file do, and what family is it?"],
+    ["email", "Email", "Where did the message really come from?"],
+    ["vulnerability", "Vulnerabilities", "How bad is the CVE, and is it exploited?"],
+    ["reference", "Reference", "Is this binary, driver or tool a known abuse?"],
+    ["utility", "Utilities", "Decode it before you judge it."]
+  ];
+  const OPSEC = {
+    local: ["Stays local", "Runs in your browser or is a static reference. Nothing you are investigating is sent."],
+    lookup: ["Sends indicator", "The indicator goes to the vendor, which may log it. Only existing data is searched."],
+    submits: ["Public by default", "Creates a new scan or analysis the vendor may share. Never submit client files or internal URLs."]
+  };
+  const ACCESS = { free: "Free", "free-account": "Free account", freemium: "Free tier", paid: "Paid" };
+  const IOC_NAME = { ip: "IP address", domain: "Domain", url: "URL", hash: "File hash", email: "Email address", cve: "CVE" };
+  const INTERNAL_TLD = /\.(local|localdomain|internal|intranet|corp|lan|home|arpa|test|invalid|localhost)$/i;
+
+  function refang(s) {
+    return String(s || "").trim().replace(/^["'<\s]+|["'>\s]+$/g, "")
+      .replace(/^hxxp/i, "http").replace(/^fxp/i, "ftp")
+      .replace(/\[\s*(\.|dot)\s*\]|\(\s*(\.|dot)\s*\)|\{\s*(\.|dot)\s*\}/gi, ".")
+      .replace(/\[\s*:\s*\]/g, ":").replace(/\[\s*(@|at)\s*\]/gi, "@").replace(/\[\s*\/\s*\]/g, "/");
+  }
+  function privateV4(ip) {
+    const [a, b, c] = ip.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113);
+  }
+  function privateV6(ip) {
+    const s = ip.toLowerCase();
+    return s === "::" || s === "::1" || /^f[cd]/.test(s) || /^fe[89ab]/.test(s) || /^ff/.test(s) || /^::ffff:/.test(s) || /^2001:0?db8:/.test(s);
+  }
+  // Returns { type, value, hashtype?, internal?, why?, also: [{type, value}] } or null.
+  function detectIoc(raw) {
+    const v = refang(raw);
+    if (!v || /\s/.test(v)) return null;
+    if (/^CVE-\d{4}-\d{4,}$/i.test(v)) return { type: "cve", value: v.toUpperCase(), also: [] };
+    const hl = { 32: "md5", 40: "sha1", 64: "sha256" }[v.length];
+    if (hl && /^[a-f0-9]+$/i.test(v)) return { type: "hash", value: v.toLowerCase(), hashtype: hl, also: [] };
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v) && v.split(".").every(o => +o <= 255))
+      return privateV4(v) ? { type: "ip", value: v, internal: true, why: "a private, reserved or internal address", also: [] } : { type: "ip", value: v, also: [] };
+    if (v.includes(":") && /^[0-9a-f:]+$/i.test(v) && (v.match(/::/g) || []).length <= 1 && v.split(":").length <= 8)
+      return privateV6(v) ? { type: "ip", value: v.toLowerCase(), internal: true, why: "a link-local, unique-local or reserved address", also: [] } : { type: "ip", value: v.toLowerCase(), also: [] };
+    if (/^https?:\/\//i.test(v)) {
+      let u; try { u = new URL(v); } catch (e) { return null; }
+      const host = u.hostname.replace(/^\[|\]$/g, "");
+      const inner = detectIoc(host);
+      if (!inner || inner.type === "hash" || inner.type === "cve") return null;
+      if (inner.internal) return { type: "url", value: v, internal: true, why: "a link to " + inner.why.replace(/^an? /, "an "), also: [] };
+      return { type: "url", value: v, also: [{ type: inner.type, value: inner.value }] };
+    }
+    const em = /^[^\s@]+@([^\s@]+)$/.exec(v);
+    if (em) {
+      const inner = detectIoc(em[1]);
+      if (!inner || inner.type !== "domain") return null;
+      return { type: "email", value: v, internal: !!inner.internal, why: inner.why, also: inner.internal ? [] : [{ type: "domain", value: inner.value }] };
+    }
+    if (/^(?=.{4,253}$)([a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})\.?$/i.test(v)) {
+      const d = v.toLowerCase().replace(/\.$/, "");
+      return INTERNAL_TLD.test(d) ? { type: "domain", value: d, internal: true, why: "an internal or reserved domain", also: [] } : { type: "domain", value: d, also: [] };
+    }
+    return null;
+  }
+  async function sha256Hex(text) {
+    if (!(window.crypto && crypto.subtle)) return null;
+    try {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+    } catch (e) { return null; }
+  }
+  // Fill one template. In a query string or fragment the value is encoded; in the path it is
+  // already restricted to a safe character set by detectIoc, so only encodeURI is applied.
+  function fillLookup(tpl, ioc, urlHash) {
+    if (tpl.includes("{urlsha256}")) return urlHash ? tpl.replace("{urlsha256}", urlHash) : null;
+    const at = tpl.indexOf("{value}"), cut = Math.min(...["?", "#"].map(c => { const i = tpl.indexOf(c); return i < 0 ? Infinity : i; }));
+    const enc = at > cut ? encodeURIComponent(ioc.value) : encodeURI(ioc.value);
+    return tpl.replace("{value}", enc).replace("{hashtype}", ioc.hashtype || "");
+  }
+  function lookupsFor(ioc, urlHash) {
+    const keys = ioc.type === "hash" ? (ioc.hashtype === "sha256" ? ["hash", "sha256"] : ["hash"]) : [ioc.type];
+    const out = [];
+    OSINT.forEach(t => {
+      const k = keys.find(k => t.lookups && t.lookups[k]);
+      if (!k) return;
+      const href = fillLookup(t.lookups[k], ioc, urlHash);
+      if (href) out.push({ t, href });
+    });
+    const rank = { local: 0, lookup: 1, submits: 2 };
+    return out.sort((a, b) => rank[a.t.opsec] - rank[b.t.opsec]);
+  }
+  function opsecBadge(t) {
+    const [label, tip] = OPSEC[t.opsec] || ["", ""];
+    return h("span", { class: "opsec opsec-" + t.opsec, title: tip }, label);
+  }
+
+  function openOsint(value, playbook) {
+    S.view = "osint";
+    if (typeof value === "string") osintValue = value;
+    osintPlaybook = playbook && TREES[playbook] ? playbook : null;
+    if (osintPlaybook) osintGroup = "all";
+    save(); setHash("osint"); closeMap(); closeOverlays(); render(); window.scrollTo(0, 0);
+    const inp = document.getElementById("ioc-in");
+    if (inp && !value && !playbook) inp.focus({ preventScroll: true });
+  }
+
+  function renderOsint() {
+    const app = document.getElementById("app"); app.replaceChildren();
+    const input = h("input", { class: "field ioc-input", id: "ioc-in", type: "text", spellcheck: "false", autocomplete: "off",
+      placeholder: "Paste an IP, domain, URL, hash, email or CVE. Defanged is fine.", "aria-describedby": "ioc-help" });
+    input.value = osintValue;
+    const out = h("div", { class: "ioc-out", "aria-live": "polite" });
+    let seq = 0;
+    const draw = async () => {
+      const my = ++seq;
+      osintValue = input.value;
+      const ioc = detectIoc(input.value);
+      out.replaceChildren();
+      if (!input.value.trim()) return;
+      if (!ioc) { out.append(h("p", { class: "muted" }, "Not recognised. Paste one indicator: an IPv4 or IPv6 address, a domain, a full URL starting with http, an MD5, SHA-1 or SHA-256 hash, an email address or a CVE ID.")); return; }
+      if (ioc.internal) {
+        out.append(h("div", { class: "ioc-stop" }, h("strong", {}, "Not offered for lookup."),
+          " This looks like " + ioc.why + ". Check it in your own logs and asset inventory; external tools know nothing useful about it and you would be sending client data out."));
+        return;
+      }
+      const urlHash = ioc.type === "url" ? await sha256Hex(new URL(ioc.value).pathname === "/" && !ioc.value.endsWith("/") ? ioc.value + "/" : ioc.value) : null;
+      if (my !== seq) return;
+      const blocks = [];
+      const main = ioc.type === "email" ? [] : lookupsFor(ioc, urlHash);
+      if (ioc.type === "email") blocks.push(h("p", { class: "muted" }, "The full address is not sent anywhere from here. The sender domain is checked below. To check the address in breach data, see Have I Been Pwned, and only if the client allows it."));
+      if (main.length) blocks.push(lookupList(IOC_NAME[ioc.type], ioc.value, main));
+      ioc.also.forEach(a => { const l = lookupsFor(a, null); if (l.length) blocks.push(lookupList(IOC_NAME[a.type] + (ioc.type === "url" ? " in the URL" : " of the sender"), a.value, l)); });
+      if (!blocks.length) blocks.push(h("p", { class: "muted" }, "No tool here has a one-click lookup for this yet."));
+      out.append(h("div", { class: "ioc-type" }, h("span", { class: "chip mono" }, IOC_NAME[ioc.type] + (ioc.hashtype ? " · " + ioc.hashtype.toUpperCase() : "")),
+        refang(input.value) !== input.value.trim() ? h("span", { class: "muted" }, "Refanged to ", h("code", {}, ioc.value)) : null), ...blocks);
+    };
+    function lookupList(label, value, items) {
+      const links = items.map(x => x.href);
+      return h("section", { class: "ioc-block" },
+        h("div", { class: "row between" }, h("div", { class: "label-rule ioc-label" }, label + ": ", h("code", {}, value)),
+          h("button", { class: "btn sm", type: "button", onclick: () => copy(links.join("\n")) }, icon("copy"), "Copy " + links.length + " links")),
+        h("ul", { class: "ioc-list" }, items.map(({ t, href }) => h("li", {},
+          h("a", { href, target: "_blank", rel: "noopener noreferrer", class: "ioc-link" }, h("span", { class: "iname" }, t.name), icon("ext")),
+          h("span", { class: "iwhat" }, t.what), opsecBadge(t)))));
+    }
+    input.addEventListener("input", () => { clearTimeout(draw._t); draw._t = setTimeout(draw, 120); });
+    input.addEventListener("keydown", e => { if (e.key === "Escape" && input.value) { e.stopPropagation(); input.value = ""; draw(); } });
+
+    const pbTools = osintPlaybook ? OSINT.filter(t => t.playbooks.includes(osintPlaybook)) : OSINT;
+    const shown = pbTools.filter(t => osintGroup === "all" || t.group === osintGroup);
+    const counts = g => pbTools.filter(t => t.group === g).length;
+    const groupChip = (g, label, n) => h("button", { class: "chip filt", type: "button", "aria-pressed": String(osintGroup === g), onclick: () => { osintGroup = g; renderOsint(); } }, label, h("span", { class: "count" }, n));
+    const oldest = OSINT.map(t => t.verified.date).sort()[0];
+
+    app.append(h("main", { class: "dets osint" },
+      h("header", { class: "dets-head" },
+        h("div", { class: "eyebrow" }, "OSINT · " + OSINT.length + " verified tools"),
+        h("h1", {}, "Check it ", h("em", {}, "outside.")),
+        h("p", { class: "lead" }, "Free and low-cost tools for the questions your own logs cannot answer: who owns this IP, how old is this domain, what does this file do. Each one says when it helps, what can mislead you, and what it does with what you give it."),
+        h("p", { class: "muted" }, "Every link was checked, and each tool says how. Oldest check: " + (fmtDate(oldest) || oldest) + ". Tools drift, so tell me on ", h("a", { href: LINKS.github + "/issues", target: "_blank", rel: "noopener" }, "GitHub"), " if one breaks.")),
+      h("section", { class: "panel ioc" },
+        h("label", { class: "panel-title", for: "ioc-in" }, "Look up an indicator"),
+        input,
+        h("p", { class: "muted", id: "ioc-help" }, "Builds links for the tools that can check it. Nothing is sent until you open a link, and the indicator is never saved or put in this page's address. Private addresses and internal names are refused."),
+        out),
+      h("section", { class: "opsec-key" }, h("div", { class: "label-rule" }, "Before you paste"),
+        h("dl", {}, Object.entries(OPSEC).map(([k, [label, tip]]) => [h("dt", {}, h("span", { class: "opsec opsec-" + k }, label)), h("dd", {}, tip)]))),
+      h("section", {},
+        osintPlaybook ? h("div", { class: "pb-filter" }, "Showing tools for ", h("button", { class: "linkish", type: "button", onclick: () => openTree(osintPlaybook) }, TREES[osintPlaybook].title), ". ",
+          h("button", { class: "linkish", type: "button", onclick: () => openOsint(undefined, null) }, "Show all tools")) : null,
+        h("div", { class: "filters", role: "group", "aria-label": "Filter by kind" },
+          groupChip("all", "All", pbTools.length), OSINT_GROUPS.filter(([g]) => counts(g)).map(([g, label]) => groupChip(g, label, counts(g)))),
+        OSINT_GROUPS.filter(([g]) => shown.some(t => t.group === g)).map(([g, label, q]) =>
+          h("div", { class: "ogroup" }, h("div", { class: "label-rule" }, label, h("span", { class: "gq" }, q)),
+            h("div", { class: "cards tool-cards" }, shown.filter(t => t.group === g).map(toolCard)))))));
+    if (osintValue) draw();
+  }
+  function toolCard(t) {
+    const pbs = t.playbooks.filter(id => TREES[id]);
+    return h("article", { class: "card tool-card" },
+      h("div", { class: "cmeta" }, opsecBadge(t), h("span", {}, ACCESS[t.access] || t.access),
+        t.lookups ? h("span", { title: "One-click lookup from the box above" }, "Lookup: " + Object.keys(t.lookups).map(k => k === "sha256" ? "SHA-256" : k === "cve" ? "CVE" : k === "ip" ? "IP" : k === "url" ? "URL" : k).join(" · ")) : null),
+      h("h3", {}, h("a", { href: t.url, target: "_blank", rel: "noopener noreferrer" }, t.name, icon("ext"))),
+      h("p", { class: "twhat" }, md(t.what)),
+      h("p", { class: "tuse" }, h("span", { class: "tlab" }, "Use when"), md(t.use_when)),
+      t.watch_out ? h("p", { class: "twatch" }, h("span", { class: "tlab" }, "Watch out"), md(t.watch_out)) : null,
+      h("div", { class: "tfoot" },
+        pbs.length ? h("div", { class: "tpbs" }, pbs.slice(0, 4).map(id => h("button", { class: "chip", type: "button", onclick: () => openTree(id) }, TREES[id].title)),
+          pbs.length > 4 ? h("span", { class: "muted" }, "+" + (pbs.length - 4) + " more") : null) : null,
+        h("span", { class: "tver", title: t.verified.how }, svg(ICON.check), "Checked " + (fmtDate(t.verified.date) || t.verified.date))));
+  }
+
   function render() {
     renderBar();
-    if (S.view === "home") renderHome(); else if (S.view === "about") renderAbout(); else if (S.view === "detections") renderDetections(); else renderCase(false);
+    if (S.view === "home") renderHome(); else if (S.view === "about") renderAbout(); else if (S.view === "detections") renderDetections(); else if (S.view === "osint") renderOsint(); else renderCase(false);
   }
   window.addEventListener("hashchange", () => {
     const id = location.hash.slice(1);
     if (id === "library") { if (S.view !== "home") goHome(); return; }
     if (id === "about") { if (S.view !== "about") openAbout(); return; }
     if (id === "detections" || id.startsWith("detections/")) { const r = id.slice(11) || null; if (S.view !== "detections" || r !== ruleId) openDetections(r); return; }
+    if (id === "osint") { if (S.view !== "osint" && OSINT.length) openOsint(); return; }
     if (TREES[id] && id !== S.tree) openTree(id);
   });
   render();

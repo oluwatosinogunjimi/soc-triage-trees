@@ -184,3 +184,60 @@ def test_detection_with_missing_playbook_is_caught(tmp_path):
     (tmp_path / "net-user-add.yaml").write_text(yaml.safe_dump(rule))
     _, errors = load_detections(trees, tmp_path)
     assert any("no-such-playbook" in e for e in errors)
+
+
+def test_osint_tools_validate_and_link_to_real_playbooks():
+    from validate import load_osint
+
+    trees, _, _ = validate()
+    tools, errors, _ = load_osint(trees)
+    assert not errors, "\n".join(errors)
+    assert tools, "expected at least one tool in osint/tools.yaml"
+    assert len({t["id"] for t in tools}) == len(tools)
+
+
+def _osint_file(tmp_path, tool):
+    import yaml
+    path = tmp_path / "tools.yaml"
+    path.write_text(yaml.safe_dump({"tools": [tool]}))
+    return path
+
+
+GOOD_TOOL = {
+    "id": "sample", "name": "Sample", "url": "https://example.com/", "group": "reputation",
+    "what": "w", "use_when": "u", "opsec": "lookup", "access": "free",
+    "lookups": {"ip": "https://example.com/ip/{value}"},
+    "playbooks": ["risky-ip-signin"], "verified": {"date": "2026-10-01", "how": "Opened it."},
+}
+
+
+def test_osint_bad_playbook_template_and_future_date_are_caught(tmp_path):
+    from datetime import date
+    from validate import load_osint
+
+    trees, _, _ = validate()
+    bad = dict(GOOD_TOOL, playbooks=["no-such-playbook"], lookups={"ip": "https://example.com/{hashtype}/{value}"},
+               verified={"date": "2027-01-01", "how": "x"})
+    _, errors, _ = load_osint(trees, _osint_file(tmp_path, bad), today=date(2026, 10, 1))
+    assert any("no-such-playbook" in e for e in errors), errors
+    assert any("hashtype" in e for e in errors), errors
+    assert any("future" in e for e in errors), errors
+
+
+def test_osint_template_without_value_and_unknown_type_fail_schema(tmp_path):
+    from validate import load_osint
+
+    trees, _, _ = validate()
+    for lookups in ({"ip": "https://example.com/static"}, {"asn": "https://example.com/{value}"}):
+        _, errors, _ = load_osint(trees, _osint_file(tmp_path, dict(GOOD_TOOL, lookups=lookups)))
+        assert errors, lookups
+
+
+def test_osint_stale_check_warns(tmp_path):
+    from datetime import date
+    from validate import load_osint
+
+    trees, _, _ = validate()
+    _, errors, warnings = load_osint(trees, _osint_file(tmp_path, GOOD_TOOL), today=date(2027, 6, 1))
+    assert not errors
+    assert any("over 180 days" in w for w in warnings), warnings

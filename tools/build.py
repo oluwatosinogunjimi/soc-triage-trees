@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate import ROOT, load_detections, validate  # noqa: E402
+from validate import ROOT, load_detections, load_osint, validate  # noqa: E402
 
 SITE = ROOT / "site"
 DIST = ROOT / "dist"
@@ -27,7 +27,9 @@ MARKER = "/*__TREE_DATA__*/null"
 def main() -> int:
     trees, errors, warnings = validate()
     dets, det_errors = load_detections(trees)
-    errors += det_errors
+    osint, osint_errors, osint_warnings = load_osint(trees)
+    errors += det_errors + osint_errors
+    warnings += osint_warnings
     for w in warnings:
         print(f"warning: {w}")
     if errors:
@@ -44,6 +46,7 @@ def main() -> int:
             for t in sorted(trees.values(), key=lambda t: (order[t["category"]], t["title"]))
         ],
         "detections": sorted(dets.values(), key=lambda d: (d["tactic"], d["title"])),
+        "osint": osint,
     }
     payload = json.dumps(bundle, ensure_ascii=False, separators=(",", ":"))
 
@@ -67,7 +70,7 @@ def main() -> int:
     )
     (DIST / "index.html").write_text(page, encoding="utf-8")
 
-    print(f"Built dist/index.html, dist/viewer.html and dist/trees.json ({len(trees)} trees, {len(dets)} detection rules)")
+    print(f"Built dist/index.html, dist/viewer.html and dist/trees.json ({len(trees)} trees, {len(dets)} detection rules, {len(osint)} OSINT tools)")
     return 0
 
 

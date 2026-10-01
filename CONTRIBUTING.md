@@ -87,3 +87,14 @@ You can also add or edit a file in `detections/` by hand. The site reads only th
 - [ ] Queries were run against a real workspace
 - [ ] No client names, real IPs, real users or internal hostnames anywhere (use the examples format)
 - [ ] `version` and `last_reviewed` updated
+
+## OSINT tools
+
+Tools live in `osint/tools.yaml`. The comment at the top of the file describes every field. Before adding or changing a tool:
+
+- Open the site yourself and confirm it still does what `what` says.
+- Add a lookup template only after you have opened it with a real indicator and seen the right result. If the site blocks the check or needs a date or login, leave `lookups` out and say so in `verified.how`.
+- Set `opsec` honestly. If a free tier makes submissions public, it is `submits`.
+- Put the date and method in `verified`. The validator warns when a check is over 180 days old, so re-check the link and bump the date rather than ignoring the warning.
+- `playbooks` must be real tree ids. Run `python tools/validate.py`.
+
