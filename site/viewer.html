@@ -814,7 +814,6 @@ table.vt td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); v
 .ent-osint:hover { text-decoration: underline; }
 .ent-osint:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ent-osint[hidden] { display: none; }
-.ent-osint svg { width: 10px; height: 10px; vertical-align: 0; margin-left: 2px; }
 .back-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); font-size: 14px; color: var(--ink-2); margin-bottom: -20px; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -1766,7 +1765,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       const inp = h("input", { class: "field", id, type: "text", placeholder: e.example || "", spellcheck: "false", autocomplete: "off" });
       inp.value = S.entities[e.key] || "";
       const canLook = () => { const i = OSINT.length && detectIoc(inp.value); return !!(i && !i.internal); };
-      const look = h("button", { class: "ent-osint", type: "button", title: "Look this up in a new tab. Your case stays here.", onclick: () => osintInNewTab(inp.value, S.tree) }, "OSINT", icon("ext"));
+      const look = h("button", { class: "ent-osint", type: "button", title: "Look this value up. Your case is kept, and Back to your case returns to it.", onclick: () => openOsint(inp.value) }, "OSINT");
       look.hidden = !canLook();
       const row = h("div", { class: "ent" + (inp.value.trim() ? "" : " missing") }, h("label", { for: id }, h("span", {}, e.label), h("code", {}, e.key), look), inp);
       inp.addEventListener("input", () => {
@@ -2236,24 +2235,6 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     return h("span", { class: "opsec opsec-" + t.opsec, title: tip }, label);
   }
 
-  const HANDOFF = "triage-trees-osint-handoff";
-  // Opens the OSINT page in a new tab with the value filled in. The value crosses over in a
-  // local storage key the new tab reads once and deletes within seconds; it never enters the URL.
-  function osintInNewTab(value, playbook) {
-    try { localStorage.setItem(HANDOFF, JSON.stringify({ v: value, pb: playbook || null, t: Date.now() })); } catch (e) {}
-    const w = window.open(location.pathname + location.search + "#osint", "_blank");
-    if (!w) { try { localStorage.removeItem(HANDOFF); } catch (e) {} openOsint(value, playbook); return; }
-    try { w.opener = null; } catch (e) {}
-    setTimeout(() => { try { localStorage.removeItem(HANDOFF); } catch (e) {} }, 10000);
-  }
-  function takeHandoff() {
-    try {
-      const raw = localStorage.getItem(HANDOFF); localStorage.removeItem(HANDOFF);
-      const x = raw && JSON.parse(raw);
-      if (x && typeof x.v === "string" && Date.now() - x.t < 10000) { osintValue = x.v; osintFrom = x.pb && TREES[x.pb] ? x.pb : null; }
-    } catch (e) {}
-  }
-  let osintFrom = null;
   function openOsint(value, playbook) {
     S.view = "osint";
     if (typeof value === "string") osintValue = value;
@@ -2313,9 +2294,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     const oldest = OSINT.map(t => t.verified.date).sort()[0];
 
     const inCase = S.started || S.path.length || Object.values(S.entities || {}).some(v => String(v || "").trim());
-    const back = osintFrom
-      ? h("div", { class: "back-bar" }, h("span", {}, "Looking up a value from ", h("strong", {}, TREES[osintFrom].title), ". Your case is still open in the other tab; close this one when you're done."))
-      : inCase ? h("div", { class: "back-bar" }, h("button", { class: "btn sm", type: "button", onclick: resume }, icon("back"), "Back to your case"), h("span", { class: "muted" }, TREES[S.tree].title)) : null;
+    const back = inCase ? h("div", { class: "back-bar" }, h("button", { class: "btn sm", type: "button", onclick: resume }, icon("back"), "Back to your case"), h("span", { class: "muted" }, TREES[S.tree].title)) : null;
     app.append(h("main", { class: "dets osint" }, back,
       h("header", { class: "dets-head" },
         h("div", { class: "eyebrow" }, "OSINT · " + OSINT.length + " verified tools"),
@@ -2368,7 +2347,6 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   }
   window.addEventListener("hashchange", routeFromHash);
   window.addEventListener("popstate", routeFromHash);
-  if (S.view === "osint") takeHandoff();
   // Another tab (an OSINT tab, say) saved the case: take its copy so this tab never overwrites newer work.
   window.addEventListener("storage", e => {
     if (e.key !== STORE || !e.newValue) return;
