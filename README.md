@@ -1,6 +1,6 @@
 # Triage Trees
 
-Question-driven investigation playbooks for SOC analysts, plus the custom detection rules behind some of the alerts. Pick the alert type, answer yes/no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and export a closure note written from the path you took.
+Question-driven investigation playbooks for SOC analysts, plus the custom detection rules behind some of the alerts and a verified set of OSINT tools for outside checks. Pick the alert type, answer yes/no questions backed by ready-to-run KQL, reach a verdict with recommended actions, and export a closure note written from the path you took.
 
 This project grew out of the article [Lessons from the SOC: How Analysts Can Triage Smarter, Tune Better, and Stop Drowning in Alerts](https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7). The article's question bank is now structured data, checked against vendor incident response playbooks and MITRE ATT&CK.
 
@@ -44,6 +44,18 @@ The Detections page shows custom Defender XDR detection rules from the [KQL dete
 
 The rules are copied into `detections/` as YAML, so the site never depends on the KQL repo. To refresh them after a rule changes there, run `python tools/import_detections.py ../KQL-Query`, or edit the YAML by hand. Either way, `python tools/validate.py` checks every rule and that its playbook exists.
 
+## OSINT tools
+
+The OSINT page lists 40 tools for the checks your own logs can't answer: IP and domain reputation, infrastructure and domain age, sandboxes, email headers, CVE severity, and references such as LOLBAS, LOLDrivers and LOLRMM. Each tool says when to use it, what can mislead you, whether it is free, and what it does with what you give it:
+
+- **Stays local**: runs in your browser or is a static reference.
+- **Sends indicator**: the vendor sees and may log what you look up.
+- **Public by default**: creates a scan or analysis others can see. Never submit client files or internal URLs.
+
+Paste an IP, domain, URL, hash, email or CVE (defanged is fine) and the page builds one-click lookups for the tools that support it. Private addresses and internal names are refused. The indicator is never saved or put in the page URL. In a case, entity values that are public indicators get an **OSINT** link, and each playbook lists the tools that help with it.
+
+Tools live in `osint/tools.yaml`. Every entry records when its links were last checked and how; the validator warns once a check is more than 180 days old.
+
 ## Using it
 
 Open the published site, or build it locally:
@@ -54,7 +66,7 @@ python tools/build.py          # validates, then writes dist/
 python -m http.server -d dist  # open http://localhost:8000
 ```
 
-`dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`, and to a detection rule with `#detections/rule-id`. Press `Ctrl K` (`⌘K` on Mac) anywhere to jump to a playbook.
+`dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`, and to a detection rule with `#detections/rule-id`, and to the OSINT tools with `#osint`. Press `Ctrl K` (`⌘K` on Mac) anywhere to jump to a playbook.
 
 The site has a light mode (a field-guide look on paper) and a dark mode (a console look for long shifts). It follows your device setting until you use the sun/moon switch, then remembers your choice.
 
@@ -65,8 +77,10 @@ Case state (your path, evidence and entity values) stays in your own browser's l
 ```
 trees/                 one YAML file per playbook (this is the content)
 detections/            one YAML file per detection rule, copied from the KQL library
+osint/tools.yaml       the OSINT tools, edited by hand
 schema/tree.schema.json  the contract every tree must meet
 schema/detection.schema.json  the contract every detection rule must meet
+schema/osint.schema.json  the contract every OSINT tool must meet
 tools/validate.py      schema plus graph checks (orphans, broken edges, cycles, placeholders)
 tools/build.py         validate, then bundle into dist/
 tools/new_tree.py      scaffold a new tree that already validates

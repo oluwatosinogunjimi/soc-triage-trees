@@ -13,6 +13,8 @@ Checks, in order:
   9. No also_check question repeats within a tree.
  10. Warnings: unused entities, questions with an unknown edge but no unknown note.
  11. Detection rules in detections/ match schema/detection.schema.json and link to playbooks that exist.
+ 12. OSINT tools in osint/tools.yaml match schema/osint.schema.json, link to playbooks that exist,
+     and were verified in the last 180 days (warning only).
 
 Usage: python tools/validate.py [trees_dir]
 Exit code 1 if any error.
@@ -22,6 +24,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -244,6 +247,62 @@ def load_detections(trees: dict[str, dict], det_dir: Path = ROOT / "detections")
     return dets, errors
 
 
+OSINT_SCHEMA_PATH = ROOT / "schema" / "osint.schema.json"
+OSINT_PATH = ROOT / "osint" / "tools.yaml"
+OSINT_STALE_DAYS = 180
+
+
+def load_osint(trees: dict[str, dict], path: Path = OSINT_PATH, today: date | None = None) -> tuple[list[dict], list[str], list[str]]:
+    """OSINT tools: schema, unique ids, real playbooks, sane templates. Warn when a check is over 180 days old."""
+    if not path.exists():
+        return [], [], []
+    name = path.name
+    try:
+        data = yaml.load(path.read_text(encoding="utf-8"), Loader=UniqueKeyLoader)
+    except yaml.YAMLError as e:
+        return [], [f"{name}: YAML error: {e}"], []
+    # YAML turns unquoted dates into date objects; the schema wants strings.
+    for t in (data or {}).get("tools", []) if isinstance(data, dict) else []:
+        v = t.get("verified") if isinstance(t, dict) else None
+        if isinstance(v, dict) and "date" in v and not isinstance(v["date"], str):
+            v["date"] = str(v["date"])
+    validator = Draft202012Validator(json.loads(OSINT_SCHEMA_PATH.read_text()))
+    problems = [f"{name}: {'/'.join(map(str, e.path)) or '(root)'}: {e.message}" for e in validator.iter_errors(data)]
+    if problems:
+        return [], problems, []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    today = today or date.today()
+    seen: set[str] = set()
+    for t in data["tools"]:
+        where = f"{name}: {t['id']}"
+        if t["id"] in seen:
+            errors.append(f"{where}: duplicate tool id")
+        seen.add(t["id"])
+        for pb in t["playbooks"]:
+            if pb not in trees:
+                errors.append(f"{where}: playbook '{pb}' does not exist in trees/")
+        for kind, tpl in t.get("lookups", {}).items():
+            if "{hashtype}" in tpl and kind != "hash":
+                errors.append(f"{where}: {{hashtype}} only works in a hash lookup, not {kind}")
+            if "{urlsha256}" in tpl and kind != "url":
+                errors.append(f"{where}: {{urlsha256}} only works in a url lookup, not {kind}")
+            leftover = set(re.findall(r"\{([a-z0-9]+)\}", tpl)) - {"value", "hashtype", "urlsha256"}
+            if leftover:
+                errors.append(f"{where}: unknown placeholder {sorted(leftover)} in {kind} lookup")
+        try:
+            checked = date.fromisoformat(t["verified"]["date"])
+        except ValueError:
+            errors.append(f"{where}: verified.date '{t['verified']['date']}' is not a real date")
+            continue
+        if checked > today:
+            errors.append(f"{where}: verified.date {checked} is in the future")
+        elif (today - checked).days > OSINT_STALE_DAYS:
+            warnings.append(f"{where}: last verified {checked}, over {OSINT_STALE_DAYS} days ago. Re-check the link and lookups.")
+    return data["tools"], errors, warnings
+
+
 def validate(trees_dir: Path = ROOT / "trees") -> tuple[dict[str, dict], list[str], list[str]]:
     trees, errors = load_trees(trees_dir)
     graph_errors, warnings = check_graphs(trees)
@@ -254,14 +313,16 @@ def main() -> int:
     trees_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "trees"
     trees, errors, warnings = validate(trees_dir)
     dets, det_errors = load_detections(trees) if len(sys.argv) == 1 else ({}, [])
-    errors += det_errors
+    osint, osint_errors, osint_warnings = load_osint(trees) if len(sys.argv) == 1 else ([], [], [])
+    errors += det_errors + osint_errors
+    warnings += osint_warnings
     for w in warnings:
         print(f"warning: {w}")
     for e in errors:
         print(f"error: {e}")
     total_nodes = sum(len(t["nodes"]) for t in trees.values())
     status = "FAILED" if errors else "OK"
-    print(f"{status}: {len(trees)} trees, {total_nodes} nodes, {len(dets)} detection rules, {len(errors)} errors, {len(warnings)} warnings")
+    print(f"{status}: {len(trees)} trees, {total_nodes} nodes, {len(dets)} detection rules, {len(osint)} OSINT tools, {len(errors)} errors, {len(warnings)} warnings")
     return 1 if errors else 0
 
 
