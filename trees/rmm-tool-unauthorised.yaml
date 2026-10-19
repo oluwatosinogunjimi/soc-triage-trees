@@ -10,14 +10,16 @@ applies_to:
   - AnyDesk / ScreenConnect installed
   - Quick Assist session started after unsolicited contact
 mitre: [T1219]
-version: 1.2.0
-last_reviewed: 2026-09-29
+version: 1.3.0
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: "MITRE ATT&CK T1219 Remote Access Tools"
     url: https://attack.mitre.org/techniques/T1219/
   - title: CISA advisory AA23-025A, malicious use of RMM software
     url: https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-025a
+  - title: GoTo support, how GoTo Meeting installs updates automatically
+    url: https://support.goto.com/article/g2m010015
 entities:
   - { key: device, label: Device name, example: "WKS-FIN-023" }
   - { key: file, label: Tool executable, example: "AnyDesk.exe" }
@@ -65,10 +67,39 @@ nodes:
     text: Was a new local account created or added to the administrators group on {{device}}?
     why: A new admin account after a remote access tool appears is a classic backdoor for return access, so a yes means hands-on intrusion.
     yes: o-tp-active
-    no: q-approved
+    no: q-component
     notes:
       yes: I found a new local account was created or added to the administrators group on {{device}}.
       no: I found no new local accounts or administrators group changes on {{device}}.
+
+  q-component:
+    type: question
+    text: Is {{file}} only a background component (updater, log uploader) of a meeting or collaboration app from a remote access vendor, launched by Task Scheduler, with no remote session?
+    why: >-
+      Some remote access vendors also make meeting apps. Their updaters match vendor-name detections
+      (GoTo Meeting's g2mupdate.exe and g2mupload.exe match on LogMeIn) but give no one control of the
+      device. A parent of svchost.exe -k netsvcs -p -s Schedule and no interactive client launches point here.
+    kql:
+      - title: Every binary from the same vendor on the device, with parent (30d)
+        platform: xdr
+        query: |
+          let vendor = DeviceProcessEvents
+            | where Timestamp > ago(30d)
+            | where DeviceName =~ "{{device}}" and FileName =~ "{{file}}"
+            | take 1
+            | project ProcessVersionInfoCompanyName;
+          DeviceProcessEvents
+          | where Timestamp > ago(30d)
+          | where DeviceName =~ "{{device}}"
+          | where ProcessVersionInfoCompanyName in (vendor)
+          | summarize FirstSeen = min(Timestamp), LastSeen = max(Timestamp), Runs = count()
+              by FileName, FolderPath, ProcessVersionInfoProductName, InitiatingProcessCommandLine, AccountName
+          | order by FirstSeen asc
+    yes: o-fp-component
+    no: q-approved
+    notes:
+      yes: "{{file}} on {{device}} is only a scheduled background component of a meeting app, and no interactive client or remote session ran."
+      no: "{{file}} is a remote access component, or the vendor's interactive client also ran on {{device}}."
 
   q-approved:
     type: question
@@ -120,6 +151,18 @@ nodes:
     actions:
       - Close
     tuning: Exclude the approved tool by signer plus the customer's tenant or relay, not by name alone.
+
+  o-fp-component:
+    type: outcome
+    verdict: false_positive
+    title: Meeting app background component
+    anchor: "{{file}} on {{device}} is a scheduled updater or log uploader for a meeting app from a remote access vendor, and no remote session took place."
+    risk: The risk here is attacker remote access through RMM software; it doesn't apply because the component only updates the app or uploads its logs and gives no one control of the device.
+    actions:
+      - Ask the user whether they still need the app
+      - Remove the app if it is unused, since its scheduled tasks keep it running
+      - Close
+    tuning: Exclude the meeting app's install path with Task Scheduler as the parent, and keep the same vendor's remote support products (for example GoToAssist, GoTo Resolve, LogMeIn Rescue) in scope.
 
   o-policy:
     type: outcome

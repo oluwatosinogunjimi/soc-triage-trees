@@ -41,6 +41,8 @@ The Detections page shows custom Defender XDR detection rules from the [KQL dete
 | User Account Creation via Command Line | Persistence | Local Account Created or Added to Administrators |
 | Local Administrators Group Modification via Command Line | Privilege Escalation | Local Account Created or Added to Administrators |
 | Svchost Execution from Unusual Location | Defense Evasion | Malware or EDR Detection |
+| LSASS Memory Dump via LOLBin or Dump Utility | Credential Access | LSASS Credential Dumping |
+| Unsanctioned Remote Access Tool Execution | Command and Control | Unauthorised Remote Access Tool |
 
 The rules are copied into `detections/` as YAML, so the site never depends on the KQL repo. To refresh them after a rule changes there, run `python tools/import_detections.py ../KQL-Query`, or edit the YAML by hand. Either way, `python tools/validate.py` checks every rule and that its playbook exists.
 
