@@ -10,13 +10,13 @@ applies_to:
   - Suspicious Microsoft Defender Antivirus exclusion
   - Tamper protection blocked a change
   - EDR agent uninstalled or sensor offline unexpectedly
-mitre: [T1562.001]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1685]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
-  - title: "MITRE ATT&CK T1562.001 Impair Defenses: Disable or Modify Tools"
-    url: https://attack.mitre.org/techniques/T1562/001/
+  - title: "MITRE ATT&CK T1685 Disable or Modify Tools"
+    url: https://attack.mitre.org/techniques/T1685/
 entities:
   - { key: device, label: Device name, example: "WKS-FIN-023" }
 start: c-change

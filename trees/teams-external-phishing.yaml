@@ -9,9 +9,9 @@ applies_to:
   - External Teams chat from unknown tenant
   - Teams phishing message detected
   - Email bombing followed by Teams contact
-mitre: [T1566.003, T1656, T1219]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1566.003, T1684.001, T1219]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: Microsoft Threat Intelligence, Storm-1811 abuse of Quick Assist and Teams

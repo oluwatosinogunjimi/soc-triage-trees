@@ -9,15 +9,15 @@ applies_to:
   - Request to change supplier bank details
   - Invoice fraud from known vendor
   - Suspicious email from trusted partner domain
-mitre: [T1566, T1656]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1566, T1684.001]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: FBI IC3 Business Email Compromise public service announcement
     url: https://www.ic3.gov/PSA/2024/PSA240911
-  - title: "MITRE ATT&CK T1656 Impersonation"
-    url: https://attack.mitre.org/techniques/T1656/
+  - title: "MITRE ATT&CK T1684.001 Social Engineering: Impersonation"
+    url: https://attack.mitre.org/techniques/T1684/001/
 entities:
   - { key: sender, label: Vendor sender, example: "accounts@supplier-co.com" }
   - { key: recipient, label: Recipient UPN, example: "ap.clerk@contoso.com" }

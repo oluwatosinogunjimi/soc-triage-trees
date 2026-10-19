@@ -9,9 +9,9 @@ applies_to:
   - Vulnerable driver loaded
   - Suspicious driver load (known vulnerable driver blocklist)
   - Possible EDR killer activity
-mitre: [T1068, T1562.001, T1543.003]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1068, T1685, T1543.003]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: "MITRE ATT&CK T1068 Exploitation for Privilege Escalation"

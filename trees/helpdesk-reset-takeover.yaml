@@ -10,15 +10,15 @@ applies_to:
   - Admin deleted security info then new registration
   - Suspicious MFA tampering activity by admin account
   - Suspicious sign-in to a web app following MFA phone number tampering activity
-mitre: [T1656, T1098.005, T1078.004]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1684.001, T1098.005, T1078.004]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: CISA advisory AA23-320A Scattered Spider
     url: https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-320a
-  - title: "MITRE ATT&CK T1656 Impersonation"
-    url: https://attack.mitre.org/techniques/T1656/
+  - title: "MITRE ATT&CK T1684.001 Social Engineering: Impersonation"
+    url: https://attack.mitre.org/techniques/T1684/001/
 entities:
   - { key: user, label: User whose credentials were reset, example: "finance.lead@contoso.com" }
   - { key: actor, label: Admin or helpdesk account, example: "helpdesk02@contoso.com" }

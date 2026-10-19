@@ -9,9 +9,9 @@ applies_to:
   - New-TransportRule
   - Set-TransportRule
   - Mail flow rule redirecting mail externally
-mitre: [T1114.003, T1562]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1114.003, T1685]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: Microsoft phishing playbook (review mail flow rules)

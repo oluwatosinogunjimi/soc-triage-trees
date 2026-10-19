@@ -10,13 +10,13 @@ applies_to:
   - New admin account on network device
   - Logging disabled on firewall
   - Admin login to network device from unusual source
-mitre: [T1562.004, T1098]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1686, T1098]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
-  - title: "MITRE ATT&CK T1562.004 Disable or Modify System Firewall"
-    url: https://attack.mitre.org/techniques/T1562/004/
+  - title: "MITRE ATT&CK T1686 Disable or Modify System Firewall"
+    url: https://attack.mitre.org/techniques/T1686/
 entities:
   - { key: device, label: Network device, example: "FW-EDGE-01" }
   - { key: admin, label: Admin account, example: "netadmin" }
