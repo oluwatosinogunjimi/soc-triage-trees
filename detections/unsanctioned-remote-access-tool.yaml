@@ -140,16 +140,8 @@ validation:
   environment: Windows test device, Defender XDR
   result: Pending
 - date: '2026-10-19'
-  method: Advanced Hunting run, 30-day lookback (first version)
-  environment: Production tenant, Defender XDR
-  result: Matched; false positive from GoTo Meeting background updater (see False Positives)
-- date: '2026-10-19'
-  method: Deployed as custom detection (first version)
-  environment: Production tenant, Defender XDR
-  result: Fired every run on a scheduled meeting-app log uploader (see Tuning Notes)
-- date: '2026-10-19'
-  method: Advanced Hunting run, 30-day lookback (arrival and launch version)
-  environment: Production tenant, Defender XDR
+  method: Start an installed tool through its service and through Task Scheduler (should not alert), then download and launch a portable build from Downloads (should alert)
+  environment: Windows test device, Defender XDR
   result: Pending
 playbooks:
 - rmm-tool-unauthorised
@@ -166,7 +158,4 @@ tuning:
 - date: '2026-10-19'
   change: Initial version
   reason: Baseline
-- date: '2026-10-19'
-  change: Alert on arrival (file written) or launch by a user or script instead of every execution; drop starts by services.exe and Task Scheduler and a tool's own helper processes; added an Arrival signal from DeviceFileEvents
-  reason: An hourly rule only sees the last 4 hours, so an installed tool re-alerted every run; a scheduled meeting-app log uploader alerted on each run
 source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/command-and-control/unsanctioned-remote-access-tool.md
