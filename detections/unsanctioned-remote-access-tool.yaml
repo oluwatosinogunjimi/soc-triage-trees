@@ -1,0 +1,161 @@
+# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/command-and-control/unsanctioned-remote-access-tool.md
+# The site reads only this file. Edit it here by hand, or re-run tools/import_detections.py.
+id: unsanctioned-remote-access-tool
+title: Unsanctioned Remote Access Tool Execution
+tactic: Command and Control
+technique: Remote Access Tools (T1219)
+technique_ids:
+- T1219
+severity: Medium
+severity_why: Where only approved tools are permitted, hits are a policy breach at minimum. Legitimate client and vendor support sessions occur often enough that not every hit is a compromise.
+goal: Catch an attacker gaining hands-on-keyboard control of a device through a legitimate remote access or RMM tool that the organisation has not approved.
+description: Detects commonly abused remote access and RMM tools (AnyDesk, TeamViewer, ScreenConnect, Quick Assist, Atera, Splashtop, NetSupport, RustDesk, Action1 and others) when they arrive on a device or are launched by a user or script. Organisations usually standardise on one or two approved tools, so any other remote access tool is either unauthorised IT activity or an attacker. These tools are signed and legitimate, so Defender rarely alerts on them, which is why vishing crews and ransomware operators rely on them for initial access and persistence.
+strategy: 'Two signals, unioned:
+
+
+  - **Arrival:** `DeviceFileEvents` where a known remote access binary is created or renamed into place (browser download, installer, script or another tool).
+
+  - **Launch:** `DeviceProcessEvents` where a known remote access tool is started, matched on `FileName`, `ProcessVersionInfoOriginalFileName` (catches renamed binaries), `ProcessVersionInfoProductName` and `ProcessVersionInfoCompanyName`.
+
+
+  Both signals drop events where the tool is updating or running itself: launches by the Service Control Manager (`services.exe`) or Task Scheduler (`svchost.exe -s Schedule`), and files or processes written or spawned from inside the tool''s own app folder (same top-level folder under Program Files, AppData or ProgramData). An installed tool that keeps running therefore goes quiet, while a new download, install or user launch still alerts. Tools the organisation approves are listed in `ApprovedRmm` and excluded by product, vendor, file name or install folder. Results are summarised to one alert per device, account and tool per run.'
+technical_context: In helpdesk vishing, the attacker calls or messages the user posing as IT support and talks them into opening Quick Assist or downloading AnyDesk or ScreenConnect. Portable builds run straight from `Downloads` or `Temp` without installing. After initial access, ransomware operators install a second remote access tool as a backup channel in case their malware is removed. ScreenConnect client command lines include the relay host (`h=` parameter), which identifies whose instance the device is connecting to. Expect an inbound session, then discovery, credential access or more tooling dropped shortly after.
+blind_spots:
+- Tools not in the list. New RMM brands appear regularly, so the list needs periodic review.
+- A tool that was already installed and is started by its own service or by Task Scheduler does not re-alert. Its original arrival does, so coverage depends on the rule being live when it lands.
+- Persistence through a scheduled task or service that launches a remote access tool is excluded by design; task and service creation need their own rules.
+- Arrival is matched on file name only, because file events carry no version info. A renamed binary is caught when it is launched, not when it lands.
+- Renamed binaries with stripped or altered version info.
+- Browser-only remote sessions with no local agent.
+- Network-only signals (connections to tool relay domains) are not covered by this rule.
+- Abuse of an approved tool (for example a device enrolled into an attacker's own tenant of the same product) is excluded along with it and needs its own rule.
+- The self-update exclusion assumes tools live under Program Files, AppData or ProgramData. A tool running from elsewhere is never treated as updating itself, which errs towards alerting.
+false_positives:
+- Staff joining a client's or vendor's support session using that party's tool (for example a client-hosted TeamViewer session).
+- IT or vendor engineers using their own preferred tool instead of the approved one.
+- Personal use of a remote access tool on a work device.
+- Meeting clients from remote access vendors when a user opens them (for example GoTo Meeting, which matches on the LogMeIn vendor name). Their scheduled background components, such as GoTo Meeting's `g2mupdate.exe` and `g2mupload.exe`, are excluded by the Task Scheduler filter.
+frequency: Every 1 hour
+lookback: 1 hour
+kql: |
+  // Detect remote access / RMM tools that are not approved, when they arrive on a device
+  // or are launched by a user or script. Relaunches by the tool's own service, Task Scheduler
+  // or its own helper processes are dropped, so an installed tool does not re-alert every run.
+  // Add your organisation's approved tool(s) to ApprovedRmm (product, vendor, file name or install folder name)
+
+  let ApprovedRmm = dynamic([]);   // e.g. "Example RMM Product"
+  // Executable names, also checked against OriginalFileName to catch renames
+  let RmmFileNames = dynamic([
+      "anydesk.exe", "teamviewer.exe", "teamviewer_service.exe", "tv_w32.exe", "tv_x64.exe",
+      "screenconnect.clientservice.exe", "screenconnect.windowsclient.exe",
+      "quickassist.exe", "ateraagent.exe", "srservice.exe", "srmanager.exe", "strwinclt.exe",
+      "client32.exe", "rustdesk.exe", "meshagent.exe", "simpleservice.exe",
+      "tvnserver.exe", "winvnc.exe", "rutserv.exe", "rfusclient.exe", "aa_v3.exe",
+      "remoting_host.exe", "za_connect.exe", "dwagent.exe", "supremo.exe",
+      "logmein.exe", "lmiguardiansvc.exe", "tacticalrmm.exe",
+      "action1_agent.exe", "action1_remote.exe"
+  ]);
+  // Product metadata (survives renaming)
+  let RmmProducts = dynamic([
+      "AnyDesk", "TeamViewer", "ScreenConnect", "Quick Assist", "Atera", "Splashtop",
+      "NetSupport", "RustDesk", "MeshCentral", "SimpleHelp", "TightVNC", "UltraVNC",
+      "Remote Utilities", "Ammyy", "Chrome Remote Desktop", "Zoho Assist", "DWService",
+      "Supremo", "LogMeIn", "GoTo", "Tactical RMM", "Action1"
+  ]);
+  // Vendor metadata (survives renaming)
+  let RmmCompanies = dynamic([
+      "AnyDesk Software", "TeamViewer", "ConnectWise", "Atera Networks", "Splashtop",
+      "NetSupport", "GlavSoft", "Remote Utilities", "SimpleHelp", "LogMeIn", "GoTo, Inc",
+      "Nanosystems", "AmidaWare", "Action1"
+  ]);
+  // Top-level app folder (under Program Files, AppData or ProgramData), used to spot a tool
+  // updating or spawning itself. Empty for paths outside those folders (Downloads, Temp, System32).
+  let AppRoot = (path: string) {
+      extract(@"(?i)^(.*?\\(?:Program Files(?: \(x86\))?|AppData\\Local|AppData\\Roaming|ProgramData)\\[^\\]+)", 1, path)
+  };
+  // Signal 1: a remote access tool launched by a user or script
+  let Launches = DeviceProcessEvents
+      | where Timestamp > ago(1h)
+      | where FileName in~ (RmmFileNames)
+          or ProcessVersionInfoOriginalFileName in~ (RmmFileNames)
+          or ProcessVersionInfoProductName has_any (RmmProducts)
+          or ProcessVersionInfoCompanyName has_any (RmmCompanies)
+      // Drop starts by the Service Control Manager or Task Scheduler (installed tool running itself)
+      | where not(InitiatingProcessFileName =~ "services.exe")
+      | where not(InitiatingProcessFileName =~ "svchost.exe" and InitiatingProcessCommandLine has "Schedule")
+      | where not(InitiatingProcessFileName =~ "taskeng.exe")
+      // Drop the tool spawning its own helper processes (parent in the same app folder)
+      | where not(isnotempty(AppRoot(FolderPath)) and AppRoot(FolderPath) =~ AppRoot(InitiatingProcessFolderPath))
+      | project Timestamp, ReportId, DeviceId, DeviceName, AccountName, Signal = "Launch",
+                FileName, FolderPath, SHA256, Product = ProcessVersionInfoProductName,
+                Vendor = ProcessVersionInfoCompanyName, CommandLine = ProcessCommandLine,
+                InitiatingProcessFileName, InitiatingProcessCommandLine;
+  // Signal 2: a remote access binary written or renamed into place
+  let Arrivals = DeviceFileEvents
+      | where Timestamp > ago(1h)
+      | where ActionType in ("FileCreated", "FileRenamed")
+      | where FileName in~ (RmmFileNames)
+      // Drop the tool updating itself (writer in the same app folder)
+      | where not(isnotempty(AppRoot(FolderPath)) and AppRoot(FolderPath) =~ AppRoot(InitiatingProcessFolderPath))
+      | project Timestamp, ReportId, DeviceId, DeviceName, AccountName = InitiatingProcessAccountName,
+                Signal = "Arrival", FileName, FolderPath, SHA256, Product = "", Vendor = "",
+                CommandLine = InitiatingProcessCommandLine,
+                InitiatingProcessFileName, InitiatingProcessCommandLine;
+  Launches
+  | union Arrivals
+  // Keep approved tools out (skipped while the list is empty)
+  | where array_length(ApprovedRmm) == 0
+      or not(Product has_any (ApprovedRmm) or Vendor has_any (ApprovedRmm)
+             or FileName has_any (ApprovedRmm) or FolderPath has_any (ApprovedRmm))
+  // Normalise the tool name for the alert title
+  | extend Tool = iff(isnotempty(Product), Product, FileName)
+  // One alert per device, account and tool per run
+  | summarize
+      arg_min(Timestamp, ReportId, Tool, FolderPath, SHA256, Vendor, CommandLine,
+              InitiatingProcessFileName, InitiatingProcessCommandLine),
+      Signals = strcat_array(make_set(Signal), ", "),
+      Events = count()
+      by DeviceId, DeviceName, AccountName, FileName = tolower(FileName)
+alert:
+  title: Unsanctioned remote access tool {{Tool}} on {{DeviceName}}
+  description: Remote access tool {{FileName}} seen for {{AccountName}} ({{Signals}})
+  custom_details:
+  - 'Path: FolderPath'
+  - 'CommandLine: CommandLine'
+  - 'ParentProcess: InitiatingProcessFileName'
+  - 'Hash: SHA256'
+  - 'Vendor: Vendor'
+entity_mapping:
+  Account: AccountName
+  Host: DeviceName
+  File: FileName
+  Process: CommandLine
+validation:
+- date: '2026-10-19'
+  method: Atomic Red Team T1219 (AnyDesk, TeamViewer)
+  environment: Windows test device, Defender XDR
+  result: Pending
+- date: '2026-10-19'
+  method: Manual launch of Quick Assist and portable AnyDesk from Downloads
+  environment: Windows test device, Defender XDR
+  result: Pending
+- date: '2026-10-19'
+  method: Start an installed tool through its service and through Task Scheduler (should not alert), then download and launch a portable build from Downloads (should alert)
+  environment: Windows test device, Defender XDR
+  result: Pending
+playbooks:
+- rmm-tool-unauthorised
+actions:
+- 'Read `Signals` first: Arrival means the tool was written to disk, Launch means a user or script started it. An Arrival with no Launch means it landed but has not run yet.'
+- Confirm with the user and IT whether the session was expected (client or vendor support, approved exception). If not, treat as potential unauthorised access.
+- 'Review how the tool arrived: the parent process (browser download, msiexec, PowerShell or another remote tool) and the `FolderPath` (Downloads, Temp and AppData point to a user-run portable build).'
+- If the hit is a meeting client from a remote access vendor (for example GoTo Meeting), confirm no remote session took place, then remove the app if unused or exclude it by path.
+- For ScreenConnect, extract the relay host from the `h=` parameter in the command line to identify whose instance the device connected to.
+- 'Check for a preceding lure: external Teams chats or calls, or phishing emails to the user in the hour before launch.'
+- 'Review activity during and after the session on the same `DeviceId`: new processes, files dropped, credential access and outbound connections.'
+- 'If unauthorised: isolate the device, remove the tool, block the hash via indicators, reset the user''s credentials and hunt across the estate for the same `SHA256` or relay host.'
+tuning:
+- date: '2026-10-19'
+  change: Initial version
+  reason: Baseline
+source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/command-and-control/unsanctioned-remote-access-tool.md
