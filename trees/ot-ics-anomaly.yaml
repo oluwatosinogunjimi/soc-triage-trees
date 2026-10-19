@@ -10,15 +10,15 @@ applies_to:
   - Modbus write from unknown host
   - New IT-to-OT connection
   - Engineering workstation activity outside maintenance window
-mitre: [T0843, T0855, T0886]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T0843, T1692.001, T0886]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: "MITRE ATT&CK for ICS T0843 Program Download"
     url: https://attack.mitre.org/techniques/T0843/
-  - title: "MITRE ATT&CK for ICS T0855 Unauthorized Command Message"
-    url: https://attack.mitre.org/techniques/T0855/
+  - title: "MITRE ATT&CK for ICS T1692.001 Unauthorized Message: Command Message"
+    url: https://attack.mitre.org/techniques/T1692/001/
   - title: CISA ICS recommended practices
     url: https://www.cisa.gov/resources-tools/resources/ics-recommended-practices
 entities:

@@ -10,9 +10,9 @@ applies_to:
   - Delete conditional access policy
   - Add or update named location
   - MFA disabled for user or tenant
-mitre: [T1556.009, T1562.001]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1556.009, T1685]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: Microsoft Entra audit activity reference

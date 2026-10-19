@@ -3,10 +3,23 @@
 id: lsass-dump-via-lolbin
 title: LSASS Memory Dump via LOLBin or Dump Utility
 tactic: Credential Access
+tactics:
+- Credential Access
+- Stealth
+attack_version: v20 (Enterprise)
 technique: 'OS Credential Dumping: LSASS Memory (T1003.001), System Binary Proxy Execution: Rundll32 (T1218.011)'
 technique_ids:
 - T1003.001
 - T1218.011
+detection_strategies:
+- DET0363
+- DET0475
+analytics:
+- id: AN1030
+  strategy: DET0363
+- id: AN1308
+  strategy: DET0475
+telemetry: DeviceProcessEvents (the MITRE analytics use Sysmon 1, 3, 7, 10, 11, 13–14, 22 and Security 4673)
 severity: High
 severity_why: Legitimate LSASS dumping is rare and usually change-controlled, and a successful dump on an admin or jump host exposes every credential used from it.
 goal: Catch an attacker dumping LSASS memory to steal credentials, with priority on admin and jump hosts where privileged credentials are cached.

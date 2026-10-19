@@ -9,8 +9,19 @@
     "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
     "title": { "type": "string", "minLength": 1 },
     "tactic": { "type": "string" },
+    "tactics": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "attack_version": { "type": "string" },
     "technique": { "type": "string" },
     "technique_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$" } },
+    "detection_strategies": { "type": "array", "items": { "type": "string", "pattern": "^DET[0-9]{4}$" } },
+    "analytics": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "strategy"],
+        "properties": { "id": { "type": "string", "pattern": "^AN[0-9]{4}$" }, "strategy": { "type": "string", "pattern": "^DET[0-9]{4}$" } }
+      }
+    },
+    "telemetry": { "type": "string" },
     "severity": { "enum": ["Informational", "Low", "Medium", "High"] },
     "severity_why": { "type": "string" },
     "goal": { "type": "string", "minLength": 1 },

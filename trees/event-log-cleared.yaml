@@ -9,13 +9,13 @@ applies_to:
   - Event log was cleared (1102 / 104)
   - wevtutil cl executed
   - Audit policy changed
-mitre: [T1070.001]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1685.005]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
-  - title: "MITRE ATT&CK T1070.001 Clear Windows Event Logs"
-    url: https://attack.mitre.org/techniques/T1070/001/
+  - title: "MITRE ATT&CK T1685.005 Disable or Modify Tools: Clear Windows Event Logs"
+    url: https://attack.mitre.org/techniques/T1685/005/
 entities:
   - { key: device, label: Device name, example: "SRV-DC02" }
   - { key: account, label: Account that cleared the log, example: "adm-jdoe" }

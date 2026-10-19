@@ -3,9 +3,18 @@
 id: powershell-downloadstring
 title: PowerShell DownloadString Remote Execution
 tactic: Execution
+tactics:
+- Execution
+attack_version: v20 (Enterprise)
 technique: 'Command and Scripting Interpreter: PowerShell'
 technique_ids:
 - T1059.001
+detection_strategies:
+- DET0455
+analytics:
+- id: AN1252
+  strategy: DET0455
+telemetry: DeviceProcessEvents, DeviceEvents (`PowerShellCommand`) (the MITRE analytic uses Sysmon 1 and 7, and PowerShell 400, 403 and 4103–4106)
 severity: High
 severity_why: A download cradle into memory is a high-value execution signal; legitimate uses are few and usually attributable to known admin tooling.
 goal: Catch PowerShell pulling a script or payload straight into memory from a URL with `DownloadString()`, the classic download cradle for fileless execution.

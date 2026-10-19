@@ -9,15 +9,15 @@ applies_to:
   - User impersonation detected
   - Domain impersonation detected
   - Display name spoofing of executive
-mitre: [T1656, T1566.003]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1684.001, T1566.003]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: Microsoft Defender for Office 365 impersonation protection
     url: https://learn.microsoft.com/en-us/defender-office-365/anti-phishing-policies-about
-  - title: "MITRE ATT&CK T1656 Impersonation"
-    url: https://attack.mitre.org/techniques/T1656/
+  - title: "MITRE ATT&CK T1684.001 Social Engineering: Impersonation"
+    url: https://attack.mitre.org/techniques/T1684/001/
 entities:
   - { key: sender, label: External sender, example: "ceo.office@gmail.com" }
   - { key: executive, label: Impersonated executive, example: "Jane Smith (CEO)" }

@@ -11,15 +11,15 @@ applies_to:
   - CloudTrail logging disabled
   - New access key created for IAM user
   - Unusual instance type launched
-mitre: [T1078.004, T1562.008, T1098.001, T1496, T1578]
-version: 1.2.0
-last_reviewed: 2026-09-29
+mitre: [T1078.004, T1685.002, T1098.001, T1496, T1578]
+version: 1.2.1
+last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: "Lessons from the SOC (Cloud/SaaS Alerts section)"
     url: https://medium.com/@OluwatosinOgunjimi/lessons-from-the-soc-04d395c195c7
-  - title: "MITRE ATT&CK T1562.008 Impair Defenses: Disable or Modify Cloud Logs"
-    url: https://attack.mitre.org/techniques/T1562/008/
+  - title: "MITRE ATT&CK T1685.002 Disable or Modify Tools: Disable or Modify Cloud Log"
+    url: https://attack.mitre.org/techniques/T1685/002/
   - title: "MITRE ATT&CK T1496 Resource Hijacking"
     url: https://attack.mitre.org/techniques/T1496/
 entities:
