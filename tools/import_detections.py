@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "detections"
 REPO_URL = "https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/"
 PLAYBOOK_LINK = re.compile(r"soc-triage-trees/#([a-z0-9-]+)\)")
+TACTIC_ID = re.compile(r"\s*\(TA\d{4}\)")
+DET_ID = re.compile(r"\bDET\d{4}\b")
+ANALYTIC = re.compile(r"\[(AN\d{4})\]\([^)]*?(DET\d{4})#AN\d{4}\)")
 
 
 class Block(str):
@@ -67,6 +70,16 @@ def table(text: str) -> list[list[str]]:
     return [[c.strip() for c in r.strip("|").split("|")] for r in rows[2:]]
 
 
+def tactic_names(value: str) -> list[str]:
+    """'Credential Access (TA0006); Stealth (TA0005) for T1218.011' -> ['Credential Access', 'Stealth']."""
+    names = []
+    for part in re.split(r"[;,]", value):
+        name = re.sub(r"\s+for\s+T\d{4}(\.\d{3})?.*$", "", TACTIC_ID.sub("", part)).strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def convert(path: Path, repo: Path) -> dict:
     s = sections(path.read_text(encoding="utf-8"))
     missing = [k for k in ("Title", "Goal", "MITRE Mapping", "KQL Query") if not s.get(k)]
@@ -90,9 +103,14 @@ def convert(path: Path, repo: Path) -> dict:
     return {
         "id": path.stem,
         "title": s["Title"].strip(),
-        "tactic": mitre.get("Tactic", ""),
+        "tactic": (tactic_names(mitre.get("Tactic", "")) or [""])[0],
+        "tactics": tactic_names(mitre.get("Tactic", "")),
+        "attack_version": mitre.get("ATT&CK version", ""),
         "technique": mitre.get("Technique", ""),
         "technique_ids": [t.strip() for t in mitre.get("Technique ID", "").split(",") if t.strip()],
+        "detection_strategies": list(dict.fromkeys(DET_ID.findall(mitre.get("Detection Strategy", "")))),
+        "analytics": [{"id": a, "strategy": d} for a, d in ANALYTIC.findall(mitre.get("Analytic (Windows)", ""))],
+        "telemetry": mitre.get("Telemetry", ""),
         "severity": sev[0] if sev else "",
         "severity_why": sev[1].removeprefix("Why:").strip() if len(sev) > 1 else "",
         "goal": s["Goal"],

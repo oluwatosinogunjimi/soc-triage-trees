@@ -3,9 +3,19 @@
 id: local-admin-group-modification
 title: Local Administrators Group Modification via Command Line
 tactic: Privilege Escalation
+tactics:
+- Privilege Escalation
+- Persistence
+attack_version: v20 (Enterprise)
 technique: Account Manipulation
 technique_ids:
 - T1098
+detection_strategies:
+- DET0096
+analytics:
+- id: AN0265
+  strategy: DET0096
+telemetry: DeviceProcessEvents (the MITRE analytic uses Security 4670, 4728, 4738 and Sysmon 1)
 severity: High
 severity_why: Unauthorised admin rights give an attacker full control of the host; legitimate changes should be traceable to a ticket or known tooling.
 goal: Catch an account being added to the local Administrators group from the command line, a common step after initial access to gain or keep admin rights.

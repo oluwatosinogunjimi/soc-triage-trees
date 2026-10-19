@@ -1,11 +1,20 @@
-# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/defense-evasion/svchost-masquerading.md
+# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/stealth/svchost-masquerading.md
 # The site reads only this file. Edit it here by hand, or re-run tools/import_detections.py.
 id: svchost-masquerading
 title: Svchost Execution from Unusual Location
-tactic: Defense Evasion
-technique: 'Masquerading: Match Legitimate Name or Location'
+tactic: Stealth
+tactics:
+- Stealth
+attack_version: v20 (Enterprise)
+technique: 'Masquerading: Match Legitimate Resource Name or Location'
 technique_ids:
 - T1036.005
+detection_strategies:
+- DET0347
+analytics:
+- id: AN0983
+  strategy: DET0347
+telemetry: DeviceProcessEvents, DeviceFileEvents (the MITRE analytic uses Security 4688 and Sysmon 11)
 severity: High
 severity_why: A svchost.exe outside the system folders has almost no legitimate explanation once upgrade and backup paths are excluded.
 goal: Catch malware disguised as svchost.exe by running or dropping a copy of it outside the Windows system folders.
@@ -95,4 +104,4 @@ tuning:
 - date: '2026-03-25'
   change: Initial version
   reason: Baseline
-source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/defense-evasion/svchost-masquerading.md
+source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/stealth/svchost-masquerading.md

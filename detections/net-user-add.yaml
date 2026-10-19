@@ -1,11 +1,20 @@
-# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/privilege-escalation/net-user-add.md
+# Copied from https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/persistence/net-user-add.md
 # The site reads only this file. Edit it here by hand, or re-run tools/import_detections.py.
 id: net-user-add
 title: User Account Creation via Command Line
 tactic: Persistence
+tactics:
+- Persistence
+attack_version: v20 (Enterprise)
 technique: 'Create Account: Local Account'
 technique_ids:
 - T1136.001
+detection_strategies:
+- DET0447
+analytics:
+- id: AN1235
+  strategy: DET0447
+telemetry: DeviceProcessEvents (the MITRE analytic uses Security 4720 and Sysmon 1)
 severity: Medium
 severity_why: New local accounts are rarely created by hand on managed estates; it merits review but usually needs a second signal to confirm malice.
 goal: Catch a local user account being created from the command line, often a backdoor account for persistence.
@@ -63,4 +72,4 @@ tuning:
 - date: '2026-03-25'
   change: Initial version
   reason: Baseline
-source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/privilege-escalation/net-user-add.md
+source: https://github.com/oluwatosinogunjimi/KQL-Query/blob/main/detections/persistence/net-user-add.md

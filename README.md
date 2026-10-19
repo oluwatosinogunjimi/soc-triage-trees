@@ -32,16 +32,16 @@ Every tree has:
 
 ## Detection rules
 
-The Detections page shows custom Defender XDR detection rules from the [KQL detection library](https://github.com/oluwatosinogunjimi/KQL-Query). Each rule shows its query, what it catches, its blind spots and false positives, how it was tested, and the playbook to walk when it fires. Playbooks link back to the rules that lead to them.
+The Detections page shows custom Defender XDR detection rules from the [KQL detection library](https://github.com/oluwatosinogunjimi/KQL-Query). Each rule shows its query, its MITRE ATT&CK v20 mapping (tactics, Detection Strategy and Analytic IDs, telemetry), what it catches, its blind spots and false positives, how it was tested, and the playbook to walk when it fires. Playbooks link back to the rules that lead to them.
 
 | Rule | Tactic | Playbook |
 |---|---|---|
 | PowerShell DownloadString Remote Execution | Execution | Suspicious PowerShell or LOLBin Execution |
 | Suspicious Office Child Process | Execution | Office Application Spawned a Suspicious Process |
 | User Account Creation via Command Line | Persistence | Local Account Created or Added to Administrators |
-| Local Administrators Group Modification via Command Line | Privilege Escalation | Local Account Created or Added to Administrators |
-| Svchost Execution from Unusual Location | Defense Evasion | Malware or EDR Detection |
-| LSASS Memory Dump via LOLBin or Dump Utility | Credential Access | LSASS Credential Dumping |
+| Local Administrators Group Modification via Command Line | Privilege Escalation, Persistence | Local Account Created or Added to Administrators |
+| Svchost Execution from Unusual Location | Stealth | Malware or EDR Detection |
+| LSASS Memory Dump via LOLBin or Dump Utility | Credential Access, Stealth | LSASS Credential Dumping |
 | Unsanctioned Remote Access Tool Execution | Command and Control | Unauthorised Remote Access Tool |
 
 The rules are copied into `detections/` as YAML, so the site never depends on the KQL repo. To refresh them after a rule changes there, run `python tools/import_detections.py ../KQL-Query`, or edit the YAML by hand. Either way, `python tools/validate.py` checks every rule and that its playbook exists.

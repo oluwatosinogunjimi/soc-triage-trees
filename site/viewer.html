@@ -750,6 +750,7 @@ footer.foot { padding-top: 12px; }
 .rule-side .fires .card { padding: 14px; }
 .rule-side .fires .card h3 { font-size: 19px; }
 .mono-box { font-family: var(--font-mono); font-size: 12.5px; background: var(--code-bg); color: var(--code-ink); padding: 10px 12px; border-radius: var(--r); overflow-wrap: anywhere; line-height: 1.5; }
+.rule-side dd.chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .rule-side dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 13.5px; }
 .rule-side dt { color: var(--muted); }
 .rule-side dd { margin: 0; font-family: var(--font-mono); font-size: 12.5px; overflow-wrap: anywhere; }
@@ -845,7 +846,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   const OSINT = (bundle.osint || []).map(t => Object.assign({}, t, { playbooks: t.playbooks || [] }));
   const DETS_FOR = new Map();
   DETS.forEach(d => (d.playbooks || []).forEach(pb => { if (!DETS_FOR.has(pb)) DETS_FOR.set(pb, []); DETS_FOR.get(pb).push(d); }));
-  const TACTIC_ORDER = ["Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"];
+  // ATT&CK v20 Enterprise matrix order (Defense Evasion split into Stealth and Defense Impairment in v19).
+  const TACTIC_ORDER = ["Reconnaissance", "Resource Development", "Initial Access", "Execution", "Persistence", "Privilege Escalation", "Stealth", "Defense Impairment", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"];
+  const DET_URL = "https://attack.mitre.org/detectionstrategies/";
   const CATS = [
     ["triage", "Start here", "It asks a few questions about what fired, then hands you to the right playbook."],
     ["email", "Email and collaboration", "Phishing, business email compromise, mailbox abuse and Teams."],
@@ -1278,7 +1281,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     return s;
   }
   function scoreRule(d, words) {
-    const title = d.title.toLowerCase(), rest = [d.goal, d.tactic, d.technique, d.technique_ids.join(" "), d.id, d.description].join(" ").toLowerCase();
+    const title = d.title.toLowerCase(), rest = [d.goal, d.tactic, (d.tactics || []).join(" "), d.technique, d.technique_ids.join(" "), (d.detection_strategies || []).join(" "), (d.analytics || []).map(a => a.id).join(" "), d.id, d.description].join(" ").toLowerCase();
     let s = 0;
     for (const w of words) { if (title.startsWith(w)) s += 7; else if (title.includes(w)) s += 5; else if (rest.includes(w)) s += 1; else return 0; }
     return s;
@@ -2070,7 +2073,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   const playbooksOf = d => (d.playbooks || []).filter(id => TREES[id]);
   function ruleCard(d) {
     return h("button", { class: "card rule-card", type: "button", onclick: () => openDetections(d.id) },
-      h("span", { class: "cmeta" }, [d.tactic].concat(d.technique_ids || []).filter(Boolean).join(" \u00b7 ")),
+      h("span", { class: "cmeta" }, ((d.tactics && d.tactics.length) ? d.tactics : [d.tactic]).concat(d.technique_ids || []).filter(Boolean).join(" \u00b7 ")),
       h("h3", {}, d.title),
       h("div", { class: "alerts" }, String(d.goal || "").replace(/`/g, "")),
       h("div", { class: "rfoot" }, sevPill(d.severity), testBadge(d),
@@ -2127,6 +2130,12 @@ const EMBEDDED = /*__TREE_DATA__*/null;
           pbs.length ? h("div", { class: "panel fires" }, h("div", { class: "panel-title" }, "When it fires, walk"),
             pbs.map(id => card(TREES[id], [])),
             h("button", { class: "btn primary", type: "button", onclick: () => openTree(pbs[0]) }, "Start the playbook")) : null,
+          (d.detection_strategies || []).length ? h("div", { class: "panel" }, h("div", { class: "panel-title" }, "MITRE ATT&CK" + (d.attack_version ? " " + d.attack_version.replace(/\s*\(.*\)$/, "") : "")),
+            h("dl", {},
+              (d.tactics || []).length ? [h("dt", {}, d.tactics.length > 1 ? "Tactics" : "Tactic"), h("dd", {}, d.tactics.join(", "))] : null,
+              [h("dt", {}, "Detection strategy"), h("dd", { class: "chips" }, d.detection_strategies.map(id => h("a", { class: "chip mono", href: DET_URL + id, target: "_blank", rel: "noopener" }, id)))],
+              (d.analytics || []).length ? [h("dt", {}, "Analytic"), h("dd", { class: "chips" }, d.analytics.map(a => h("a", { class: "chip mono", href: DET_URL + a.strategy + "#" + a.id, target: "_blank", rel: "noopener" }, a.id)))] : null,
+              d.telemetry ? [h("dt", {}, "Telemetry"), h("dd", {}, d.telemetry)] : null)) : null,
           d.severity ? h("div", { class: "panel" }, h("div", { class: "panel-title" }, "Severity"), h("div", {}, sevPill(d.severity)), d.severity_why ? h("p", {}, md(d.severity_why)) : null) : null,
           (alert.title || alert.description) ? h("div", { class: "panel" }, h("div", { class: "panel-title" }, "Alert"),
             alert.title ? h("div", { class: "mono-box" }, alert.title) : null,

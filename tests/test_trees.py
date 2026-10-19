@@ -186,6 +186,40 @@ def test_detection_with_missing_playbook_is_caught(tmp_path):
     assert any("no-such-playbook" in e for e in errors)
 
 
+def test_import_reads_attack_v20_mapping(tmp_path):
+    sys.path.insert(0, str(ROOT / "tools"))
+    from import_detections import convert
+
+    rule = tmp_path / "detections" / "credential-access" / "lsass-test.md"
+    rule.parent.mkdir(parents=True)
+    rule.write_text(textwrap.dedent("""\
+        # LSASS test
+        ## Title
+        LSASS test
+        ## Goal (ADS)
+        Catch LSASS dumping.
+        ## MITRE Mapping
+        - ATT&CK version: v20 (Enterprise)
+        - Tactic: Credential Access (TA0006); Stealth (TA0005) for T1218.011
+        - Technique: LSASS Memory (T1003.001), Rundll32 (T1218.011)
+        - Technique ID: T1003.001, T1218.011
+        - Detection Strategy: [DET0363](https://attack.mitre.org/detectionstrategies/DET0363) (T1003.001), [DET0475](https://attack.mitre.org/detectionstrategies/DET0475) (T1218.011)
+        - Analytic (Windows): [AN1030](https://attack.mitre.org/detectionstrategies/DET0363#AN1030) (T1003.001), [AN1308](https://attack.mitre.org/detectionstrategies/DET0475#AN1308) (T1218.011)
+        - Telemetry: DeviceProcessEvents
+        ## KQL Query
+        ```kql
+        DeviceProcessEvents
+        ```
+        """))
+    d = convert(rule, tmp_path)
+    assert d["tactic"] == "Credential Access"
+    assert d["tactics"] == ["Credential Access", "Stealth"]
+    assert d["attack_version"] == "v20 (Enterprise)"
+    assert d["detection_strategies"] == ["DET0363", "DET0475"]
+    assert d["analytics"] == [{"id": "AN1030", "strategy": "DET0363"}, {"id": "AN1308", "strategy": "DET0475"}]
+    assert d["telemetry"] == "DeviceProcessEvents"
+
+
 def test_osint_tools_validate_and_link_to_real_playbooks():
     from validate import load_osint
 

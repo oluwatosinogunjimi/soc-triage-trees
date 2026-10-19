@@ -3,9 +3,18 @@
 id: unsanctioned-remote-access-tool
 title: Unsanctioned Remote Access Tool Execution
 tactic: Command and Control
+tactics:
+- Command and Control
+attack_version: v20 (Enterprise)
 technique: Remote Access Tools (T1219)
 technique_ids:
 - T1219
+detection_strategies:
+- DET0496
+analytics:
+- id: AN1366
+  strategy: DET0496
+telemetry: DeviceProcessEvents, DeviceFileEvents (the MITRE analytic uses Sysmon 1, 3, 11, 12–14, 22 and System 7045)
 severity: Medium
 severity_why: Where only approved tools are permitted, hits are a policy breach at minimum. Legitimate client and vendor support sessions occur often enough that not every hit is a compromise.
 goal: Catch an attacker gaining hands-on-keyboard control of a device through a legitimate remote access or RMM tool that the organisation has not approved.
