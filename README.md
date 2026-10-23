@@ -92,9 +92,9 @@ site/viewer.html       the viewer (walkthrough, map, closure note)
 tests/                 pytest suite for the validator and build
 ```
 
-## Design
+## Philosophy and research
 
-The research behind the project and the choices it led to, from the verdict set to the colours, are in [docs/DESIGN.md](docs/DESIGN.md). It also lists the rules to keep when changing the viewer.
+Why the project exists, what it believes about triage, the usability research behind it and the choices that research led to, from the verdict set to the colours, are in [docs/DESIGN.md](docs/DESIGN.md). It also lists the rules to keep when changing the viewer.
 
 ## Contributing
 
