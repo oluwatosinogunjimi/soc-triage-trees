@@ -720,6 +720,9 @@ input.field { border-radius: var(--r); background: var(--surface); }
 .esc { background: var(--tp-block); color: #ffffff; font-family: var(--font-body); font-size: 13px; letter-spacing: 0; text-transform: none; padding: 4px 10px; border-radius: var(--r); font-weight: 700; }
 :root[data-theme="dark"] .esc { color: #111316; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .esc { color: #111316; } }
+.act-type { font-weight: 700; }
+.act-gate { display: block; font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
+.act-gate.warn { color: var(--tp); font-weight: 700; }
 .act { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 4px 14px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 .act .at { font-size: 14px; font-weight: 700; }
 .act .ag { grid-column: 2; font-size: 13.5px; color: var(--ink-2); }
@@ -1008,6 +1011,18 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   const key = (tid, nid) => tid + ":" + nid;
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+  // Actions are plain sentences or typed objects: { type, text, approval, reversible, tip_off }.
+  const ACT_LABEL = { enrich: "Enrich", contain: "Contain", remediate: "Remediate", notify: "Notify" };
+  const actText = a => typeof a === "string" ? a : a.text;
+  function actGate(a) {
+    if (typeof a === "string") return "";
+    const bits = [];
+    if (a.approval) bits.push("Needs approval: " + a.approval);
+    else if (a.type === "enrich") bits.push("No approval needed");
+    if (a.reversible === true) bits.push("reversible");
+    if (a.reversible === false) bits.push("not reversible");
+    return bits.join(" · ");
+  }
   function labelFor(k) {
     // Prefer the label from the tree in front of the analyst, then trees on the current path, then any tree.
     const ids = [S.tree].concat((S.path || []).map(p => p && (p.tid || p.tree))).filter(Boolean);
@@ -1594,6 +1609,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   function renderStep(n) {
     const t = TREES[S.tree];
     const box = h("section", { class: "panel step", "aria-live": "polite" });
+    if (t.applies_to && t.applies_to.length) box.append(h("div", { class: "condition" }, h("span", { class: "ct" }, "Use this card for"),
+      h("span", { class: "ca" }, t.applies_to.slice(0, 3).join(" · ") + (t.applies_to.length > 3 ? " · …" : ""))));
     box.append(renderProgress(n));
     if (n.type === "link") {
       const target = TREES[n.tree];
@@ -1615,6 +1632,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     }
     if (n.also_check && n.also_check.length) box.append(renderAlso(n));
     if (n.kql && n.kql.length) { box.append(h("div", { class: "sub" }, n.kql.length > 1 ? "Queries" : "Query")); renderKql(n.kql).forEach(el => box.append(el)); }
+    if (n.on_empty) box.append(h("p", { class: "on-empty" }, h("span", {}, h("b", {}, "No rows? "), fill(n.on_empty))));
     const k = key(S.tree, S.node);
     const ta = h("textarea", { id: "ev-" + S.tree + "-" + S.node, rows: 2, placeholder: "Real values, for example: 42 sign-ins from 81.2.69.160 (AS2856) over 30 days, all from a compliant device" });
     ta.value = S.evidence[k] || "";
@@ -1717,7 +1735,11 @@ const EMBEDDED = /*__TREE_DATA__*/null;
           const tk = key(S.tree, S.node) + ":act:" + i;
           const cb = h("input", { type: "checkbox", id: "act-" + i }); cb.checked = !!S.ticks[tk];
           cb.addEventListener("change", () => { S.ticks[tk] = cb.checked; save(); });
-          return h("li", {}, h("label", { for: "act-" + i }, cb, h("span", {}, fill(a))));
+          const typed = typeof a !== "string";
+          return h("li", typed ? { class: "act-" + a.type } : {}, h("label", { for: "act-" + i }, cb, h("span", {},
+            typed ? h("b", { class: "act-type" }, ACT_LABEL[a.type] + " ") : null, fill(actText(a)),
+            typed && actGate(a) ? h("span", { class: "act-gate" }, actGate(a)) : null,
+            typed && a.tip_off ? h("span", { class: "act-gate warn" }, "Could tip off the attacker") : null)));
         }))), side), backRow());
     wrap.append(body, renderNoteEditor());
     return wrap;
@@ -1763,7 +1785,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       if (S.ticket.trim()) act.push("This is tracked under " + S.ticket.trim() + ".");
       if (act.length) { lines.push(""); lines.push(act.join(" ")); }
       if (out.monitor) { lines.push(""); lines.push(fill(out.monitor)); }
-      if (S.incActions) { lines.push(""); lines.push("Recommended actions:"); out.actions.forEach((a, i) => lines.push((i + 1) + ". " + fill(a))); }
+      if (S.incActions) { lines.push(""); lines.push("Recommended actions:"); out.actions.forEach((a, i) => lines.push((i + 1) + ". " + fill(actText(a)) + (typeof a !== "string" && a.approval ? " (needs approval: " + a.approval + ")" : ""))); }
     }
     if (S.incSteps && S.path.length) {
       lines.push(""); lines.push("Investigative steps:");
@@ -1773,6 +1795,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         alsoAnswers(st.tree, st.node).forEach(x => { if (x.a) lines.push("- " + fill(x.q) + " " + (x.a === "yes" ? "Yes" : "No") + "."); });
       });
     }
+    const vt = TREES[S.tree];
+    if (vt) { lines.push(""); lines.push("Playbook: " + vt.title + " (" + vt.id + " v" + vt.version + ", Triage Trees)."); }
     if (S.signoff.trim()) { lines.push(""); lines.push(S.signoff.trim()); }
     return { text: lines.join("\n").replace(/\n{3,}/g, "\n\n"), missing: [...missing] };
   }
@@ -1928,7 +1952,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
           h("div", { class: "verdict-label" }, VLABEL[n.verdict], n.escalate ? h("span", { class: "esc" }, "Escalate") : null),
           h("h2", { style: "font-size:20px" }, n.title), h("p", { style: "font-size:14px" }, fill(n.anchor))),
         h("div", { class: "sub" }, "Risk"), h("p", {}, fill(n.risk)),
-        h("div", { class: "sub" }, "Actions"), h("ol", { style: "margin:0;padding-left:18px;display:grid;gap:4px" }, n.actions.map(a => h("li", {}, fill(a)))));
+        h("div", { class: "sub" }, "Actions"), h("ol", { style: "margin:0;padding-left:18px;display:grid;gap:4px" }, n.actions.map(a => h("li", {}, fill(actText(a))))));
     } else if (n.type === "link") {
       add(h("div", { class: "kind" }, h("span", { class: "tag" }, "Hand-over")), h("div", { class: "q-text" }, n.text), h("p", { class: "muted" }, TREES[n.tree].summary),
         h("button", { class: "btn", type: "button", onclick: () => { closeMap(); openTree(n.tree); } }, "Open " + TREES[n.tree].title));

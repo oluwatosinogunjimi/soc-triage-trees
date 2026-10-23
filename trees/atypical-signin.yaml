@@ -12,8 +12,10 @@ applies_to:
   - Sign-in from an unusual location or anonymous IP
   - Risky sign-in (Entra ID Protection)
 mitre: [T1078.004]
-version: 1.2.0
-last_reviewed: 2026-09-29
+version: 1.3.0
+last_reviewed: 2026-10-23
+review_by: 2027-04-23
+status: stable
 authors: [Oluwatosin Ogunjimi]
 sources:
   - title: Microsoft incident response playbook, Phishing investigation (sign-in and device checks)
@@ -246,6 +248,9 @@ nodes:
                                  "Add-MailboxPermission", "FileDownloaded", "FileSyncDownloadedFull",
                                  "Send", "SendAs", "HardDelete")
           | summarize Count = count(), First = min(TimeGenerated), IPs = make_set(ClientIP, 10) by Operation, OfficeWorkload
+    on_empty: >-
+      No rows from both queries can mean the AuditLogs or OfficeActivity connector is missing or the
+      account name differs. Confirm the tables hold data for other users before treating this as clean.
     yes: o-compromised
     no: q-security-settings
     notes:
@@ -302,10 +307,12 @@ nodes:
     anchor: The account of {{user}} was accessed from {{ip}} without authorisation.
     risk: The risk here is data theft, internal phishing and persistence through the compromised account; containment is required now.
     actions:
-      - Revoke all sessions and refresh tokens, then reset the password
-      - Remove any attacker-added MFA methods, inbox rules, OAuth consents and devices
-      - Confirm the user as compromised in Entra ID Protection
-      - Block {{ip}} in Conditional Access named locations
+      - { type: contain, text: "Revoke all sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI, reversible: true }
+      - { type: remediate, text: "Remove any attacker-added MFA methods, inbox rules, OAuth consents and devices", approval: SOC lead or per client RACI, reversible: false }
+      - { type: contain, text: "Block {{ip}} in Conditional Access named locations", approval: Client identity team, reversible: true }
+      - { type: notify, text: "Tell the user by phone or in person, not by email to the affected mailbox", tip_off: true }
+      - { type: contain, text: "Confirm the user as compromised in Entra ID Protection", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Check for other accounts signing in from {{ip}}" }
       - Raise an incident and escalate per client RACI
     escalate: true
     monitor: I will monitor {{user}} and {{ip}} for further sign-ins and persistence attempts.

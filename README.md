@@ -70,7 +70,7 @@ python -m http.server -d dist  # open http://localhost:8000
 
 `dist/index.html` is self-contained with the trees embedded, so you can also open it straight from disk. Link to a tree directly with `#tree-id`, for example `#phishing-email`, and to a detection rule with `#detections/rule-id`, and to the OSINT tools with `#osint`. Press `Ctrl K` (`⌘K` on Mac) anywhere to jump to a playbook.
 
-The site has a light mode (a field-guide look on paper) and a dark mode (a console look for long shifts). It follows your device setting until you use the sun/moon switch, then remembers your choice.
+The site has a Day theme (paper) and a Night theme (graphite for long shifts). It follows your device setting until you use the sun/moon switch, then remembers your choice. Fonts (Atkinson Hyperlegible Next and Mono, SIL Open Font License) are embedded in the build, so the page makes no network requests.
 
 Case state (your path, evidence and entity values) stays in your own browser's local storage. Nothing is sent anywhere. Don't paste data into the tool that your client's handling rules forbid storing on your workstation.
 

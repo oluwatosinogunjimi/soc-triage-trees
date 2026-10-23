@@ -128,7 +128,9 @@ What would tell us the trees work, if teams choose to measure it on their side: 
 ## Status of the redesign
 
 - [x] Philosophy, research and design notes
-- [ ] Data model: review status, typed actions, empty-result rule, public-safety lint
-- [ ] Viewer re-skin: tokens, embedded fonts, verdict shapes, card motif, trace, home illustration
-- [ ] Viewer functionality: typed actions, empty-result hints, version stamp in notes, clear case
+- [x] Data model: review status, typed actions, empty-result rule, public-safety lint
+- [x] Viewer re-skin: tokens, embedded fonts, verdict shapes, card motif, trace, home illustration
+- [x] Viewer functionality: typed actions, empty-result hints, alert condition box, version stamp in notes
+- [ ] Adopt typed actions and `on_empty` across the other trees (one tree done: impossible travel)
+- [ ] Guided and expert modes, and index tables for the OSINT and Detections pages
 - [ ] CI: contrast test, offline test, design lint
