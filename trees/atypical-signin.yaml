@@ -12,7 +12,7 @@ applies_to:
   - Sign-in from an unusual location or anonymous IP
   - Risky sign-in (Entra ID Protection)
 mitre: [T1078.004]
-version: 1.3.2
+version: 1.3.3
 last_reviewed: 2026-10-23
 review_by: 2027-04-23
 status: stable
@@ -362,9 +362,9 @@ nodes:
     anchor: The password for {{user}} was accepted from {{ip}}, but MFA or Conditional Access stopped the sign-in.
     risk: The risk here is account takeover using the valid password; it has not happened yet because the second factor held, but the password must be treated as compromised.
     actions:
-      - { type: remediate, text: "Reset the password and revoke sessions", approval: System owner or per client RACI }
+      - { type: remediate, text: "Reset the password and revoke sessions", approval: System owner or per client RACI, reversible: false }
       - { type: enrich, text: "Check whether the user approved or received unexpected MFA prompts" }
-      - { type: contain, text: "Block {{ip}} and review other accounts it targeted", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{ip}} and review other accounts it targeted", approval: SOC lead or per client RACI, reversible: true }
     monitor: I will monitor {{user}} for MFA fatigue attempts and further sign-ins from new infrastructure.
 
   o-failed-benign:
@@ -375,4 +375,4 @@ nodes:
     risk: The risk here is credential guessing against {{user}}; it doesn't apply as the attempts were isolated and never passed the first factor.
     actions:
       - "Close"
-      - { type: contain, text: "Block {{ip}} if it has a bad reputation", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{ip}} if it has a bad reputation", approval: SOC lead or per client RACI, reversible: true }

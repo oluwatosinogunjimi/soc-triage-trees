@@ -10,7 +10,7 @@ applies_to:
   - Possible AS-REP roasting attack
   - TGT request without pre-authentication (Event 4768, PreAuthType 0)
 mitre: [T1558.004]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -128,8 +128,8 @@ nodes:
     anchor: "{{src_host}} requested tickets for accounts without pre-authentication, including {{account}}, consistent with AS-REP roasting."
     risk: The risk here is cracked passwords for the targeted accounts; containment is required now.
     actions:
-      - { type: contain, text: "Isolate or investigate {{src_host}}", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Reset passwords for every targeted account and enable pre-authentication", approval: System owner or per client RACI }
+      - { type: contain, text: "Isolate or investigate {{src_host}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: remediate, text: "Reset passwords for every targeted account and enable pre-authentication", approval: System owner or per client RACI, reversible: false }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the targeted accounts for logons from unusual hosts.

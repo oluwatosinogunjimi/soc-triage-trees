@@ -10,7 +10,7 @@ applies_to:
   - Data compressed with password (7z -p / rar -hp)
   - Large archive created in staging directory
 mitre: [T1560.001, T1074.001]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -140,8 +140,8 @@ nodes:
     anchor: Data on {{device}} was archived and uploaded by {{account}}, consistent with exfiltration.
     risk: The risk here is data theft ahead of extortion, often before ransomware; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}} and disable {{account}}", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Block the upload destinations", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}} and disable {{account}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Block the upload destinations", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Scope what data was in the archives" }
       - Raise a P1 incident and escalate
     escalate: true

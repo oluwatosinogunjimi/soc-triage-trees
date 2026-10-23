@@ -11,7 +11,7 @@ applies_to:
   - Risky sign in followed by privilege role grant
   - PIM role activation outside business hours
 mitre: [T1098.003, T1078.004]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -180,7 +180,7 @@ nodes:
     risk: The risk here is full tenant compromise, including new backdoor accounts, apps and federation changes; containment is required now.
     actions:
       - { type: remediate, text: "Remove the role and disable {{user}} if it is attacker-created", approval: System owner or per client RACI }
-      - { type: contain, text: "Revoke sessions for {{actor}} and {{user}}, reset passwords", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{actor}} and {{user}}, reset passwords", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Review every change made by both accounts (users, apps, credentials, Conditional Access, federation)" }
       - Engage the customer's break-glass process
       - Raise a P1 incident and escalate

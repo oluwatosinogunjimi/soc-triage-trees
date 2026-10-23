@@ -11,7 +11,7 @@ applies_to:
   - Possible golden ticket attack (CVE-2021-42287 exploitation)
   - Suspicious Kerberos authentication (TGT request using TGS-REQ)
 mitre: [T1558.001]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -128,7 +128,7 @@ nodes:
     risk: The risk here is persistent domain-wide access that survives password resets until krbtgt is reset twice; this is a domain-level emergency.
     actions:
       - { type: notify, text: "Call the customer on the P1 path and engage incident response" }
-      - { type: contain, text: "Isolate {{src_host}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{src_host}}", approval: SOC lead or per client RACI, reversible: true }
       - Plan a double krbtgt reset (allowing replication between resets)
       - { type: enrich, text: "Hunt for the original domain compromise and other persistence" }
     escalate: true

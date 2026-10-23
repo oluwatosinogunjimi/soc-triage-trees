@@ -10,7 +10,7 @@ applies_to:
   - Process hollowing detected
   - A process was injected with potentially malicious code
 mitre: [T1055, T1055.012]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -122,7 +122,7 @@ nodes:
     anchor: "{{source}} injected code into {{target}} on {{device}}, which then behaved maliciously."
     risk: The risk here is an implant hiding in a trusted process with network and credential access; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Collect memory or an investigation package before remediation" }
       - { type: enrich, text: "Identify how {{source}} arrived and block its hash" }
       - Raise an incident and escalate

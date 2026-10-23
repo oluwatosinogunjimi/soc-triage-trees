@@ -10,7 +10,7 @@ applies_to:
   - Suspicious process launched by web server (w3wp.exe spawning cmd)
   - Web shell detected (Backdoor:ASP/Webshell)
 mitre: [T1505.003, T1190]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -110,7 +110,7 @@ nodes:
     anchor: A web shell is present on {{device}} and the web server is executing commands.
     risk: The risk here is persistent remote access to an often internet-facing server and a route into the internal network; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}} or take it out of the load balancer", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}} or take it out of the load balancer", approval: SOC lead or per client RACI, reversible: true }
       - Preserve the web shell and web logs, then remove it
       - { type: enrich, text: "Identify the exploited vulnerability from web logs around the file's creation, and patch it" }
       - { type: enrich, text: "Check for further shells and accounts created" }

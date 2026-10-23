@@ -10,7 +10,7 @@ applies_to:
   - Set-TransportRule
   - Mail flow rule redirecting mail externally
 mitre: [T1114.003, T1685]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -118,8 +118,8 @@ nodes:
     anchor: Mail flow rule "{{rule_name}}" was created by {{actor}} to intercept mail or weaken filtering without approval.
     risk: The risk here is tenant-wide interception of mail, often finance traffic; containment is required now.
     actions:
-      - { type: contain, text: "Disable and remove the rule", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Revoke sessions and reset {{actor}}; review their other admin actions", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable and remove the rule", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Revoke sessions and reset {{actor}}; review their other admin actions", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Scope the mail that matched the rule since creation" }
       - Raise an incident and escalate
     escalate: true

@@ -10,7 +10,7 @@ applies_to:
   - Email sending limit exceeded
   - Suspicious email sending patterns detected
 mitre: [T1534, T1114]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -112,7 +112,7 @@ nodes:
     anchor: The mailbox of {{user}} was used to send spam or phishing that triggered the outbound restriction.
     risk: The risk here is further phishing from a trusted address and reputation damage to the domain; the account must be contained before release.
     actions:
-      - { type: contain, text: "Revoke sessions, reset the password, remove inbox rules and rogue MFA methods", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions, reset the password, remove inbox rules and rogue MFA methods", approval: SOC lead or per client RACI, reversible: false }
       - Warn recipients and purge internal copies
       - Release the restriction only after containment
     escalate: true

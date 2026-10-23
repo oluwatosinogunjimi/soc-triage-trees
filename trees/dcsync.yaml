@@ -10,7 +10,7 @@ applies_to:
   - Suspected DCSync attack
   - Directory Services replication from non-DC (Event 4662)
 mitre: [T1003.006]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -135,7 +135,7 @@ nodes:
     risk: The risk here is full domain compromise, including golden tickets from the krbtgt hash; this is a domain-level emergency.
     actions:
       - { type: notify, text: "Call the customer on the P1 path immediately" }
-      - { type: contain, text: "Isolate {{src_host}} and disable {{account}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{src_host}} and disable {{account}}", approval: SOC lead or per client RACI, reversible: true }
       - Plan a double krbtgt reset and reset privileged account passwords
       - { type: remediate, text: "Remove replication rights from any account that should not hold them", approval: System owner or per client RACI }
       - Engage incident response

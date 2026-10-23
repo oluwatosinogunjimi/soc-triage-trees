@@ -11,7 +11,7 @@ applies_to:
   - Unusual Azure OpenAI usage spike
   - PutFoundationModelEntitlement from unfamiliar principal
 mitre: [T1496, T1078.004]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -116,7 +116,7 @@ nodes:
     anchor: "{{principal}} was used to call hosted models without authorisation."
     risk: The risk here is large unexpected cost and misuse of models under the customer's account; containment is required now.
     actions:
-      - { type: contain, text: "Deactivate the key or revoke the principal's sessions", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Deactivate the key or revoke the principal's sessions", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Re-enable invocation logging and remove unapproved model access and provisioned throughput", approval: System owner or per client RACI }
       - { type: enrich, text: "Find how the key leaked and run the credential misuse checks" }
       - Recommend service control policies limiting model access to approved roles

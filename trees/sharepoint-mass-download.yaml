@@ -10,7 +10,7 @@ applies_to:
   - Mass Access to Sensitive Files
   - Suspicious OAuth app file download activities
 mitre: [T1530, T1213.002]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -133,7 +133,7 @@ nodes:
     anchor: Files were downloaded in bulk from a suspicious session of {{user}}.
     risk: The risk here is a data breach through account takeover; containment is required now.
     actions:
-      - { type: contain, text: "Revoke sessions, reset the password and review OAuth apps for {{user}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions, reset the password and review OAuth apps for {{user}}", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "List the files downloaded and their sensitivity" }
       - Escalate to the customer
     escalate: true

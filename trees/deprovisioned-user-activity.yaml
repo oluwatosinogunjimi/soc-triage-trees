@@ -11,7 +11,7 @@ applies_to:
   - Suspicious on-premises account enablement after disruption
   - Sign-in by disabled account
 mitre: [T1078, T1098]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -173,7 +173,7 @@ nodes:
     anchor: "{{user}} was used from {{ip}} without any legitimate reason after offboarding."
     risk: The risk here is data theft or sabotage by a leaver or an attacker through an account nobody watches; containment is required now.
     actions:
-      - { type: contain, text: "Disable the account again, revoke sessions and reset the password", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable the account again, revoke sessions and reset the password", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Scope what was accessed during the activity" }
       - { type: notify, text: "Inform the customer, including HR and legal if the leaver may be involved" }
     escalate: true

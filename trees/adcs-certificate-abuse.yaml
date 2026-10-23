@@ -12,7 +12,7 @@ applies_to:
   - Suspicious login attempt using possibly compromised account certificate
   - Certificate issued with SAN different from requester (Event 4887)
 mitre: [T1649]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -148,7 +148,7 @@ nodes:
     risk: The risk here is persistent impersonation of {{target}} that survives password resets until the certificate is revoked; containment is required now.
     actions:
       - { type: contain, text: "Revoke the certificate and publish the CRL", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Isolate {{src_host}} and disable {{account}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{src_host}} and disable {{account}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Fix the abused template", approval: System owner or per client RACI }
       - { type: enrich, text: "Review logons as {{target}} since issuance" }
       - Raise an incident and escalate

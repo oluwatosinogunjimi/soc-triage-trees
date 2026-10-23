@@ -10,7 +10,7 @@ applies_to:
   - Teams phishing message detected
   - Email bombing followed by Teams contact
 mitre: [T1566.003, T1684.001, T1219]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -127,6 +127,6 @@ nodes:
     anchor: An unknown external Teams account posed as IT support to {{user}}, and no remote access was granted.
     risk: The risk here is remote access leading to ransomware; it doesn't apply as the user did not comply.
     actions:
-      - { type: contain, text: "Block the external tenant or domain in Teams", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block the external tenant or domain in Teams", approval: SOC lead or per client RACI, reversible: true }
       - { type: notify, text: "Brief the user and helpdesk on the lure" }
       - Recommend restricting external Teams access to allowed domains

@@ -10,7 +10,7 @@ applies_to:
   - Network discovery activity
   - Impact:EC2/PortSweep
 mitre: [T1046, T1018]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -140,8 +140,8 @@ nodes:
     anchor: "{{src_ip}} ran an unauthorised network scan with a scanning tool."
     risk: The risk here is an attacker mapping targets for lateral movement, often shortly before ransomware; containment is required now.
     actions:
-      - { type: contain, text: "Isolate the host and investigate how the tool arrived", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Reset the account that ran it", approval: System owner or per client RACI }
+      - { type: contain, text: "Isolate the host and investigate how the tool arrived", approval: SOC lead or per client RACI, reversible: true }
+      - { type: remediate, text: "Reset the account that ran it", approval: System owner or per client RACI, reversible: false }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor for remote execution and logons from {{src_ip}}.

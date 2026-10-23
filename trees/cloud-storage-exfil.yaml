@@ -11,7 +11,7 @@ applies_to:
   - Impact:S3/AnomalousBehavior.Delete
   - Unusual volume of blob reads or deletes
 mitre: [T1530, T1485, T1537]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -112,7 +112,7 @@ nodes:
     risk: The risk here is data breach and extortion, including deletion to pressure payment; containment is required now.
     actions:
       - { type: contain, text: "Revoke the principal's credentials and sessions", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Block the destination account or IP; remove rogue replication rules", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block the destination account or IP; remove rogue replication rules", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Restore deleted objects from versioning or backup", approval: System owner or per client RACI }
       - { type: enrich, text: "Scope the data taken and escalate to the customer" }
     escalate: true

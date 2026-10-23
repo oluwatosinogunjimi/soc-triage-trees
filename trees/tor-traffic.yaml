@@ -10,7 +10,7 @@ applies_to:
   - UnauthorizedAccess:EC2/TorRelay
   - Connection to TOR network detected
 mitre: [T1090.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -115,8 +115,8 @@ nodes:
     anchor: A non-browser process on {{host}} is communicating over TOR.
     risk: The risk here is command and control that bypasses proxy inspection, typical of ransomware and backdoors; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{host}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{host}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Run the EDR tree on the process" }
-      - { type: contain, text: "Block TOR entry nodes at the perimeter", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block TOR entry nodes at the perimeter", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor the estate for TOR connections from any host.

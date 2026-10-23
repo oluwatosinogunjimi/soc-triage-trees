@@ -11,7 +11,7 @@ applies_to:
   - New IT-to-OT connection
   - Engineering workstation activity outside maintenance window
 mitre: [T0843, T1692.001, T0886]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -139,7 +139,7 @@ nodes:
     actions:
       - { type: notify, text: "Call site operations and the customer P1 contact immediately; let operators decide on isolation" }
       - Preserve OT monitoring and controller logs; compare controller logic with the known good version
-      - { type: contain, text: "Block the source's path into OT at the boundary firewall if operators agree", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block the source's path into OT at the boundary firewall if operators agree", approval: SOC lead or per client RACI, reversible: true }
       - Engage ICS incident response
     escalate: true
     monitor: I will monitor all OT boundaries and controllers for further commands.

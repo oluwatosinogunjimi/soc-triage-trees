@@ -10,7 +10,7 @@ applies_to:
   - Break-glass account used
   - Sign-in by excluded privileged account
 mitre: [T1078.004]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -118,7 +118,7 @@ nodes:
     risk: The risk here is misuse of the break-glass account under cover of the emergency, which stays open until the actions are confirmed.
     actions:
       - { type: notify, text: "Send the action list to the customer's identity owner for confirmation" }
-      - { type: remediate, text: "Rotate the credential after the emergency closes", approval: System owner or per client RACI }
+      - { type: remediate, text: "Rotate the credential after the emergency closes", approval: System owner or per client RACI, reversible: false }
     monitor: I will monitor {{user}} for any further use until the emergency is closed.
 
   o-tp-attempt:
@@ -129,7 +129,7 @@ nodes:
     risk: The risk here is takeover of an unrestricted admin account; the account name is known to an attacker even though this attempt failed.
     actions:
       - { type: notify, text: "Tell the customer immediately" }
-      - { type: contain, text: "Block {{ip}} and confirm the credential is strong and phishing-resistant", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{ip}} and confirm the credential is strong and phishing-resistant", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor {{user}} for any further sign-in attempts.
 
@@ -141,7 +141,7 @@ nodes:
     risk: The risk here is full tenant compromise through an account that bypasses Conditional Access; containment is required now.
     actions:
       - { type: notify, text: "Call the customer immediately on the agreed escalation path" }
-      - { type: remediate, text: "Reset the credential and revoke sessions", approval: System owner or per client RACI }
+      - { type: remediate, text: "Reset the credential and revoke sessions", approval: System owner or per client RACI, reversible: false }
       - { type: enrich, text: "Review every action taken by the account" }
       - Raise a P1 incident
     escalate: true

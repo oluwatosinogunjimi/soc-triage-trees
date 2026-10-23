@@ -10,7 +10,7 @@ applies_to:
   - Root console login
   - Root access key used
 mitre: [T1078.004]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -129,7 +129,7 @@ nodes:
     risk: The risk here is total control of the AWS account, including deletion of resources and backups; this is a P1.
     actions:
       - { type: notify, text: "Call the customer on the P1 path" }
-      - { type: remediate, text: "Reset the root password, replace MFA and delete any root access keys", approval: System owner or per client RACI }
+      - { type: remediate, text: "Reset the root password, replace MFA and delete any root access keys", approval: System owner or per client RACI, reversible: false }
       - { type: remediate, text: "Remove users, keys, roles and policies created by root", approval: System owner or per client RACI }
       - { type: enrich, text: "Review all CloudTrail activity from {{ip}}" }
     escalate: true

@@ -10,7 +10,7 @@ applies_to:
   - Unusual file deletion activities (mail)
   - Mass HardDelete in mailbox
 mitre: [T1070.008]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -125,7 +125,7 @@ nodes:
     anchor: Mail in the mailbox of {{user}} was deleted from an unfamiliar session.
     risk: The risk here is an attacker hiding a compromise, usually business email compromise; containment is required now.
     actions:
-      - { type: contain, text: "Revoke sessions and reset the password", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions and reset the password", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Recover deleted items for review" }
       - { type: enrich, text: "Run the inbox rule and token theft checks for the account" }
     escalate: true

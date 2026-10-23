@@ -134,7 +134,7 @@ What would tell us the trees work, if teams choose to measure it on their side: 
 - [x] Viewer functionality: typed actions, empty-result hints, alert condition box, version stamp in notes
 - [x] Typed actions across all trees, classified by verb and reviewed (ambiguous actions stay as plain sentences)
 - [x] A default "No rows?" hint on every query step in guided mode
-- [ ] Tree-specific `on_empty` text for high-value queries (one tree done: impossible travel)
-- [ ] Tip-off flags and reversibility on typed actions where they matter
+- [x] An `on_empty` hint on every query step, written for the tables it reads
+- [x] Reversibility on containment and remediation actions, and tip-off flags where contacting someone could alert the attacker
 - [x] Guided and expert modes, and index tables for the OSINT and Detections pages
 - [x] CI: contrast test, offline test, design lint (in the pytest suite)

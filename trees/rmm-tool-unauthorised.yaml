@@ -10,7 +10,7 @@ applies_to:
   - AnyDesk / ScreenConnect installed
   - Quick Assist session started after unsolicited contact
 mitre: [T1219]
-version: 1.3.2
+version: 1.3.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -200,9 +200,9 @@ nodes:
     anchor: An attacker used {{file}} to access {{device}} and carried out further activity.
     risk: The risk here is hands-on-keyboard intrusion that commonly ends in ransomware; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}} per client RACI", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Kill and remove the tool and any others installed", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Reset credentials used on the device", approval: System owner or per client RACI }
+      - { type: contain, text: "Isolate {{device}} per client RACI", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Kill and remove the tool and any others installed", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Reset credentials used on the device", approval: System owner or per client RACI, reversible: false }
       - { type: enrich, text: "Scope follow-on activity (tools, discovery, lateral movement)" }
       - Raise an incident and escalate
     escalate: true

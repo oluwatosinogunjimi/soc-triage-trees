@@ -11,7 +11,7 @@ applies_to:
   - Multiple failed RDP logons from external IP
   - Suspected brute-force attack (Kerberos, NTLM) from external source
 mitre: [T1110.001, T1133]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -120,7 +120,7 @@ nodes:
     anchor: "{{host}} received failed brute-force attempts, including from {{src_ip}}, on an approved exposed service."
     risk: The risk here is a guessed password on an internet-facing service; it doesn't apply as no attempt succeeded.
     actions:
-      - { type: contain, text: "Block {{src_ip}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{src_ip}}", approval: SOC lead or per client RACI, reversible: true }
       - Recommend account lockout, MFA or IP allowlisting on the service
 
   o-exposure:
@@ -131,7 +131,7 @@ nodes:
     risk: The risk here is a guessed password giving direct access, a common ransomware entry point; the exposure must be closed.
     actions:
       - Ask the customer to remove the exposure or put it behind VPN
-      - { type: contain, text: "Block {{src_ip}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{src_ip}}", approval: SOC lead or per client RACI, reversible: true }
     monitor: I will monitor {{host}} for successful external logons until the exposure is closed.
 
   o-tp:
@@ -141,8 +141,8 @@ nodes:
     anchor: An attacker logged on to {{host}} from the internet after brute-forcing credentials.
     risk: The risk here is hands-on intrusion from an internet-facing foothold; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{host}} and remove its internet exposure", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Disable and reset the compromised account", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{host}} and remove its internet exposure", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Disable and reset the compromised account", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Review what the attacker did in the session" }
       - Raise an incident and escalate
     escalate: true

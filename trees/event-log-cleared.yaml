@@ -10,7 +10,7 @@ applies_to:
   - wevtutil cl executed
   - Audit policy changed
 mitre: [T1685.005]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -128,7 +128,7 @@ nodes:
     anchor: The log on {{device}} was cleared by {{account}} after other suspicious activity.
     risk: The risk here is an active intrusion hiding its footprint; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}} and reset {{account}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}} and reset {{account}}", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Rebuild the timeline from EDR and forwarded logs" }
       - Raise an incident and escalate
     escalate: true

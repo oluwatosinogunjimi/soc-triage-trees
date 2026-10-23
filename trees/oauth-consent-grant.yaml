@@ -11,7 +11,7 @@ applies_to:
   - Unusual addition of credentials to an OAuth app
   - App with suspicious OAuth scopes
 mitre: [T1528, T1550.001, T1098.001]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -255,10 +255,10 @@ nodes:
     anchor: "{{user}} granted consent to {{app}}, a consent phishing application, and the app has not yet used its access."
     risk: The risk here is persistent data access that survives password resets; disabling the app and revoking the grant removes it before use.
     actions:
-      - { type: contain, text: "Disable the application (disable rather than delete so it cannot be re-consented)", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable the application (disable rather than delete so it cannot be re-consented)", approval: SOC lead or per client RACI, reversible: false }
       - { type: contain, text: "Revoke the delegated grants and app role assignments", approval: SOC lead or per client RACI }
       - { type: contain, text: "Revoke sessions for {{user}} and check for other consenting users", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Purge the lure and report the app to Microsoft", approval: System owner or per client RACI }
+      - { type: remediate, text: "Purge the lure and report the app to Microsoft", approval: System owner or per client RACI, reversible: false }
     escalate: true
     monitor: I will monitor for new consents to {{app}} or apps from the same publisher.
 
@@ -269,7 +269,7 @@ nodes:
     anchor: "{{app}} obtained consent from {{user}} through consent phishing and has already accessed data."
     risk: The risk here is ongoing mailbox and file theft through the app token, which a password reset does not stop.
     actions:
-      - { type: contain, text: "Disable the application immediately and revoke all grants", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable the application immediately and revoke all grants", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Scope what the app accessed (mail items, files, sent mail) and for which users" }
       - { type: contain, text: "Revoke sessions for every consenting user", approval: SOC lead or per client RACI }
       - Escalate to the customer for data exposure assessment

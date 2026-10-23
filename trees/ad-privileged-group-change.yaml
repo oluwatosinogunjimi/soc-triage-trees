@@ -10,7 +10,7 @@ applies_to:
   - Suspicious additions to sensitive groups
   - Group Membership changed (Defender for Identity)
 mitre: [T1098, T1078.002]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -138,7 +138,7 @@ nodes:
     risk: The risk here is domain-level control for the attacker; containment is required now.
     actions:
       - { type: remediate, text: "Remove {{account}} from {{group}} and disable it if attacker-controlled", approval: System owner or per client RACI }
-      - { type: remediate, text: "Reset {{actor}} and investigate the source host", approval: System owner or per client RACI }
+      - { type: remediate, text: "Reset {{actor}} and investigate the source host", approval: System owner or per client RACI, reversible: false }
       - { type: enrich, text: "Review every change made with the new privilege" }
       - Raise a P1 incident and escalate
     escalate: true

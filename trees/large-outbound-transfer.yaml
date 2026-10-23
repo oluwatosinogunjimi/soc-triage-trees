@@ -10,7 +10,7 @@ applies_to:
   - Behavior:EC2/TrafficVolumeUnusual
   - Possible data exfiltration
 mitre: [T1048, T1567.002]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -123,8 +123,8 @@ nodes:
     anchor: Data left {{host}} for {{dst_ip}} through an unsanctioned tool or destination.
     risk: The risk here is data theft for extortion or competitive loss; containment is required now.
     actions:
-      - { type: contain, text: "Block {{dst_ip}} and the service domain", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Isolate {{host}} and identify the account that ran the tool", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{dst_ip}} and the service domain", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Isolate {{host}} and identify the account that ran the tool", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Scope the data sent (paths the tool read)" }
       - Raise an incident and escalate
     escalate: true

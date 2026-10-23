@@ -12,7 +12,7 @@ applies_to:
   - Port scan or internal reconnaissance
   - Beaconing detected
 mitre: [T1190, T1071, T1021, T1046]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -287,7 +287,7 @@ nodes:
     risk: The risk here is exploitation of {{host}}; it doesn't apply as the traffic was blocked and the target is patched.
     actions:
       - "Close"
-      - { type: contain, text: "Block {{src_ip}} if it keeps probing", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{src_ip}} if it keeps probing", approval: SOC lead or per client RACI, reversible: true }
     tuning: If this signature fires constantly on blocked traffic to patched assets, lower its priority for dropped events.
 
   o-blocked-but-vulnerable:
@@ -298,7 +298,7 @@ nodes:
     risk: The risk here is exploitation of {{host}} through {{cve}} by the next attempt, which stays open until the asset is patched.
     actions:
       - { type: notify, text: "Notify the customer to patch or mitigate {{cve}} on {{host}}" }
-      - { type: contain, text: "Block {{src_ip}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{src_ip}}", approval: SOC lead or per client RACI, reversible: true }
     monitor: I will monitor {{host}} for further attempts and any post-exploitation activity until it is patched.
 
   o-tp-exploited:
@@ -308,9 +308,9 @@ nodes:
     anchor: "{{host}} was exploited through the traffic from {{src_ip}} and shows post-exploitation activity."
     risk: The risk here is an attacker foothold on a server, often internet-facing, leading to lateral movement; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{host}} per client RACI", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{host}} per client RACI", approval: SOC lead or per client RACI, reversible: true }
       - Preserve web and application logs and any web shells found
-      - { type: contain, text: "Block {{src_ip}} and hunt for the same activity on similar servers", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{src_ip}} and hunt for the same activity on similar servers", approval: SOC lead or per client RACI, reversible: true }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{host}} and {{src_ip}} for further activity across the estate.
@@ -330,7 +330,7 @@ nodes:
     anchor: The connection from {{host}} to {{dst_ip}} came from a browser session with no beacon pattern and no payload.
     risk: The risk here is a drive-by download from the flagged site; it doesn't apply as no file or process followed the visit.
     actions:
-      - { type: contain, text: "Block {{dst_ip}} or its domain at the proxy", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{dst_ip}} or its domain at the proxy", approval: SOC lead or per client RACI, reversible: true }
 
   o-tp-c2:
     type: outcome
@@ -339,9 +339,9 @@ nodes:
     anchor: "{{host}} is connecting to {{dst_ip}} from a suspicious process, consistent with command and control."
     risk: The risk here is remote attacker control of {{host}}; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{host}} per client RACI", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{host}} per client RACI", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Run the EDR tree on the process behind the connection" }
-      - { type: contain, text: "Block {{dst_ip}} and related infrastructure", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{dst_ip}} and related infrastructure", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Hunt for other hosts talking to {{dst_ip}}" }
     escalate: true
     monitor: I will monitor the estate for connections to {{dst_ip}} and related infrastructure.
@@ -362,7 +362,7 @@ nodes:
     anchor: "{{src_ip}} is moving laterally or scanning across internal hosts with no legitimate role that explains it."
     risk: The risk here is an attacker spreading from a compromised host toward high-value systems; containment is required now.
     actions:
-      - { type: contain, text: "Isolate the source host per client RACI", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate the source host per client RACI", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Identify the account and process used" }
       - { type: enrich, text: "Check every target host for remote service creation and logons" }
       - Raise an incident and escalate

@@ -9,7 +9,7 @@ applies_to:
   - WMI event subscription created
   - Suspicious WMI persistence (CommandLineEventConsumer / ActiveScriptEventConsumer)
 mitre: [T1546.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -127,7 +127,7 @@ nodes:
     anchor: A malicious WMI event subscription on {{device}} has executed its payload.
     risk: The risk here is an attacker with persistent code execution on {{device}}; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Remove the subscription and investigate the payload", approval: System owner or per client RACI }
       - Raise an incident and escalate
     escalate: true

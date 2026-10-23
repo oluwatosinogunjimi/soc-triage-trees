@@ -11,7 +11,7 @@ applies_to:
   - Tamper protection blocked a change
   - EDR agent uninstalled or sensor offline unexpectedly
 mitre: [T1685]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -115,7 +115,7 @@ nodes:
     risk: The risk here is an attacker preparing to run a payload; the block held, but whoever tried is on the host.
     actions:
       - { type: enrich, text: "Investigate the process and account behind the attempt" }
-      - { type: contain, text: "Isolate {{device}} if the process is not explained quickly", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}} if the process is not explained quickly", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor {{device}} for further tampering and new executables.
 
@@ -126,7 +126,7 @@ nodes:
     anchor: Security tools on {{device}} were disabled or weakened without authorisation.
     risk: The risk here is an attacker operating on {{device}} without detection, often right before ransomware; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}} (network isolation may still work through the platform)", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}} (network isolation may still work through the platform)", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Restore protection and remove rogue exclusions", approval: System owner or per client RACI }
       - Look for what the attacker ran after the change
       - Raise an incident and escalate

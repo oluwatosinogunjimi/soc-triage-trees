@@ -10,7 +10,7 @@ applies_to:
   - DLL search order hijacking
   - Unsigned DLL loaded from user-writable path
 mitre: [T1574.001]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -111,8 +111,8 @@ nodes:
     anchor: A malicious {{dll}} was sideloaded by a signed executable on {{device}}.
     risk: The risk here is an implant hiding behind a trusted signature; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Quarantine the DLL and the copied executable, and find the persistence that launches them", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Quarantine the DLL and the copied executable, and find the persistence that launches them", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Hunt for the DLL hash and the folder pattern across the estate" }
       - Raise an incident and escalate
     escalate: true

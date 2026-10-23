@@ -10,7 +10,7 @@ applies_to:
   - Invoice fraud from known vendor
   - Suspicious email from trusted partner domain
 mitre: [T1566, T1684.001]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -112,8 +112,8 @@ nodes:
     anchor: The request from {{sender}} to change payment details is fraudulent, and no change or payment was made.
     risk: The risk here is payment redirection to an attacker account; it doesn't apply as finance did not act.
     actions:
-      - { type: contain, text: "Block the sender or lookalike domain", approval: SOC lead or per client RACI }
-      - { type: notify, text: "Tell the real vendor their mailbox may be compromised (if their domain was used)" }
+      - { type: contain, text: "Block the sender or lookalike domain", approval: SOC lead or per client RACI, reversible: true }
+      - { type: notify, text: "Tell the real vendor their mailbox may be compromised (if their domain was used)", tip_off: true }
       - Flag the supplier record in finance for extra verification
 
   o-tp-loss:
@@ -126,6 +126,6 @@ nodes:
       - Escalate urgently to the customer's finance lead
       - { type: notify, text: "Advise contacting the bank to recall the payment immediately and reporting to the authorities" }
       - { type: remediate, text: "Revert the supplier bank details", approval: System owner or per client RACI }
-      - { type: notify, text: "Notify the real vendor" }
+      - { type: notify, text: "Notify the real vendor", tip_off: true }
     escalate: true
     monitor: I will monitor for further messages from the vendor domain and lookalikes.

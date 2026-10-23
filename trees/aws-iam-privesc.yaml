@@ -11,7 +11,7 @@ applies_to:
   - AttachUserPolicy AdministratorAccess
   - UpdateAssumeRolePolicy to external account
 mitre: [T1098.003, T1098.001]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -134,7 +134,7 @@ nodes:
     anchor: "{{principal}} escalated privilege or created external trust in AWS without authorisation."
     risk: The risk here is account takeover and persistence through new admin identities; containment is required now.
     actions:
-      - { type: contain, text: "Detach the added policies, delete created users and keys, revert trust policies", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Detach the added policies, delete created users and keys, revert trust policies", approval: SOC lead or per client RACI, reversible: false }
       - { type: contain, text: "Revoke sessions for {{principal}} and find how it was compromised", approval: SOC lead or per client RACI }
       - { type: enrich, text: "Review actions taken with the new privilege" }
       - Raise an incident and escalate

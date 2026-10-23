@@ -10,7 +10,7 @@ applies_to:
   - Domain impersonation detected
   - Display name spoofing of executive
 mitre: [T1684.001, T1566.003]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -108,7 +108,7 @@ nodes:
     risk: The risk here is an attacker inside the executive's accounts sending requests that staff will trust; it stays open until the mailbox activity is explained.
     actions:
       - Escalate to the customer and the executive's office
-      - { type: contain, text: "Hold any payment or data request from {{sender}} until it is verified by phone", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Hold any payment or data request from {{sender}} until it is verified by phone", approval: SOC lead or per client RACI, reversible: true }
       - Ask {{executive}} to confirm the sign-ins, rules and forwarding
       - { type: enrich, text: "Run the inbox rule tree for any new rules or forwarding found" }
     escalate: true
@@ -121,7 +121,7 @@ nodes:
     anchor: "{{sender}} impersonated {{executive}}, and no recipient engaged."
     risk: The risk here is payment fraud or data disclosure under executive pressure; it doesn't apply as nobody acted.
     actions:
-      - { type: remediate, text: "Purge the messages and block the sender", approval: System owner or per client RACI }
+      - { type: remediate, text: "Purge the messages and block the sender", approval: System owner or per client RACI, reversible: false }
       - Add {{executive}} to the impersonation protection list if missing
       - Let the targeted teams know the lure is circulating
 
@@ -134,6 +134,6 @@ nodes:
     actions:
       - Escalate urgently to the customer, including finance and the executive's office
       - { type: notify, text: "Advise contacting the bank immediately if money moved" }
-      - { type: remediate, text: "Purge the messages and block the sender", approval: System owner or per client RACI }
+      - { type: remediate, text: "Purge the messages and block the sender", approval: System owner or per client RACI, reversible: false }
     escalate: true
     monitor: I will monitor for new lookalike senders impersonating {{executive}}.

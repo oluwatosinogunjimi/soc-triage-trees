@@ -11,7 +11,7 @@ applies_to:
   - New local user account created (4720)
   - Member added to security-enabled local group (4732)
 mitre: [T1136.001, T1098, T1546.008]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -150,7 +150,7 @@ nodes:
     anchor: "{{account}} was made local admin on {{device}} without a legitimate reason and has been used."
     risk: The risk here is an attacker with persistent admin rights on {{device}}; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Remove {{account}} and investigate its logon sessions", approval: System owner or per client RACI }
       - Raise an incident and escalate
     escalate: true
@@ -163,7 +163,7 @@ nodes:
     anchor: The change for {{account}} on {{device}} was made through an accessibility binary or a server process.
     risk: The risk here is SYSTEM-level access without credentials, through a replaced accessibility tool or an exploited service; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Check Utilman.exe, sethc.exe and similar for replacement or Image File Execution Options debugger keys" }
       - { type: remediate, text: "Remove {{account}}", approval: System owner or per client RACI }
       - Raise an incident and escalate

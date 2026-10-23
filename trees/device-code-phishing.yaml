@@ -10,7 +10,7 @@ applies_to:
   - Suspicious sign-in using device code flow
   - Sign-in with authentication protocol deviceCode
 mitre: [T1528, T1566.002]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -152,8 +152,8 @@ nodes:
     risk: The risk here is mailbox and file access with the stolen refresh token, which stays valid until sessions are revoked.
     actions:
       - { type: contain, text: "Revoke sessions and refresh tokens for {{user}}", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Purge the lure and find other recipients", approval: System owner or per client RACI }
-      - { type: contain, text: "Block device code flow with Conditional Access where it is not needed", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Purge the lure and find other recipients", approval: System owner or per client RACI, reversible: false }
+      - { type: contain, text: "Block device code flow with Conditional Access where it is not needed", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor {{user}} for non-interactive sign-ins from {{ip}} or its ASN.
 
@@ -164,10 +164,10 @@ nodes:
     anchor: An attacker at {{ip}} obtained a token for {{user}} through device code phishing and used it to access data.
     risk: The risk here is data theft and persistence through the stolen refresh token; containment is required now.
     actions:
-      - { type: contain, text: "Revoke sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Scope what was accessed (MailItemsAccessed, file access, Graph calls)" }
       - { type: enrich, text: "Check for inbox rules, consents and new MFA methods" }
-      - { type: contain, text: "Block device code flow where it is not needed", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block device code flow where it is not needed", approval: SOC lead or per client RACI, reversible: true }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{user}} and {{ip}} for further token use.

@@ -11,7 +11,7 @@ applies_to:
   - Add user followed by Add member to role
   - OAuth app created a user
 mitre: [T1136.003, T1098.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -147,7 +147,7 @@ nodes:
     risk: The risk here is an unapproved privileged account, which stays open until the customer confirms it.
     actions:
       - Ask the customer to confirm the account and its role
-      - { type: contain, text: "Disable it pending confirmation if it holds a privileged role", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable it pending confirmation if it holds a privileged role", approval: SOC lead or per client RACI, reversible: true }
     monitor: I will monitor {{user}} for sign-ins and privileged actions until this is resolved.
 
   o-tp-backdoor:
@@ -157,7 +157,7 @@ nodes:
     anchor: "{{user}} was created outside any legitimate process, consistent with an attacker backdoor."
     risk: The risk here is persistent tenant control through a hidden admin account; containment is required now.
     actions:
-      - { type: contain, text: "Disable {{user}} and remove its roles", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable {{user}} and remove its roles", approval: SOC lead or per client RACI, reversible: true }
       - { type: contain, text: "Revoke sessions for {{actor}} and investigate how it was compromised", approval: SOC lead or per client RACI }
       - { type: enrich, text: "Review everything done by both accounts" }
       - Raise a P1 incident and escalate

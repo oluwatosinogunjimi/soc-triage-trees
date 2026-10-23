@@ -12,7 +12,7 @@ applies_to:
   - New access key created for IAM user
   - Unusual instance type launched
 mitre: [T1078.004, T1685.002, T1098.001, T1496, T1578]
-version: 1.2.3
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -219,7 +219,7 @@ nodes:
     anchor: "{{principal}} performed an unauthorised action from {{ip}}."
     risk: The risk here is persistence, data exposure or resource abuse through compromised cloud credentials; containment is required now.
     actions:
-      - { type: contain, text: "Disable or rotate the access keys, or revoke the user's sessions", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Disable or rotate the access keys, or revoke the user's sessions", approval: SOC lead or per client RACI, reversible: false }
       - { type: remediate, text: "Remove any keys, users, role assignments or policies the attacker created", approval: System owner or per client RACI }
       - { type: remediate, text: "Revert security-impacting changes (re-enable logging, close exposed rules)", approval: System owner or per client RACI }
       - Snapshot evidence, then stop unauthorised resources

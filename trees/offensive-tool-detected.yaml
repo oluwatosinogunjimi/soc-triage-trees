@@ -11,7 +11,7 @@ applies_to:
   - An active 'Sliver' / 'BruteRatel' beacon was detected
   - Impacket toolkit usage
 mitre: [T1588.002, T1071.001]
-version: 1.1.2
+version: 1.1.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -94,7 +94,7 @@ nodes:
     risk: The risk here is a hands-on attacker; the tool was stopped, but someone put it there.
     actions:
       - { type: enrich, text: "Find who or what dropped the tool and isolate {{device}} if that cannot be explained quickly" }
-      - { type: remediate, text: "Reset the account that dropped it", approval: System owner or per client RACI }
+      - { type: remediate, text: "Reset the account that dropped it", approval: System owner or per client RACI, reversible: false }
     escalate: true
     monitor: I will monitor {{device}} for further tool drops and suspicious logons.
 
@@ -105,9 +105,9 @@ nodes:
     anchor: "{{tool}} executed on {{device}} without authorisation."
     risk: The risk here is an active intrusion with credential theft and lateral movement capability; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}} and call the customer on the P1 path", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Block the C2 infrastructure", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Reset credentials used on the device", approval: System owner or per client RACI }
+      - { type: contain, text: "Isolate {{device}} and call the customer on the P1 path", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Block the C2 infrastructure", approval: SOC lead or per client RACI, reversible: true }
+      - { type: remediate, text: "Reset credentials used on the device", approval: System owner or per client RACI, reversible: false }
       - { type: enrich, text: "Hunt for the same beacon or tool across the estate" }
       - Engage incident response
     escalate: true

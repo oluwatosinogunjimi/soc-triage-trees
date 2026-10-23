@@ -12,7 +12,7 @@ applies_to:
   - Verified threat actor IP (nationStateIP)
   - Activity from a TOR IP address
 mitre: [T1078.004, T1090.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -155,6 +155,6 @@ nodes:
     anchor: "{{ip}} is malicious infrastructure and its sign-in attempts against the tenant failed at the password stage."
     risk: The risk here is account takeover by a known threat actor; it doesn't apply to this attempt, but the targeting is real.
     actions:
-      - { type: contain, text: "Block {{ip}} in Conditional Access named locations", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{ip}} in Conditional Access named locations", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Review every account it targeted and reset any with a password-accepted result" }
     monitor: I will monitor the targeted accounts for sign-ins from related infrastructure.

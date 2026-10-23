@@ -10,7 +10,7 @@ applies_to:
   - Internal phishing campaign detected
   - Suspicious email sending patterns (suspiciousSendingPatterns)
 mitre: [T1534, T1566.002]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -134,9 +134,9 @@ nodes:
     anchor: "{{sender}} sent phishing lures to colleagues or contacts, and no recipient clicked."
     risk: The risk here is the campaign spreading through trusted internal mail; the sending account is compromised.
     actions:
-      - { type: contain, text: "Revoke sessions, reset the password and check inbox rules for {{sender}}", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Purge the messages from all mailboxes and warn external recipients", approval: System owner or per client RACI }
-      - { type: contain, text: "Block the phishing URLs", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions, reset the password and check inbox rules for {{sender}}", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Purge the messages from all mailboxes and warn external recipients", approval: System owner or per client RACI, reversible: false }
+      - { type: contain, text: "Block the phishing URLs", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Run the token theft tree for {{sender}}" }
     escalate: true
     monitor: I will monitor {{sender}} for further sends and sign-ins from new infrastructure.
@@ -148,9 +148,9 @@ nodes:
     anchor: "{{sender}} sent phishing lures and recipients clicked them."
     risk: The risk here is a spreading compromise across accounts; each clicker needs the same checks.
     actions:
-      - { type: contain, text: "Contain {{sender}} (revoke sessions, reset, remove rules)", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Contain {{sender}} (revoke sessions, reset, remove rules)", approval: SOC lead or per client RACI, reversible: false }
       - { type: enrich, text: "Run the malicious URL click tree for every recipient who clicked" }
-      - { type: remediate, text: "Purge the messages and block the URLs", approval: System owner or per client RACI }
+      - { type: remediate, text: "Purge the messages and block the URLs", approval: System owner or per client RACI, reversible: false }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor every recipient who clicked for sign-ins from new infrastructure.

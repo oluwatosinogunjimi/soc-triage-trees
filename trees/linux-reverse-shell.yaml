@@ -11,7 +11,7 @@ applies_to:
   - Web server process spawned shell on Linux
   - Unexpected SSH authorized_keys modification
 mitre: [T1059.004, T1098.004]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -132,7 +132,7 @@ nodes:
     anchor: A network service on {{device}} spawned a shell as {{account}}, indicating exploitation.
     risk: The risk here is attacker control of the host and a pivot into the environment; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Identify the exploited service and CVE from application logs, and patch" }
       - { type: enrich, text: "Check for persistence (cron, systemd units, SSH keys, new users)" }
       - Raise an incident and escalate
@@ -146,9 +146,9 @@ nodes:
     anchor: "{{account}} on {{device}} was used from an unusual source or to add persistence."
     risk: The risk here is persistent attacker access through SSH keys, users or cron; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
       - { type: remediate, text: "Remove rogue keys, users and cron or systemd entries", approval: System owner or per client RACI }
-      - { type: remediate, text: "Rotate the credentials and keys for {{account}}", approval: System owner or per client RACI }
+      - { type: remediate, text: "Rotate the credentials and keys for {{account}}", approval: System owner or per client RACI, reversible: false }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{device}} for SSH logons and changes to authorized_keys.

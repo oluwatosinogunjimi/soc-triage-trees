@@ -10,7 +10,7 @@ applies_to:
   - Secure web gateway malware category hit
   - Access to phishing category allowed
 mitre: [T1071.001, T1189]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -129,4 +129,4 @@ nodes:
     anchor: "{{user}} reached {{url}}, but no file or login page was delivered."
     risk: The risk here is drive-by compromise or credential phishing; it doesn't apply as nothing was delivered.
     actions:
-      - { type: contain, text: "Block {{url}} at the proxy", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{url}} at the proxy", approval: SOC lead or per client RACI, reversible: true }

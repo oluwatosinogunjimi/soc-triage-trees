@@ -10,7 +10,7 @@ applies_to:
   - DNS tunnelling detected
   - Trojan:EC2/DNSDataExfiltration
 mitre: [T1071.004, T1048.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -129,8 +129,8 @@ nodes:
     anchor: "{{host}} is tunnelling data or commands through DNS queries to {{domain}}."
     risk: The risk here is data exfiltration and command and control that bypasses web proxies; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{host}}", approval: SOC lead or per client RACI }
-      - { type: contain, text: "Sinkhole or block {{domain}} at the resolvers", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{host}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Sinkhole or block {{domain}} at the resolvers", approval: SOC lead or per client RACI, reversible: true }
       - { type: enrich, text: "Run the EDR tree on the sending process" }
       - { type: enrich, text: "Estimate the volume exfiltrated from query counts and label sizes" }
     escalate: true

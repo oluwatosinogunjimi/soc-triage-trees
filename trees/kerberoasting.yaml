@@ -12,7 +12,7 @@ applies_to:
   - Suspicious Kerberos SPN request
   - Multiple RC4 service ticket requests (4769)
 mitre: [T1558.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -146,8 +146,8 @@ nodes:
     anchor: "{{account}} requested service tickets for many service accounts from {{src_host}}, consistent with Kerberoasting."
     risk: The risk here is cracked service account passwords giving the attacker privileged, often domain-wide, access; containment is required now.
     actions:
-      - { type: contain, text: "Isolate {{src_host}} and disable or reset {{account}}", approval: SOC lead or per client RACI }
-      - { type: remediate, text: "Rotate passwords for every service account whose ticket was requested, starting with privileged ones, using long random passwords or gMSAs", approval: System owner or per client RACI }
+      - { type: contain, text: "Isolate {{src_host}} and disable or reset {{account}}", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Rotate passwords for every service account whose ticket was requested, starting with privileged ones, using long random passwords or gMSAs", approval: System owner or per client RACI, reversible: false }
       - { type: remediate, text: "Enforce AES-only Kerberos for service accounts where possible", approval: System owner or per client RACI }
       - Raise an incident and escalate
     escalate: true
