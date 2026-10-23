@@ -275,3 +275,61 @@ def test_osint_stale_check_warns(tmp_path):
     _, errors, warnings = load_osint(trees, _osint_file(tmp_path, GOOD_TOOL), today=date(2027, 6, 1))
     assert not errors
     assert any("over 180 days" in w for w in warnings), warnings
+
+
+def test_public_safety_lint(tmp_path):
+    from validate import check_public_safety
+    p = tmp_path / "t.yaml"
+    p.write_text(
+        "a: jdoe@contoso.com\n"
+        "b: someone@realclient.co.uk\n"
+        "c: 3f2504e0-4f89-11d3-9a0c-0305e82c3301\n"
+        "d: 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2\n"
+        "e: connects to ACME-DC01\n"
+    )
+    errors = check_public_safety([p], denylist=["acme-dc01"])
+    joined = "\n".join(errors)
+    assert "realclient.co.uk" in joined
+    assert "3f2504e0" in joined
+    assert "1131f6aa" not in joined and "domain 'contoso.com'" not in joined
+    assert "denylisted term" in joined
+    assert len(errors) == 3
+
+
+def test_typed_actions_and_lifecycle(tmp_path):
+    body = BASE.format(id="lifecycle") + textwrap.indent(textwrap.dedent("""
+        q-a:
+          type: question
+          text: Is it bad?
+          on_empty: No rows means the sign-in table is not connected; resolve the gap first.
+          yes: o-bad
+          no: o-ok
+          notes: {yes: It is bad., no: It is fine.}
+        o-bad:
+          type: outcome
+          verdict: true_positive
+          title: Bad
+          anchor: It was bad.
+          risk: Risk applies.
+          actions:
+            - {type: contain, text: Revoke sessions, approval: SOC lead, reversible: true}
+            - {type: notify, text: Phone the user, tip_off: true}
+            - Plain string action
+        o-ok:
+          type: outcome
+          verdict: false_positive
+          title: Fine
+          anchor: It was fine.
+          risk: Risk does not apply.
+          actions: [Close]
+    """), "  ")
+    body = body.replace("authors: [Test]", "authors: [Test]\nstatus: stable\nreview_by: 2000-01-01")
+    _write(tmp_path, "lifecycle", body)
+    trees, errors, warnings = validate(tmp_path)
+    assert not errors, errors
+    assert any("review_by" in w for w in warnings)
+
+    bad = body.replace("approval: SOC lead, ", "")
+    _write(tmp_path, "lifecycle", bad)
+    _, errors, _ = validate(tmp_path)
+    assert any("schema" in e for e in errors), "contain without approval should fail"
