@@ -10,7 +10,7 @@ applies_to:
   - Invoice fraud from known vendor
   - Suspicious email from trusted partner domain
 mitre: [T1566, T1684.001]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,10 @@ nodes:
           | where SenderFromDomain =~ dom or RecipientEmailAddress endswith dom
           | summarize Messages = count(), First = min(Timestamp), Last = max(Timestamp), Senders = make_set(SenderFromAddress, 10) by EmailDirection
     note: I compared the message from {{sender}} with the vendor's mail history.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-lookalike
 
   q-lookalike:

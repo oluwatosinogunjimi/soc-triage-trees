@@ -12,7 +12,7 @@ applies_to:
   - New access key created for IAM user
   - Unusual instance type launched
 mitre: [T1078.004, T1685.002, T1098.001, T1496, T1578]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -57,6 +57,11 @@ nodes:
                     UserIdentityType, UserIdentityArn, UserIdentityAccessKeyId, RequestParameters
           | order by TimeGenerated asc
     note: I reviewed the control-plane activity by {{principal}} from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: AzureActivity needs the subscription connected;
+      CloudTrail must cover every account and region you are checking. Check the value matches how the
+      table records it and the time window is long enough, and confirm AzureActivity returns rows for
+      another resource before you answer.
     next: q-change-record
 
   q-change-record:
@@ -93,6 +98,11 @@ nodes:
           | where UserIdentityArn has "{{principal}}" or UserIdentityAccessKeyId == "{{principal}}"
           | summarize Count = count(), IPs = make_set(SourceIpAddress, 10), Regions = make_set(AWSRegion), Last = max(TimeGenerated) by EventName
           | order by Count desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: AzureActivity needs the subscription connected;
+      CloudTrail must cover every account and region you are checking. Check the value matches how the
+      table records it and the time window is long enough, and confirm AzureActivity returns rows for
+      another resource before you answer.
     yes: q-owner-confirm
     no: q-high-impact
     notes:
@@ -134,6 +144,11 @@ nodes:
                                              "securityRules/write", "listKeys/action", "snapshots/beginGetAccess",
                                              "policyAssignments/delete", "virtualMachines/write", "vaults/accessPolicies/write")
           | project TimeGenerated, OperationNameValue, ActivityStatusValue, CallerIpAddress, _ResourceId
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CloudTrail must cover every account and region
+      you are checking; AzureActivity needs the subscription connected. Check the value matches how the
+      table records it and the time window is long enough, and confirm AWSCloudTrail returns rows for
+      another account or resource before you answer.
     yes: q-source
     no: q-owner-confirm
     notes:

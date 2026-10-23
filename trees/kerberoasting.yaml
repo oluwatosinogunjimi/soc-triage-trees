@@ -12,7 +12,7 @@ applies_to:
   - Suspicious Kerberos SPN request
   - Multiple RC4 service ticket requests (4769)
 mitre: [T1558.003]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -48,6 +48,11 @@ nodes:
           | where Query has "servicePrincipalName"
           | project Timestamp, ActionType, AccountName, DeviceName, Query, QueryTarget
     note: I counted the service ticket requests by {{account}} from {{src_host}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects; the Identity tables need Defender for Identity sensors on every
+      domain controller. Check the value matches how the table records it and the time window is long
+      enough, and confirm SecurityEvent returns rows for another device before you answer.
     next: q-volume
 
   q-volume:
@@ -105,6 +110,10 @@ nodes:
           | where ProcessCommandLine has_any ("kerberoast", "Rubeus", "GetUserSPNs", "Invoke-Kerberoast", "asktgs", "PowerView", "setspn -q")
              or FileName in~ ("rubeus.exe")
           | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     yes: o-tp
     no: o-tp
     notes:

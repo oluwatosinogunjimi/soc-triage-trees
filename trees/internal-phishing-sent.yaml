@@ -10,7 +10,7 @@ applies_to:
   - Internal phishing campaign detected
   - Suspicious email sending patterns (suspiciousSendingPatterns)
 mitre: [T1534, T1566.002]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -39,6 +39,10 @@ nodes:
                       ThreatTypes = make_set(ThreatTypes) by bin(Timestamp, 1h), EmailDirection
           | order by Timestamp desc
     note: I measured the mail sent by {{sender}} and its recipients.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-content
 
   q-content:
@@ -83,6 +87,10 @@ nodes:
           | where TimeGenerated > ago(7d)
           | where UserId =~ "{{sender}}" and Operation in~ ("Send", "SendAs", "SendOnBehalf", "Create")
           | summarize Count = count(), First = min(TimeGenerated) by ClientIP, Operation
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     yes: q-clicks
     no: q-clicks
     notes:
@@ -100,6 +108,10 @@ nodes:
           | where Timestamp > ago(7d) and SenderFromAddress =~ "{{sender}}"
           | join kind=inner (UrlClickEvents | where Timestamp > ago(7d)) on NetworkMessageId
           | project Timestamp1, AccountUpn, Url, ActionType, IsClickedThrough
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     yes: o-tp-spread
     no: o-tp
     notes:

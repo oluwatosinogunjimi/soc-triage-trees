@@ -10,7 +10,7 @@ applies_to:
   - Root console login
   - Root access key used
 mitre: [T1078.004]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
                     MFAUsed = tostring(parse_json(AdditionalEventData).MFAUsed)
           | order by TimeGenerated asc
     note: I pulled every root action in account {{account_id}}, including from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CloudTrail must cover every account and region
+      you are checking. Check the value matches how the table records it and the time window is long
+      enough, and confirm AWSCloudTrail returns rows for another account or resource before you answer.
     next: q-planned
 
   q-planned:

@@ -10,7 +10,7 @@ applies_to:
   - IMAP/POP sign-in from unusual location
   - SMTP AUTH client submission from unknown IP
 mitre: [T1078.004, T1110]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -38,6 +38,10 @@ nodes:
           | summarize Attempts = count(), Success = countif(ResultType == "0"), First = min(TimeGenerated), Last = max(TimeGenerated)
                     by ClientAppUsed, IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion)
     note: I identified the legacy protocol sign-ins for {{user}} from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-service-account
 
   q-service-account:
@@ -120,6 +124,10 @@ nodes:
           | where TimeGenerated > ago(7d)
           | where UserId =~ "{{user}}" and ClientIP has "{{ip}}"
           | summarize Count = count() by Operation
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     yes: o-tp-active
     no: o-tp-contained
     notes:

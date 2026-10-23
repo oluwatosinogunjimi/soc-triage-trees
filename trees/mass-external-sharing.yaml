@@ -9,7 +9,7 @@ applies_to:
   - Anonymous link created for sensitive file
   - Unusual external user file activity
 mitre: [T1567, T1537]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -36,6 +36,10 @@ nodes:
           | where Operation in~ ("AnonymousLinkCreated", "SharingInvitationCreated", "AddedToSecureLink", "SecureLinkCreated", "SharingSet", "CompanyLinkCreated")
           | summarize Count = count(), Targets = make_set(TargetUserOrGroupName, 30), Files = make_set(OfficeObjectId, 20) by Operation, ClientIP
     note: I listed the links and external recipients created by {{user}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     next: q-partner
 
   q-partner:

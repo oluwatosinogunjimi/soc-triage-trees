@@ -10,7 +10,7 @@ applies_to:
   - DLP removable media policy match
   - USB mass storage device mounted (policy violation)
 mitre: [T1052.001]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -43,6 +43,10 @@ nodes:
           | summarize Files = count(), SizeMB = round(sum(FileSize) / 1048576.0, 1), Types = make_set(tostring(split(FileName, ".")[-1]), 20),
                       Samples = make_set(FileName, 20) by Drive, Product, Serial, InitiatingProcessAccountName
     note: I measured the files {{user}} copied to removable media on {{device}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     next: q-unusual-access
 
   q-unusual-access:

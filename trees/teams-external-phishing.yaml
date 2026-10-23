@@ -10,7 +10,7 @@ applies_to:
   - Teams phishing message detected
   - Email bombing followed by Teams contact
 mitre: [T1566.003, T1684.001, T1219]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -45,6 +45,11 @@ nodes:
           | summarize Messages = count() by bin(Timestamp, 15m)
           | where Messages > 50
     note: I found the external Teams contact with {{user}} and checked for email bombing beforehand.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging; the Defender for Office 365 email tables need the right
+      licence. Check the value matches how the table records it and the time window is long enough, and
+      confirm OfficeActivity returns rows for another user before you answer.
     next: q-known-partner
 
   q-known-partner:
@@ -91,6 +96,10 @@ nodes:
           | where DeviceName =~ "{{device}}"
           | where FileName has_any ("quickassist", "anydesk", "teamviewer", "screenconnect") or ProcessCommandLine has "quickassist"
           | project Timestamp, AccountName, FileName, ProcessCommandLine
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     yes: l-rmm
     no: o-tp-attempt
     notes:

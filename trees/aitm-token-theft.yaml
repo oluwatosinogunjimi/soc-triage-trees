@@ -13,7 +13,7 @@ applies_to:
   - Stolen session cookie was used
   - Suspicious sign-in after a phishing click
 mitre: [T1557, T1539, T1550.004]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -58,6 +58,10 @@ nodes:
                         AutonomousSystemNumber, Country, DeviceId, UserAgent, SessionId, AuthenticationRequirement)
           | order by TimeGenerated asc
     note: I built the interactive and non-interactive sign-in timeline for {{user}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-session-hop
 
   q-session-hop:
@@ -75,6 +79,10 @@ nodes:
           | summarize IPs = make_set(IPAddress), ASNs = make_set(AutonomousSystemNumber), UAs = make_set(UserAgent, 5),
                       First = min(TimeGenerated), Last = max(TimeGenerated) by SessionId
           | where array_length(IPs) > 1
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: c-lure
     no: q-unmanaged-officehome
     notes:
@@ -95,6 +103,10 @@ nodes:
           | where isempty(tostring(DeviceDetail.deviceId))
           | project TimeGenerated, AppDisplayName, IPAddress, AutonomousSystemNumber,
                     Country = tostring(LocationDetails.countryOrRegion), UserAgent, AuthenticationRequirement, MfaDetail
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: c-lure
     no: q-risk-detections
     notes:
@@ -113,6 +125,11 @@ nodes:
           | where UserPrincipalName =~ "{{user}}"
           | where RiskEventType in ("anomalousToken", "tokenIssuerAnomaly", "attackerinTheMiddle", "unfamiliarFeatures", "suspiciousBrowser")
           | project TimeGenerated, RiskEventType, RiskLevel, RiskState, IpAddress, DetectionTimingType, Source
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AADUserRiskEvents returns rows for another user before you
+      answer.
     yes: c-lure
     no: o-fp-no-token-indicators
     notes:
@@ -140,6 +157,10 @@ nodes:
           | where IPAddress == "{{ip}}" and ResultType == "0"
           | summarize SignIns = count(), First = min(TimeGenerated) by UserPrincipalName
     note: I looked for the phishing lure and for other users signing in from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm UrlClickEvents returns rows for another mailbox before you answer.
     next: q-persistence
 
   q-persistence:
@@ -170,6 +191,11 @@ nodes:
           | where UserId =~ "{{user}}"
           | where Operation in~ ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Set-Mailbox", "Send", "SendAs")
           | project TimeGenerated, Operation, ClientIP, Parameters
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings; OfficeActivity depends on the Microsoft 365 connector and
+      unified audit logging. Check the value matches how the table records it and the time window is long
+      enough, and confirm AuditLogs returns rows for another user before you answer.
     yes: o-tp-persistence
     no: q-user-confirm
     notes:

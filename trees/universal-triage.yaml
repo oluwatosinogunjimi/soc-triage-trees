@@ -6,7 +6,7 @@ summary: >-
   exists, and otherwise bucket the alert as benign, false positive, true positive or
   needs more work.
 applies_to: [Any alert, Unfamiliar detection, Custom analytics rule]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -64,6 +64,10 @@ nodes:
           | summarize Alerts = count(), Entities = dcount(CompromisedEntity), LastFired = max(TimeGenerated) by bin(TimeGenerated, 1d)
           | order by TimeGenerated desc
     note: I checked for related alerts on {{entity}} and for recent firings of the same rule.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the alert tables only hold alerts from connected
+      products. Check the value matches how the table records it and the time window is long enough, and
+      confirm SecurityAlert returns rows for any recent alert before you answer.
     next: ch-route
 
   # BEGIN GENERATED ROUTER (python tools/gen_router.py)

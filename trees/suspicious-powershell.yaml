@@ -11,7 +11,7 @@ applies_to:
   - Suspicious process executed via mshta, rundll32 or regsvr32
   - Suspicious download using certutil or bitsadmin
 mitre: [T1059.001, T1027, T1105, T1218]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -48,6 +48,10 @@ nodes:
                     ProcessCommandLine, Decoded
           | order by Timestamp asc
     note: I decoded and reviewed the command line on {{device}} along with its parent process chain.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     next: q-known-admin
 
   q-known-admin:
@@ -63,6 +67,10 @@ nodes:
           | where ProcessCommandLine has "{{command}}"
           | summarize Devices = dcount(DeviceName), Executions = count(), Parents = make_set(InitiatingProcessFileName, 10),
                       Accounts = make_set(AccountName, 10), First = min(Timestamp), Last = max(Timestamp)
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     yes: q-lsass
     no: q-offensive-traits
     unknown: q-offensive-traits
@@ -153,6 +161,10 @@ nodes:
           | where DeviceName =~ "{{device}}"
           | where ActionType in ("AntivirusDetection", "AmsiScriptDetection") or ActionType startswith "Asr"
           | project Timestamp, ActionType, FileName, InitiatingProcessCommandLine, AdditionalFields
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceNetworkEvents returns rows for another device before you answer.
     yes: o-tp-executed
     no: o-tp-blocked
     notes:

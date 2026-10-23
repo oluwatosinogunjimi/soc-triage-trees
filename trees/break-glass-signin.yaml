@@ -10,7 +10,7 @@ applies_to:
   - Break-glass account used
   - Sign-in by excluded privileged account
 mitre: [T1078.004]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,10 @@ nodes:
                | project TimeGenerated, Kind = "Action", Detail = OperationName, IP = tostring(InitiatedBy.user.ipAddress))
           | order by TimeGenerated asc
     note: I pulled every sign-in and action by {{user}}, including the sign-in from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-declared
 
   q-declared:

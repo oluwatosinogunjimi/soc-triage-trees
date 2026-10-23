@@ -10,7 +10,7 @@ applies_to:
   - User clicked through to a malicious URL
   - Safe Links click allowed, URL later weaponized
 mitre: [T1204.001, T1566.002]
-version: 1.1.1
+version: 1.1.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -38,6 +38,10 @@ nodes:
           | where Url has "{{url}}"
           | project Timestamp, AccountUpn, ActionType, IsClickedThrough, NetworkMessageId, Workload, IPAddress
     note: I pulled the click on {{url}} by {{user}} and the message it came from.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm UrlClickEvents returns rows for another mailbox before you answer.
     next: q-malicious
 
   q-malicious:

@@ -10,7 +10,7 @@ applies_to:
   - Unusual file deletion activities (mail)
   - Mass HardDelete in mailbox
 mitre: [T1070.008]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -37,6 +37,10 @@ nodes:
           | where Operation in~ ("HardDelete", "SoftDelete", "MoveToDeletedItems")
           | summarize Count = count(), First = min(TimeGenerated), Last = max(TimeGenerated) by Operation, ClientIP, ClientInfoString
     note: I measured the deletions in the mailbox of {{user}} and the sessions that made them.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     next: q-session
 
   q-session:

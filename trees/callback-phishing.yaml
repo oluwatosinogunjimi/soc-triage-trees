@@ -10,7 +10,7 @@ applies_to:
   - Fake subscription renewal or invoice with phone number
   - User reported callback scam
 mitre: [T1566.004, T1219]
-version: 1.1.1
+version: 1.1.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
           | where Subject == toscalar(m | project Subject) or SenderFromAddress == toscalar(m | project SenderFromAddress)
           | summarize Recipients = make_set(RecipientEmailAddress, 100), Delivered = countif(DeliveryAction == "Delivered") by Subject, SenderFromAddress
     note: I confirmed the callback lure on message {{network_message_id}} and scoped the campaign.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-called
 
   q-called:
@@ -62,6 +66,10 @@ nodes:
           | where FileName has_any ("anydesk", "teamviewer", "screenconnect", "connectwise", "logmein", "splashtop", "quickassist",
                                     "atera", "netsupport", "rustdesk", "zoho", "supremo")
           | project Timestamp, AccountName, FileName, FolderPath, ProcessCommandLine, InitiatingProcessFileName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     yes: l-rmm
     no: o-no-call
     unknown: o-inconclusive

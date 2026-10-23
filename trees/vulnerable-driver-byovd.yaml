@@ -10,7 +10,7 @@ applies_to:
   - Suspicious driver load (known vulnerable driver blocklist)
   - Possible EDR killer activity
 mitre: [T1068, T1685, T1543.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -43,6 +43,10 @@ nodes:
           | where DeviceName =~ "{{device}}"
           | order by Timestamp asc
     note: I identified {{driver}} on {{device}}, where it was dropped and how it was loaded.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     next: q-legit-product
 
   q-legit-product:

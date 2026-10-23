@@ -10,7 +10,7 @@ applies_to:
   - Suspicious additions to sensitive groups
   - Group Membership changed (Defender for Identity)
 mitre: [T1098, T1078.002]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -50,6 +50,11 @@ nodes:
           | extend Group = tostring(AdditionalFields["TO.GROUP"]), Actor = tostring(AdditionalFields["ACTOR.ACCOUNT"])
           | project Timestamp, TargetAccountDisplayName, Group, Actor, DeviceName, AdditionalFields
     note: I pulled the addition of {{account}} to {{group}} by {{actor}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects; the Identity tables need Defender for Identity sensors on every
+      domain controller. Check the value matches how the table records it and the time window is long
+      enough, and confirm SecurityEvent returns rows for another device before you answer.
     next: q-actor-normal
 
   q-request:

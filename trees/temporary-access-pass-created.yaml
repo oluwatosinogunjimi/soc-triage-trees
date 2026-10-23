@@ -10,7 +10,7 @@ applies_to:
   - Reciprocal Temporary Access Pass creation between users
   - Admin registered security info (TAP)
 mitre: [T1098.005, T1556.006]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -45,6 +45,10 @@ nodes:
           | where Target =~ "{{user}}" or Actor =~ "{{actor}}"
           | order by TimeGenerated asc
     note: I pulled the Temporary Access Pass issued for {{user}} by {{actor}} and the sign-ins that used it.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AuditLogs returns rows for another user before you answer.
     next: q-ticket
 
   q-ticket:

@@ -10,7 +10,7 @@ applies_to:
   - DNS tunnelling detected
   - Trojan:EC2/DNSDataExfiltration
 mitre: [T1071.004, T1048.003]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -49,6 +49,11 @@ nodes:
           | where Q endswith "{{domain}}"
           | summarize Queries = count() by DeviceName, InitiatingProcessFileName, InitiatingProcessFolderPath
     note: I profiled the DNS queries from {{host}} to {{domain}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: DnsEvents needs DNS server logging collected;
+      Defender for Endpoint only reports devices that are onboarded and online. Check the value matches
+      how the table records it and the time window is long enough, and confirm DnsEvents returns rows for
+      another host before you answer.
     next: q-known-service
 
   q-known-service:

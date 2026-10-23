@@ -10,7 +10,7 @@ applies_to:
   - File backups were deleted (vssadmin, wbadmin)
   - Ransom note detected
 mitre: [T1486, T1490]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
           | summarize Files = count(), Extensions = make_set(tostring(split(FileName, ".")[-1]), 20)
                     by bin(Timestamp, 5m), InitiatingProcessFileName, InitiatingProcessAccountName
           | order by Files desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     yes: o-tp-live
     no: c-indicators
     notes:
@@ -67,6 +71,10 @@ nodes:
                                               "bcdedit", "recoveryenabled no", "ignoreallfailures", "Win32_ShadowCopy")
           | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
     note: I collected ransomware indicators on {{device}} for {{account}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     next: q-legit-backup
 
   q-legit-backup:
@@ -117,6 +125,10 @@ nodes:
           | where Title has_any ("ransomware", "shadow", "backup", "encrypt")
           | join kind=inner (AlertEvidence | where EntityType == "Machine") on AlertId
           | summarize Alerts = count(), Titles = make_set(Title, 10) by DeviceName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the alert tables only hold alerts from connected
+      products. Check the value matches how the table records it and the time window is long enough, and
+      confirm AlertInfo returns rows for any recent alert before you answer.
     yes: o-tp-spread
     no: o-tp-single
     notes:

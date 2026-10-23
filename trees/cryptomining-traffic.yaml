@@ -10,7 +10,7 @@ applies_to:
   - Impact:EC2/BitcoinDomainRequest.Reputation
   - Firewall detected Stratum mining protocol
 mitre: [T1496]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -39,6 +39,10 @@ nodes:
           | summarize Sessions = count(), MB = round(sum(SentBytes + ReceivedBytes) / 1048576.0, 1), First = min(TimeGenerated)
                     by DestinationIP, DestinationPort, RequestURL, ApplicationProtocol
     note: I confirmed the mining pool traffic from {{src_ip}} and identified the device.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CommonSecurityLog only holds what the firewall,
+      proxy or IDS forwards. Check the value matches how the table records it and the time window is long
+      enough, and confirm CommonSecurityLog returns rows for another host before you answer.
     next: q-managed
 
   q-managed:

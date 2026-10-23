@@ -10,7 +10,7 @@ applies_to:
   - Behavior:EC2/TrafficVolumeUnusual
   - Possible data exfiltration
 mitre: [T1048, T1567.002]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,6 +47,11 @@ nodes:
           | where (DeviceName =~ "{{host}}" or LocalIP == "{{host}}") and RemoteIP == "{{dst_ip}}"
           | summarize Connections = count() by InitiatingProcessFileName, InitiatingProcessCommandLine, RemoteUrl, RemotePort
     note: I measured the outbound transfer from {{host}} to {{dst_ip}} against its baseline.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CommonSecurityLog only holds what the firewall,
+      proxy or IDS forwards; Defender for Endpoint only reports devices that are onboarded and online.
+      Check the value matches how the table records it and the time window is long enough, and confirm
+      CommonSecurityLog returns rows for another host before you answer.
     next: q-known-dest
 
   q-known-dest:

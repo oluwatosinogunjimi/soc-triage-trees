@@ -10,7 +10,7 @@ applies_to:
   - Phish detected, URL in QR code
   - User reported QR code phishing
 mitre: [T1566.002, T1204.001]
-version: 1.1.1
+version: 1.1.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
           | join kind=inner (EmailEvents | project NetworkMessageId, RecipientEmailAddress, SenderFromAddress, Subject, DeliveryAction) on NetworkMessageId
           | project Url, UrlDomain, RecipientEmailAddress, SenderFromAddress, Subject, DeliveryAction
     note: I pulled message {{network_message_id}}, the decoded QR code URL and every recipient.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailUrlInfo returns rows for another mailbox before you answer.
     next: q-delivered
 
   q-delivered:
@@ -70,6 +74,10 @@ nodes:
           | project TimeGenerated, ResultType, AppDisplayName, IPAddress, AutonomousSystemNumber,
                     OS = tostring(DeviceDetail.operatingSystem), DeviceId = tostring(DeviceDetail.deviceId), UserAgent
           | order by TimeGenerated asc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: l-aitm
     no: o-purged
     unknown: o-inconclusive

@@ -10,7 +10,7 @@ applies_to:
   - Ransomware payment instruction file uploaded
   - Mass file rename in OneDrive
 mitre: [T1485, T1486]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -38,6 +38,10 @@ nodes:
           | where Operation in~ ("FileDeleted", "FileRecycled", "FileRenamed", "FileModified", "FileUploaded", "FileDeletedFirstStageRecycleBin")
           | summarize Count = count(), Extensions = make_set(SourceFileExtension, 20), First = min(TimeGenerated) by Operation, ClientIP, UserAgent
     note: I measured the deletions, renames and uploads by {{user}} and their client.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     next: q-encryption
 
   q-encryption:

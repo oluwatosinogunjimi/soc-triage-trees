@@ -10,7 +10,7 @@ applies_to:
   - Suspicious sign-in using device code flow
   - Sign-in with authentication protocol deviceCode
 mitre: [T1528, T1566.002]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -44,6 +44,10 @@ nodes:
           | project TimeGenerated, ResultType, AppDisplayName, ResourceDisplayName, IPAddress, AutonomousSystemNumber,
                     Country = tostring(LocationDetails.countryOrRegion), UserAgent, DeviceId = tostring(DeviceDetail.deviceId)
     note: I found the device code sign-ins for {{user}} and the IP that used them, {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-expected-use
 
   q-expected-use:
@@ -93,6 +97,10 @@ nodes:
           | where Url has_any ("devicelogin", "microsoft.com/devicelogin", "login.microsoftonline.com/common/oauth2/deviceauth")
           | join kind=inner (EmailEvents | where RecipientEmailAddress =~ "{{user}}") on NetworkMessageId
           | project Timestamp, SenderFromAddress, Subject, Url
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailUrlInfo returns rows for another mailbox before you answer.
     yes: q-token-used
     no: q-token-used
     notes:
@@ -115,6 +123,11 @@ nodes:
           | where TimeGenerated > ago(7d)
           | where UserPrincipalName =~ "{{user}}" and IPAddress == "{{ip}}"
           | summarize SignIns = count(), Resources = make_set(ResourceDisplayName, 10), First = min(TimeGenerated), Last = max(TimeGenerated) by AppDisplayName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AADNonInteractiveUserSignInLogs returns rows for another
+      user before you answer.
     yes: o-tp-active
     no: o-tp-contained
     notes:

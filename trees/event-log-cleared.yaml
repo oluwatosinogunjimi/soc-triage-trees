@@ -10,7 +10,7 @@ applies_to:
   - wevtutil cl executed
   - Audit policy changed
 mitre: [T1685.005]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,11 @@ nodes:
           | where ProcessCommandLine has_any ("wevtutil cl", "Clear-EventLog", "Remove-EventLog", "auditpol /clear", "auditpol /set")
           | project Timestamp, AccountName, ProcessCommandLine, InitiatingProcessFileName
     note: I confirmed the log clear on {{device}} by {{account}} and reviewed what ran around it.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects; Defender for Endpoint only reports devices that are onboarded
+      and online. Check the value matches how the table records it and the time window is long enough, and
+      confirm SecurityEvent returns rows for another device before you answer.
     next: q-planned
 
   q-planned:

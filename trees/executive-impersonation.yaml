@@ -10,7 +10,7 @@ applies_to:
   - Domain impersonation detected
   - Display name spoofing of executive
 mitre: [T1684.001, T1566.003]
-version: 1.2.2
+version: 1.2.3
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,10 @@ nodes:
           | where SenderFromAddress =~ "{{sender}}" or SenderMailFromAddress =~ "{{sender}}"
           | project Timestamp, RecipientEmailAddress, SenderDisplayName, Subject, DeliveryAction, DeliveryLocation, ThreatTypes
     note: I confirmed that {{sender}} impersonated {{executive}} in messages to {{recipient}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-exec-own
 
   q-exec-own:
@@ -76,6 +80,10 @@ nodes:
           | where Timestamp > ago(7d)
           | where EmailDirection == "Outbound" and RecipientEmailAddress =~ "{{sender}}"
           | project Timestamp, SenderFromAddress, Subject
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     yes: o-tp-engaged
     no: o-tp
     notes:

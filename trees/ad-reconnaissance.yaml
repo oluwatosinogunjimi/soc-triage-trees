@@ -12,7 +12,7 @@ applies_to:
   - Possible Active Directory enumeration via ADWS
   - Suspected account enumeration (Kerberos, NTLM)
 mitre: [T1087.002, T1069.002, T1482]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -49,6 +49,11 @@ nodes:
              or ProcessCommandLine has_any ("Invoke-BloodHound", "Get-DomainUser", "Get-NetGroup", "domain admins", "enterprise admins", "/domain_trusts", "Get-ADComputer")
           | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
     note: I reviewed the directory queries and recon commands by {{account}} on {{src_host}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Identity tables need Defender for Identity
+      sensors on every domain controller; Defender for Endpoint only reports devices that are onboarded
+      and online. Check the value matches how the table records it and the time window is long enough, and
+      confirm IdentityQueryEvents returns rows for another account before you answer.
     next: q-admin-tool
 
   q-admin-tool:

@@ -10,7 +10,7 @@ applies_to:
   - Possible AS-REP roasting attack
   - TGT request without pre-authentication (Event 4768, PreAuthType 0)
 mitre: [T1558.004]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -38,6 +38,10 @@ nodes:
           | where EventID == 4768 and PreAuthType == "0"
           | summarize Requests = count(), Accounts = make_set(TargetUserName, 50), First = min(TimeGenerated) by IpAddress
     note: I found the TGT requests without pre-authentication, including for {{account}}, from {{src_host}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects. Check the value matches how the table records it and the time
+      window is long enough, and confirm SecurityEvent returns rows for another device before you answer.
     next: q-many
 
   q-many:

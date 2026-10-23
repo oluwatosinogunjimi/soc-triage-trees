@@ -10,7 +10,7 @@ applies_to:
   - Suspicious process launched by web server (w3wp.exe spawning cmd)
   - Web shell detected (Backdoor:ASP/Webshell)
 mitre: [T1505.003, T1190]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -41,6 +41,10 @@ nodes:
           | where DeviceName =~ "{{device}}"
           | order by Timestamp asc
     note: I gathered the new script files and web server child processes on {{device}}, including {{file}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     next: q-deployment
 
   q-deployment:

@@ -10,7 +10,7 @@ applies_to:
   - Sensitive data uploaded to personal cloud storage
   - Sensitive data pasted into generative AI site
 mitre: [T1567.002, T1048]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,11 @@ nodes:
           | where ActionType has "DLP" and AccountDisplayName has tostring(split("{{user}}", "@")[0])
           | project Timestamp, ActionType, Application, RawEventData
     note: I read the DLP matches for {{user}}, including data types, counts and destinations.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging; CloudAppEvents needs the Defender for Cloud Apps app
+      connectors. Check the value matches how the table records it and the time window is long enough, and
+      confirm OfficeActivity returns rows for another user before you answer.
     next: q-business
 
   q-business:

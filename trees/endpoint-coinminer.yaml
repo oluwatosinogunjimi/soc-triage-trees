@@ -10,7 +10,7 @@ applies_to:
   - Connection to cryptocurrency mining pool
   - XMRig execution
 mitre: [T1496]
-version: 1.1.1
+version: 1.1.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -39,6 +39,10 @@ nodes:
           | where DeviceName =~ "{{device}}"
           | order by Timestamp asc
     note: I identified the miner on {{device}}, its parent process and its pool connections.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     next: q-server
 
   q-server:

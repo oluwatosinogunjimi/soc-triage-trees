@@ -12,7 +12,7 @@ applies_to:
   - Suspicious login attempt using possibly compromised account certificate
   - Certificate issued with SAN different from requester (Event 4887)
 mitre: [T1649]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,6 +54,11 @@ nodes:
           | where ProcessCommandLine has_any ("certify", "certipy", "ForgeCert", "req /ca", "find /vulnerable", "certreq")
           | project Timestamp, AccountName, FileName, ProcessCommandLine
     note: I reviewed the certificate request by {{account}} from {{src_host}} for {{target}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects; Defender for Endpoint only reports devices that are onboarded
+      and online. Check the value matches how the table records it and the time window is long enough, and
+      confirm SecurityEvent returns rows for another device before you answer.
     next: q-mismatch
 
   q-mismatch:

@@ -1672,7 +1672,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     }
     if (n.also_check && n.also_check.length) box.append(renderAlso(n));
     if (n.kql && n.kql.length) { box.append(h("div", { class: "sub" }, n.kql.length > 1 ? "Queries" : "Query")); renderKql(n.kql).forEach(el => box.append(el)); }
-    if (n.on_empty) box.append(h("p", { class: "on-empty" }, h("span", {}, h("b", {}, "No rows? "), fill(n.on_empty))));
+    if (n.on_empty) box.append(mode === "expert"
+      ? h("details", { class: "why-d" }, h("summary", {}, "No rows?"), h("p", { class: "on-empty" }, h("span", {}, fill(n.on_empty))))
+      : h("p", { class: "on-empty" }, h("span", {}, h("b", {}, "No rows? "), fill(n.on_empty))));
     else if (n.kql && n.kql.length && mode === "guided") box.append(h("p", { class: "on-empty" }, h("span", {}, h("b", {}, "No rows? "),
       "That can mean missing data, not a clean result. Check the table holds data for other users or hosts before you answer.")));
     const k = key(S.tree, S.node);

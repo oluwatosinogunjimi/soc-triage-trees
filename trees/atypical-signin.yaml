@@ -12,7 +12,7 @@ applies_to:
   - Sign-in from an unusual location or anonymous IP
   - Risky sign-in (Entra ID Protection)
 mitre: [T1078.004]
-version: 1.3.1
+version: 1.3.2
 last_reviewed: 2026-10-23
 review_by: 2027-04-23
 status: stable
@@ -58,6 +58,10 @@ nodes:
                     RiskLevelDuringSignIn, RiskEventTypes_V2, SessionId, CorrelationId
           | order by TimeGenerated asc
     note: I identified the flagged sign-in for {{user}} from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-success
 
   q-success:
@@ -87,6 +91,10 @@ nodes:
           | where UserPrincipalName =~ "{{user}}" and IPAddress == "{{ip}}"
           | summarize Attempts = count(), First = min(TimeGenerated), Last = max(TimeGenerated)
                     by ResultType, ResultDescription, AppDisplayName, ClientAppUsed
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: o-password-known
     no: q-failed-pattern
     notes:
@@ -105,6 +113,10 @@ nodes:
           | where IPAddress == "{{ip}}"
           | summarize Attempts = count(), Users = dcount(UserPrincipalName),
                       Failures = countif(ResultType != "0"), Codes = make_set(ResultType)
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: l-spray
     no: o-failed-benign
     notes:
@@ -132,6 +144,10 @@ nodes:
                        OS = tostring(DeviceDetail.operatingSystem), Browser = tostring(DeviceDetail.browser)
           | extend IsFlaggedIP = IPAddress == "{{ip}}"
           | order by SignIns desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: q-other-alerts
     no: q-explained
     notes:
@@ -149,6 +165,11 @@ nodes:
             (SecurityAlert | where TimeGenerated > ago(48h) | where Entities has "{{user}}" | project TimeGenerated, Source = "Alert", Detail = AlertName),
             (AADUserRiskEvents | where TimeGenerated > ago(48h) | where UserPrincipalName =~ "{{user}}" | project TimeGenerated, Source = "Risk", Detail = RiskEventType)
           | order by TimeGenerated desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the alert tables only hold alerts from connected
+      products; Entra ID sign-in, audit and risk logs reach Sentinel only through diagnostic settings.
+      Check the value matches how the table records it and the time window is long enough, and confirm
+      SecurityAlert returns rows for any recent alert before you answer.
     yes: c-device-auth
     no: o-fp-baseline
     notes:
@@ -171,6 +192,10 @@ nodes:
           | summarize Users = dcount(UserPrincipalName), SampleUsers = make_set(UserPrincipalName, 10),
                       Apps = make_set(AppDisplayName, 10), Success = countif(ResultType == "0"),
                       Failure = countif(ResultType != "0")
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: q-other-alerts
     no: c-device-auth
     unknown: c-device-auth
@@ -206,6 +231,10 @@ nodes:
           | summarize IPs = make_set(IPAddress), Sources = make_set(Source), UAs = make_set(UserAgent, 5),
                       First = min(TimeGenerated), Last = max(TimeGenerated) by SessionId
           | where array_length(IPs) > 1
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: l-aitm
     no: q-post-auth
     notes:
