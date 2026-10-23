@@ -721,6 +721,13 @@ input.field { border-radius: var(--r); background: var(--surface); }
 :root[data-theme="dark"] .esc { color: #111316; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .esc { color: #111316; } }
 .act-type { font-weight: 700; }
+.mode-seg { display: inline-flex; border: 1.5px solid var(--line-strong); border-radius: var(--r); overflow: hidden; }
+.mode-seg button { all: unset; box-sizing: border-box; cursor: pointer; padding: 0 12px; min-height: 36px; display: inline-flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.mode-seg button + button { border-left: 1.5px solid var(--line-strong); }
+.mode-seg button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+details.why-d > summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-2); width: fit-content; }
+details.why-d > summary:hover { color: var(--ink); }
+details.why-d[open] > summary { margin-bottom: 6px; }
 .act-gate { display: block; font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
 .act-gate.warn { color: var(--tp); font-weight: 700; }
 .act { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 4px 14px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
@@ -966,6 +973,15 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   let ruleId = hashId.startsWith("detections/") && DETS.has(hashId.slice(11)) ? hashId.slice(11) : null;
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
 
+  // Mode: guided shows the reasoning and hints open; expert folds them away. Remembered per viewer.
+  const MODE_KEY = "triage-trees-mode";
+  let mode = "guided";
+  try { if (localStorage.getItem(MODE_KEY) === "expert") mode = "expert"; } catch (e) {}
+  function setMode(m) { mode = m; try { localStorage.setItem(MODE_KEY, m); } catch (e) {} render(); toast(m === "expert" ? "Expert mode: reasons folded away" : "Guided mode: reasons shown"); }
+  function whyBlock(text) {
+    const p = h("p", { class: "why" }, h("span", {}, fill(text)));
+    return mode === "expert" ? h("details", { class: "why-d" }, h("summary", {}, "Why this matters"), p) : p;
+  }
   // Theme: follow the device until the analyst picks one, then remember it.
   const THEME_KEY = "triage-trees-theme";
   function applyTheme(t) { if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
@@ -975,7 +991,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   function toggleTheme() {
     const t = isDark() ? "light" : "dark"; applyTheme(t);
     try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
-    renderBar(); toast(t === "dark" ? "Dark mode" : "Light mode");
+    renderBar(); toast(t === "dark" ? "Night theme" : "Day theme");
   }
   if (darkMq && darkMq.addEventListener) darkMq.addEventListener("change", () => { if (!document.documentElement.getAttribute("data-theme")) renderBar(); });
   let query = "";
@@ -1229,7 +1245,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       h("a", { class: "btn ghost sm ext wide-only", href: LINKS.medium, target: "_blank", rel: "noopener" }, "Medium", icon("ext")),
       h("a", { class: "btn ghost sm ext wide-only", href: LINKS.linkedin, target: "_blank", rel: "noopener" }, "LinkedIn", icon("ext")),
       h("button", { class: "btn ghost sm hide-sm", type: "button", "aria-label": "Keyboard shortcuts", onclick: toggleShortcuts }, h("kbd", {}, "?")),
-      h("button", { class: "theme-btn", type: "button", onclick: toggleTheme, "aria-label": isDark() ? "Switch to light mode" : "Switch to dark mode", title: isDark() ? "Light mode" : "Dark mode" }, svg(isDark() ? ICON.sun : ICON.moon)),
+      h("button", { class: "theme-btn", type: "button", onclick: toggleTheme, "aria-label": isDark() ? "Switch to Day theme" : "Switch to Night theme", title: isDark() ? "Day theme" : "Night theme" }, svg(isDark() ? ICON.sun : ICON.moon)),
       h("button", { class: "btn ghost sm menu-btn", type: "button", "aria-label": "Menu", "aria-expanded": "false", onclick: toggleMenu }, icon("menu"))
     ];
     bar.append(...parts.filter(Boolean));
@@ -1516,6 +1532,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         (DETS_FOR.get(t.id) || []).length ? h("div", { class: "det-links" }, h("span", { class: "det-lead" }, "Detection rules that lead here"),
           DETS_FOR.get(t.id).map(d => h("button", { class: "chip det-chip", type: "button", onclick: () => openDetections(d.id) }, svg(ICON.rule), d.title))) : null ),
       h("div", { class: "actions" },
+        h("div", { class: "mode-seg", role: "group", "aria-label": "Mode" },
+          h("button", { type: "button", "aria-pressed": mode === "guided" ? "true" : "false", title: "Reasons and hints shown", onclick: () => mode !== "guided" && setMode("guided") }, "Guided"),
+          h("button", { type: "button", "aria-pressed": mode === "expert" ? "true" : "false", title: "Reasons folded away for speed", onclick: () => mode !== "expert" && setMode("expert") }, "Expert")),
         h("button", { class: "btn", type: "button", onclick: openMap }, icon("map"), "Map", h("kbd", {}, "M")),
         h("button", { class: "btn", type: "button", onclick: () => { const el = document.getElementById("note-anchor") || document.getElementById("draft-panel"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, icon("note"), "Note")));
     app.append(head, h("div", { class: "ws" }, renderRoute(), renderStage(n), renderFile(n)));
@@ -1642,7 +1661,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       return box;
     }
     box.append(h("div", { class: "q-text" }, fill(n.text)));
-    if (n.why) box.append(h("p", { class: "why" }, h("span", {}, fill(n.why))));
+    if (n.why) box.append(whyBlock(n.why));
     if (n.look_for) {
       box.append(h("div", { class: "sub" }, "Look for"), h("ul", { class: "lookfor" }, n.look_for.map((x, i) => {
         const tk = key(S.tree, S.node) + ":" + i;
@@ -1654,6 +1673,8 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     if (n.also_check && n.also_check.length) box.append(renderAlso(n));
     if (n.kql && n.kql.length) { box.append(h("div", { class: "sub" }, n.kql.length > 1 ? "Queries" : "Query")); renderKql(n.kql).forEach(el => box.append(el)); }
     if (n.on_empty) box.append(h("p", { class: "on-empty" }, h("span", {}, h("b", {}, "No rows? "), fill(n.on_empty))));
+    else if (n.kql && n.kql.length && mode === "guided") box.append(h("p", { class: "on-empty" }, h("span", {}, h("b", {}, "No rows? "),
+      "That can mean missing data, not a clean result. Check the table holds data for other users or hosts before you answer.")));
     const k = key(S.tree, S.node);
     const ta = h("textarea", { id: "ev-" + S.tree + "-" + S.node, rows: 2, placeholder: "Real values, for example: 42 sign-ins from 81.2.69.160 (AS2856) over 30 days, all from a compliant device" });
     ta.value = S.evidence[k] || "";
