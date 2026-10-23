@@ -92,6 +92,10 @@ site/viewer.html       the viewer (walkthrough, map, closure note)
 tests/                 pytest suite for the validator and build
 ```
 
+## Design
+
+The research behind the project and the choices it led to, from the verdict set to the colours, are in [docs/DESIGN.md](docs/DESIGN.md). It also lists the rules to keep when changing the viewer.
+
 ## Contributing
 
 Adding or improving a tree means editing one YAML file. See [CONTRIBUTING.md](CONTRIBUTING.md) for the node types, writing guidance and review checklist. CI validates every pull request and publishes the site when `main` changes.
