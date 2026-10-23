@@ -861,6 +861,27 @@ table.vt th, .det-lead, .tool-card .tlab { font-family: var(--font-body); font-s
 .chip, .chip.filt, .tool-card { border-radius: var(--r); }
 .tool-card .cmeta { text-transform: none; letter-spacing: 0; }
 .rule-side .panel-title, .osint .ioc .panel-title { font-family: var(--font-body); font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+/* Detection rules and OSINT tools as index rows, not card grids */
+.rule-cards, .tool-cards { grid-template-columns: minmax(0, 1fr); margin-top: 0; }
+.rule-card { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 28px; padding: 14px 6px; }
+.rule-card h3 { grid-column: 1; grid-row: 1; }
+.rule-card .cmeta { grid-column: 1; grid-row: 2; }
+.rule-card .alerts { grid-column: 2; grid-row: 1 / span 2; font-family: var(--font-body); font-size: 14.5px; color: var(--ink-2); align-self: start; }
+.rule-card .rfoot { grid-column: 3; grid-row: 1 / span 2; align-self: start; font-size: 13px; color: var(--ink-2); }
+.card.tool-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 2fr) minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 28px; row-gap: 6px;
+  align-items: start; padding: 16px 6px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+.tool-card h3 { grid-column: 1; grid-row: 1; font-size: 17px; }
+.tool-card .cmeta { grid-column: 1; grid-row: 2 / span 2; flex-direction: column; align-items: flex-start; gap: 4px; font-size: 12.5px; }
+.tool-card .twhat { grid-column: 2; grid-row: 1; }
+.tool-card .tuse { grid-column: 2; grid-row: 2; }
+.tool-card .twatch { grid-column: 2; grid-row: 3; padding-left: 0; border-left: 0; }
+.tool-card .twatch .tlab { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; }
+.tool-card .twatch .tlab::before { content: ""; width: 10px; height: 10px; background: var(--inc-block); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.tool-card .tfoot { grid-column: 3; grid-row: 1 / span 3; margin-top: 0; padding-top: 0; }
+@media (max-width: 860px) {
+  .rule-card, .card.tool-card { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .rule-card > *, .tool-card > * { grid-column: 1 !important; grid-row: auto !important; }
+}
 </style>
 <svg width="0" height="0" aria-hidden="true" style="position:absolute"><filter id="tt-ink" x="-5%" y="-10%" width="110%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.55" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in" result="s"/><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="9" result="w"/><feDisplacementMap in="s" in2="w" scale="2.5" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
 
