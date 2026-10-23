@@ -34,7 +34,7 @@ There are no controlled studies of decision-tree tools for SOC triage. The findi
 | Analyst burnout is widespread. In one vendor survey of 900 analysts, 63% reported burnout and manual work was the top frustration. | Tines, Voice of the SOC 2023 (vendor survey) | Cut typing and repetition: entities are entered once and filled into every query and the note. Notes are assembled, not written from scratch. |
 | Burnout runs in a cycle of low skill growth, low empowerment and low creativity. Analysts held to procedures they cannot question fall back on them and handle novel cases poorly. | Sundaramurthy et al., fieldwork 2015–2017 | Trees suggest, never enforce. Analysts can answer "Unsure", change earlier answers and record why their verdict differs from the tree's. |
 | Most "false positives" are really benign triggers: the rule fired correctly on legitimate activity. Analysts need alarms that are explainable and in context. | Alahmadi et al., USENIX Security 2022 | Benign true positive is its own verdict, separate from false positive. Each tree reproduces the alert and explains every check. |
-| Checklists work when they are short, used at natural pause points and suited to the user: "do-confirm" for experts, "read-do" for novices. A surgical checklist cut deaths from 1.5% to 0.8%. | Gawande, *The Checklist Manifesto*; Haynes et al. 2009 | Steps are one question at a time, grouped into short runs, with "also check" items at natural pauses. A guided mode for trainees and a faster mode for experts are planned. |
+| Checklists work when they are short, used at natural pause points and suited to the user: "do-confirm" for experts, "read-do" for novices. A surgical checklist cut deaths from 1.5% to 0.8%. | Gawande, *The Checklist Manifesto*; Haynes et al. 2009 | Steps are one question at a time, grouped into short runs, with "also check" items at natural pauses. Guided mode shows each reason and hint; expert mode folds them away for speed. |
 | Good abnormal-situation checklists start with a condition statement that reproduces the alert, highlight the current item and use generous white space and mixed-case sans-serif type. | Burian, NASA Ames checklist design guidance | The alert that opened the tree appears at the top of each step. Only the current question is framed. Type is a legibility-focused sans-serif. |
 | Clinicians override 46 to 96% of decision-support alerts, mostly because they interrupt, lack explanation or don't fit the case. | Poly et al., JMIR 2020 review | No pop-ups or blocking prompts. Hints sit inline. Every prompt explains itself, and warnings are reserved for things that change the outcome. |
 | Wizards suit novices and rare tasks but frustrate frequent users. Progressive disclosure beyond two levels gets people lost. | Nielsen Norman Group | Experts can jump to any step, see the whole tree on a map and use the keyboard. Detail is at most one click deep. |
@@ -58,6 +58,7 @@ There are no controlled studies of decision-tree tools for SOC triage. The findi
 - **The trace.** One continuous line from the alert to the verdict. Answered steps show the answer; untaken branches leave a short stub showing what they lead to.
 - **Endings narrow as you go.** Endings that can no longer be reached are struck through, so the analyst sees the decision space shrinking.
 - **Changing your mind is safe.** Revisiting an earlier step flags later answers for review instead of wiping them.
+- **Two speeds.** Guided mode shows the reason for each step and a hint on empty results; expert mode folds them away. The choice is remembered in the browser.
 - **Speed.** `Ctrl K` / `⌘K` search across titles and alert names, single-key answers, copy buttons on every query.
 - **Plain language.** Second person, short sentences, no marketing copy.
 
@@ -131,6 +132,9 @@ What would tell us the trees work, if teams choose to measure it on their side: 
 - [x] Data model: review status, typed actions, empty-result rule, public-safety lint
 - [x] Viewer re-skin: tokens, embedded fonts, verdict shapes, card motif, trace, home illustration
 - [x] Viewer functionality: typed actions, empty-result hints, alert condition box, version stamp in notes
-- [ ] Adopt typed actions and `on_empty` across the other trees (one tree done: impossible travel)
-- [ ] Guided and expert modes, and index tables for the OSINT and Detections pages
+- [x] Typed actions across all trees, classified by verb and reviewed (ambiguous actions stay as plain sentences)
+- [x] A default "No rows?" hint on every query step in guided mode
+- [ ] Tree-specific `on_empty` text for high-value queries (one tree done: impossible travel)
+- [ ] Tip-off flags and reversibility on typed actions where they matter
+- [x] Guided and expert modes, and index tables for the OSINT and Detections pages
 - [x] CI: contrast test, offline test, design lint (in the pytest suite)

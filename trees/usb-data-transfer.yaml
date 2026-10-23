@@ -10,7 +10,7 @@ applies_to:
   - DLP removable media policy match
   - USB mass storage device mounted (policy violation)
 mitre: [T1052.001]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -102,7 +102,7 @@ nodes:
     anchor: "{{user}} copied non-sensitive data to unapproved removable media on {{device}}."
     risk: The risk here is data leakage through unmanaged media; the data is low sensitivity but the practice breaches policy.
     actions:
-      - Inform the user's manager per policy
+      - { type: notify, text: "Inform the user's manager per policy" }
       - Recommend device control to block unapproved USB storage
 
   o-inconclusive:

@@ -11,7 +11,7 @@ applies_to:
   - User reported suspicious activity (MFA)
   - Multiple MFA denials followed by success
 mitre: [T1621, T1078.004]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -132,9 +132,9 @@ nodes:
     anchor: An attacker at {{ip}} has the password for {{user}} and triggered MFA prompts that were not approved.
     risk: The risk here is the user eventually approving a prompt; the password is compromised and must be changed now.
     actions:
-      - Reset the password for {{user}}
-      - Tell the user to deny any prompt they did not start and report it
-      - Block {{ip}}
+      - { type: remediate, text: "Reset the password for {{user}}", approval: System owner or per client RACI }
+      - { type: notify, text: "Tell the user to deny any prompt they did not start and report it" }
+      - { type: contain, text: "Block {{ip}}", approval: SOC lead or per client RACI }
       - Recommend number matching or phishing-resistant MFA
     monitor: I will monitor {{user}} for further MFA challenges and sign-ins from unfamiliar infrastructure over the next 7 days.
 
@@ -145,9 +145,9 @@ nodes:
     anchor: "{{user}} approved an MFA prompt for a sign-in from {{ip}} that they did not start, and I found no activity after it."
     risk: The risk here is the attacker returning with the valid session; revoking sessions removes it.
     actions:
-      - Revoke sessions and refresh tokens, then reset the password
+      - { type: contain, text: "Revoke sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI }
       - Confirm the user as compromised in Entra ID Protection
-      - Block {{ip}}
+      - { type: contain, text: "Block {{ip}}", approval: SOC lead or per client RACI }
     escalate: true
     monitor: I will monitor {{user}} for new sign-ins from {{ip}} or its ASN.
 
@@ -158,9 +158,9 @@ nodes:
     anchor: "{{user}} approved an MFA prompt for a sign-in from {{ip}}, and the attacker then made changes or accessed data."
     risk: The risk here is persistence and business email compromise through the changes made; containment is required now.
     actions:
-      - Revoke sessions and refresh tokens, then reset the password
-      - Remove attacker MFA methods, inbox rules and consents
-      - Review mail sent and files accessed during the session
+      - { type: contain, text: "Revoke sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Remove attacker MFA methods, inbox rules and consents", approval: System owner or per client RACI }
+      - { type: enrich, text: "Review mail sent and files accessed during the session" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{user}} for re-entry and new persistence.

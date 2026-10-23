@@ -11,7 +11,7 @@ applies_to:
   - Suspicious MFA tampering activity by admin account
   - Suspicious sign-in to a web app following MFA phone number tampering activity
 mitre: [T1684.001, T1098.005, T1078.004]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -129,7 +129,7 @@ nodes:
     risk: The risk here is a third party using the new credentials, which stays open until the user explains the location.
     actions:
       - Ask the user about the sign-in location (travel, new phone, VPN)
-      - Revoke sessions if the user cannot explain it
+      - { type: contain, text: "Revoke sessions if the user cannot explain it", approval: SOC lead or per client RACI }
     monitor: I will monitor {{user}} for further sign-ins from {{ip}} and new MFA registrations.
 
   o-tp:
@@ -139,9 +139,9 @@ nodes:
     anchor: The credentials of {{user}} were reset by {{actor}} for someone other than the user.
     risk: The risk here is full account takeover and, for privileged or finance users, fraud or lateral movement; containment is required now.
     actions:
-      - Revoke sessions, reset the password through a verified channel and remove new MFA methods
-      - Review what the attacker did after signing in from {{ip}}
-      - Brief the helpdesk and check for similar calls about other users
+      - { type: contain, text: "Revoke sessions, reset the password through a verified channel and remove new MFA methods", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Review what the attacker did after signing in from {{ip}}" }
+      - { type: notify, text: "Brief the helpdesk and check for similar calls about other users" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{user}} and other recent helpdesk resets for sign-ins from {{ip}} or its ASN.

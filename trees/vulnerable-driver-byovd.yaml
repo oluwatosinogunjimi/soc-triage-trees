@@ -10,7 +10,7 @@ applies_to:
   - Suspicious driver load (known vulnerable driver blocklist)
   - Possible EDR killer activity
 mitre: [T1068, T1685, T1543.003]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -109,9 +109,9 @@ nodes:
     anchor: "{{driver}} was dropped and loaded on {{device}} outside any product install, and security tools kept working."
     risk: The risk here is an EDR killer preparing for ransomware; the attacker has admin rights on the host.
     actions:
-      - Isolate {{device}}
-      - Remove the driver and its service
-      - Find how the attacker got admin rights
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Remove the driver and its service", approval: System owner or per client RACI }
+      - { type: enrich, text: "Find how the attacker got admin rights" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same driver hash.
@@ -123,10 +123,10 @@ nodes:
     anchor: "{{driver}} came from an installed product, but it loaded on {{device}} straight after an unexpected elevation."
     risk: The risk here is an attacker installing a legitimate product to bring in its vulnerable driver and kill security tools; the elevation before the load shows the install was theirs.
     actions:
-      - Isolate {{device}}
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
       - Confirm security tools on {{device}} are still running and reporting
-      - Remove the product, the driver and its service
-      - Investigate the process behind the elevation and how the attacker reached the host
+      - { type: remediate, text: "Remove the product, the driver and its service", approval: System owner or per client RACI }
+      - { type: enrich, text: "Investigate the process behind the elevation and how the attacker reached the host" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same driver hash and the same product being installed.
@@ -138,8 +138,8 @@ nodes:
     anchor: "{{driver}} was loaded on {{device}} and security tools stopped afterwards."
     risk: The risk here is ransomware deployment on a host that can no longer see it; this is a P1.
     actions:
-      - Isolate {{device}} through the network or switch if the agent cannot
-      - Call the customer on the P1 path and engage incident response
-      - Hunt for the driver and silent sensors across the estate
+      - { type: contain, text: "Isolate {{device}} through the network or switch if the agent cannot", approval: SOC lead or per client RACI }
+      - { type: notify, text: "Call the customer on the P1 path and engage incident response" }
+      - { type: enrich, text: "Hunt for the driver and silent sensors across the estate" }
     escalate: true
     monitor: I will monitor for sensors going silent and the driver hash across the estate.

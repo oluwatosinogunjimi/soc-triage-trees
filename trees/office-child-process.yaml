@@ -10,7 +10,7 @@ applies_to:
   - An Office application ran suspicious commands
   - "ASR rule: Block Office applications from creating child processes"
 mitre: [T1204.002, T1566.001, T1059]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -107,6 +107,6 @@ nodes:
     anchor: "{{document}} tried to run code on {{device}} and it was blocked."
     risk: The risk here is malware delivered through the document; it doesn't apply as the child process never ran.
     actions:
-      - Find where the document came from (email, download) and purge or block it
-      - Delete the document from the device
+      - { type: enrich, text: "Find where the document came from (email, download) and purge or block it" }
+      - { type: remediate, text: "Delete the document from the device", approval: System owner or per client RACI }
     monitor: I will monitor {{device}} for further Office child processes over the next 7 days.

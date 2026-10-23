@@ -10,7 +10,7 @@ applies_to:
   - VPN brute force followed by success
   - Concurrent VPN sessions from different locations
 mitre: [T1133, T1078]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -124,7 +124,7 @@ nodes:
     risk: The risk here is an attacker inside the network through the VPN, which stays open until confirmed.
     actions:
       - Chase the user
-      - Terminate the session as a precaution if the VPN lacks MFA
+      - { type: contain, text: "Terminate the session as a precaution if the VPN lacks MFA", approval: SOC lead or per client RACI }
     monitor: I will monitor {{user}} for VPN sessions from {{ip}} and internal activity from the VPN address.
 
   o-tp:
@@ -134,8 +134,8 @@ nodes:
     anchor: The VPN account {{user}} was used from {{ip}} by someone other than the user.
     risk: The risk here is direct internal network access, a common ransomware entry point; containment is required now.
     actions:
-      - Terminate the session and disable the VPN account, reset its password
-      - Block {{ip}}
+      - { type: contain, text: "Terminate the session and disable the VPN account, reset its password", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block {{ip}}", approval: SOC lead or per client RACI }
       - Trace everything the VPN address touched internally
       - Recommend MFA on the VPN if absent
       - Raise an incident and escalate

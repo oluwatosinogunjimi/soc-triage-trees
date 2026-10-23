@@ -10,7 +10,7 @@ applies_to:
   - Email reported by user as malware or phish
   - Suspicious email sending patterns
 mitre: [T1566.001, T1566.002, T1204.001, T1204.002, T1534]
-version: 1.1.0
+version: 1.1.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -367,7 +367,7 @@ nodes:
     risk: The risk here is credential theft or malware through the lure; it doesn't apply as no recipient interacted before remediation.
     actions:
       - Soft-delete or purge all copies of the campaign
-      - Block the sender, domain and URLs or hashes
+      - { type: contain, text: "Block the sender, domain and URLs or hashes", approval: SOC lead or per client RACI }
       - Report the message to Microsoft or the email vendor
     tuning: If the gateway missed it, submit it as a false negative so filtering improves.
 
@@ -378,9 +378,9 @@ nodes:
     anchor: "{{recipient}} clicked a malicious link from {{sender}}, but no credential use or download followed."
     risk: Due to the click on a credential-harvesting link, we will continue to monitor {{recipient}} for sign-ins from new infrastructure.
     actions:
-      - Purge the campaign and block the URL and domain
-      - Reset the password and revoke sessions as a precaution if credentials may have been entered
-      - Brief the user on the lure
+      - { type: remediate, text: "Purge the campaign and block the URL and domain", approval: System owner or per client RACI }
+      - { type: remediate, text: "Reset the password and revoke sessions as a precaution if credentials may have been entered", approval: System owner or per client RACI }
+      - { type: notify, text: "Brief the user on the lure" }
     monitor: I will monitor {{recipient}} for sign-ins from unfamiliar IPs and MFA method changes over the next 7 days.
 
   o-clicked-inconclusive:
@@ -391,8 +391,8 @@ nodes:
     risk: The risk here is an attacker holding valid credentials or a session for {{recipient}}, which stays open until the user confirms or sessions are revoked.
     actions:
       - Ask the user whether they entered credentials
-      - Revoke sessions and reset the password if the user cannot confirm
-      - Purge the campaign and block the URL
+      - { type: contain, text: "Revoke sessions and reset the password if the user cannot confirm", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Purge the campaign and block the URL", approval: System owner or per client RACI }
     monitor: I will monitor {{recipient}} for sign-ins from unfamiliar IPs, inbox rule creation and MFA changes.
 
   o-bec-engaged:
@@ -403,8 +403,8 @@ nodes:
     risk: The risk here is financial loss or data disclosure through the request; the recipient has already engaged so the business must act now.
     actions:
       - Escalate urgently to the customer, including finance if payment is involved
-      - Advise contacting the bank immediately if a payment was sent
-      - Purge the campaign and block the sender
-      - Check whether a vendor account is compromised (vendor email compromise)
+      - { type: notify, text: "Advise contacting the bank immediately if a payment was sent" }
+      - { type: remediate, text: "Purge the campaign and block the sender", approval: System owner or per client RACI }
+      - { type: enrich, text: "Check whether a vendor account is compromised (vendor email compromise)" }
     escalate: true
     monitor: I will monitor for further messages from {{sender}} or its domain to any recipient.

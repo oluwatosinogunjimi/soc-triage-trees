@@ -10,7 +10,7 @@ applies_to:
   - UnauthorizedAccess:EC2/TorRelay
   - Connection to TOR network detected
 mitre: [T1090.003]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -101,7 +101,7 @@ nodes:
     anchor: A user on {{host}} ran TOR Browser.
     risk: The risk here is covert channels and policy evasion; it is a policy breach rather than malware.
     actions:
-      - Remove TOR Browser and inform the user's manager per policy
+      - { type: remediate, text: "Remove TOR Browser and inform the user's manager per policy", approval: System owner or per client RACI }
       - Recommend blocking TOR at the firewall
 
   o-tp:
@@ -111,8 +111,8 @@ nodes:
     anchor: A non-browser process on {{host}} is communicating over TOR.
     risk: The risk here is command and control that bypasses proxy inspection, typical of ransomware and backdoors; containment is required now.
     actions:
-      - Isolate {{host}}
-      - Run the EDR tree on the process
-      - Block TOR entry nodes at the perimeter
+      - { type: contain, text: "Isolate {{host}}", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Run the EDR tree on the process" }
+      - { type: contain, text: "Block TOR entry nodes at the perimeter", approval: SOC lead or per client RACI }
     escalate: true
     monitor: I will monitor the estate for TOR connections from any host.

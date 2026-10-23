@@ -10,7 +10,7 @@ applies_to:
   - Guest user account promoted to member
   - Invite external user (unusual inviter or domain)
 mitre: [T1136.003, T1078.004]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -141,8 +141,8 @@ nodes:
     anchor: "{{guest}} was invited or promoted without a legitimate reason, from a risky or unconfirmed session of {{actor}}."
     risk: The risk here is persistent external access that survives resetting the compromised account; the guest must be removed.
     actions:
-      - Remove or block the guest account
-      - Revoke sessions for {{actor}} and investigate the compromise
-      - Review what the guest accessed (Teams, SharePoint, apps)
+      - { type: remediate, text: "Remove or block the guest account", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{actor}} and investigate the compromise", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Review what the guest accessed (Teams, SharePoint, apps)" }
     escalate: true
     monitor: I will monitor for new guest invitations and redemptions across the tenant.

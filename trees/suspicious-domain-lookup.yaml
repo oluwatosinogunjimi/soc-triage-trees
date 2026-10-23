@@ -11,7 +11,7 @@ applies_to:
   - DNS lookup to known malicious domain
   - Connection to sinkholed domain
 mitre: [T1568.002, T1071.001]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -123,5 +123,5 @@ nodes:
     anchor: A browser on {{host}} visited {{domain}}, a malicious domain, with no download or follow-on activity.
     risk: The risk here is drive-by malware or credential phishing; it doesn't apply as nothing followed the visit.
     actions:
-      - Block {{domain}} at the proxy or DNS
-      - Check whether the user entered credentials if it was a phishing page
+      - { type: contain, text: "Block {{domain}} at the proxy or DNS", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Check whether the user entered credentials if it was a phishing page" }

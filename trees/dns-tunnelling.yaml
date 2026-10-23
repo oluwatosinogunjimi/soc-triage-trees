@@ -10,7 +10,7 @@ applies_to:
   - DNS tunnelling detected
   - Trojan:EC2/DNSDataExfiltration
 mitre: [T1071.004, T1048.003]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -114,7 +114,7 @@ nodes:
     anchor: The queries from {{host}} to {{domain}} are unusual but do not look like a tunnel.
     risk: The risk here is low-rate DNS command and control, which stays open until the process is identified.
     actions:
-      - Identify the process on {{host}} through EDR
+      - { type: enrich, text: "Identify the process on {{host}} through EDR" }
     monitor: I will monitor queries to {{domain}} for volume or length increases.
 
   o-tp:
@@ -124,9 +124,9 @@ nodes:
     anchor: "{{host}} is tunnelling data or commands through DNS queries to {{domain}}."
     risk: The risk here is data exfiltration and command and control that bypasses web proxies; containment is required now.
     actions:
-      - Isolate {{host}}
-      - Sinkhole or block {{domain}} at the resolvers
-      - Run the EDR tree on the sending process
-      - Estimate the volume exfiltrated from query counts and label sizes
+      - { type: contain, text: "Isolate {{host}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Sinkhole or block {{domain}} at the resolvers", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Run the EDR tree on the sending process" }
+      - { type: enrich, text: "Estimate the volume exfiltrated from query counts and label sizes" }
     escalate: true
     monitor: I will monitor all resolvers for queries to {{domain}} and similar patterns.

@@ -10,7 +10,7 @@ applies_to:
   - Ransomware payment instruction file uploaded
   - Mass file rename in OneDrive
 mitre: [T1485, T1486]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -118,8 +118,8 @@ nodes:
     anchor: Files owned by {{user}} were encrypted through the web or API from a compromised session or app.
     risk: The risk here is data loss and extortion across shared sites; containment is required now.
     actions:
-      - Revoke sessions and app consents for {{user}}
-      - Restore files with OneDrive or SharePoint restore to a point before the activity
+      - { type: contain, text: "Revoke sessions and app consents for {{user}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Restore files with OneDrive or SharePoint restore to a point before the activity", approval: System owner or per client RACI }
       - Raise a P1 incident and escalate
     escalate: true
     monitor: I will monitor for further mass modification across the tenant.
@@ -131,8 +131,8 @@ nodes:
     anchor: Files were deleted in bulk from the account of {{user}} without explanation.
     risk: The risk here is data destruction by an attacker or insider; recovery windows are limited.
     actions:
-      - Restore from the recycle bin or a restore point
-      - Revoke sessions and investigate the account
+      - { type: remediate, text: "Restore from the recycle bin or a restore point", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions and investigate the account", approval: SOC lead or per client RACI }
       - Escalate to the customer
     escalate: true
     monitor: I will monitor {{user}} for further deletions.

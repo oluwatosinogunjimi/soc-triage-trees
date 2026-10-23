@@ -10,7 +10,7 @@ applies_to:
   - Scheduled task created by unusual process
   - Persistence via scheduled task (Event 4698)
 mitre: [T1053.005]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -136,7 +136,7 @@ nodes:
     anchor: Task "{{task}}" on {{device}} was created to run a malicious payload and has not run yet.
     risk: The risk here is the payload running at the next trigger; removing the task and payload closes it.
     actions:
-      - Delete the task and quarantine its payload
-      - Investigate the process and account that created it
+      - { type: remediate, text: "Delete the task and quarantine its payload", approval: System owner or per client RACI }
+      - { type: enrich, text: "Investigate the process and account that created it" }
     escalate: true
     monitor: I will monitor {{device}} for re-creation of the task.

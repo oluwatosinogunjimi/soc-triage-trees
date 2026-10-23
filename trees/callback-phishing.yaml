@@ -10,7 +10,7 @@ applies_to:
   - Fake subscription renewal or invoice with phone number
   - User reported callback scam
 mitre: [T1566.004, T1219]
-version: 1.1.0
+version: 1.1.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -82,7 +82,7 @@ nodes:
     anchor: Message {{network_message_id}} is a callback phishing lure and {{recipient}} did not call the number.
     risk: The risk here is remote access fraud through a phone call; it doesn't apply as nobody engaged.
     actions:
-      - Purge the campaign and block the sender
+      - { type: remediate, text: "Purge the campaign and block the sender", approval: System owner or per client RACI }
       - Share the phone number with the customer as an indicator
 
   o-inconclusive:
@@ -93,5 +93,5 @@ nodes:
     risk: The risk here is an attacker with remote access to {{device}}, which stays open until the user confirms.
     actions:
       - Ask the recipient directly whether they called and installed anything
-      - Purge the campaign
+      - { type: remediate, text: "Purge the campaign", approval: System owner or per client RACI }
     monitor: I will monitor {{device}} for remote access tool installs over the next 7 days.

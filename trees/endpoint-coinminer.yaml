@@ -10,7 +10,7 @@ applies_to:
   - Connection to cryptocurrency mining pool
   - XMRig execution
 mitre: [T1496]
-version: 1.1.0
+version: 1.1.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -75,9 +75,9 @@ nodes:
     anchor: A cryptominer on {{device}} came from software the user installed.
     risk: The risk here is resource abuse and whatever else came with the cracked software; the miner is often bundled with stealers.
     actions:
-      - Remove the miner and the bundled software
-      - Run an infostealer check on {{device}}
-      - Remind the user of software policy
+      - { type: remediate, text: "Remove the miner and the bundled software", approval: System owner or per client RACI }
+      - { type: enrich, text: "Run an infostealer check on {{device}}" }
+      - { type: notify, text: "Remind the user of software policy" }
 
   o-tp-server:
     type: outcome
@@ -86,9 +86,9 @@ nodes:
     anchor: A cryptominer was deployed on {{device}} through a service, web server or scheduled task.
     risk: The risk here is an attacker with code execution on {{device}}, usually through an unpatched service; the miner is only the visible payload.
     actions:
-      - Isolate {{device}}
-      - Find the initial access (exposed service, CVE, weak SSH or RDP credentials)
-      - Remove the miner and its persistence, then patch
-      - Block the pool domains
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Find the initial access (exposed service, CVE, weak SSH or RDP credentials)" }
+      - { type: remediate, text: "Remove the miner and its persistence, then patch", approval: System owner or per client RACI }
+      - { type: contain, text: "Block the pool domains", approval: SOC lead or per client RACI }
     escalate: true
     monitor: I will monitor the estate for mining pool connections and the miner hash.

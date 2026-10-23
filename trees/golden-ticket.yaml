@@ -11,7 +11,7 @@ applies_to:
   - Possible golden ticket attack (CVE-2021-42287 exploitation)
   - Suspicious Kerberos authentication (TGT request using TGS-REQ)
 mitre: [T1558.001]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -109,7 +109,7 @@ nodes:
     risk: The risk here is a forged ticket giving domain-wide access; it doesn't apply given the documented cause.
     actions:
       - Close referencing the cause
-      - Fix clock sync or the configuration if it will keep firing
+      - { type: remediate, text: "Fix clock sync or the configuration if it will keep firing", approval: System owner or per client RACI }
 
   o-tp:
     type: outcome
@@ -118,9 +118,9 @@ nodes:
     anchor: A forged Kerberos ticket for {{account}} was used from {{src_host}}.
     risk: The risk here is persistent domain-wide access that survives password resets until krbtgt is reset twice; this is a domain-level emergency.
     actions:
-      - Call the customer on the P1 path and engage incident response
-      - Isolate {{src_host}}
+      - { type: notify, text: "Call the customer on the P1 path and engage incident response" }
+      - { type: contain, text: "Isolate {{src_host}}", approval: SOC lead or per client RACI }
       - Plan a double krbtgt reset (allowing replication between resets)
-      - Hunt for the original domain compromise and other persistence
+      - { type: enrich, text: "Hunt for the original domain compromise and other persistence" }
     escalate: true
     monitor: I will monitor for further Kerberos anomalies and privileged logons during recovery.

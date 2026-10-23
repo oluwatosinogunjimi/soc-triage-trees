@@ -12,7 +12,7 @@ applies_to:
   - Suspicious login attempt using possibly compromised account certificate
   - Certificate issued with SAN different from requester (Event 4887)
 mitre: [T1649]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -132,7 +132,7 @@ nodes:
     anchor: The certificate request by {{account}} for {{target}} was an approved PKI action or authorised test.
     risk: The risk here is impersonation through vulnerable templates; the test proves the template is exploitable and must be fixed.
     actions:
-      - Revoke any test certificates issued for privileged identities
+      - { type: contain, text: "Revoke any test certificates issued for privileged identities", approval: SOC lead or per client RACI }
       - Recommend fixing the vulnerable template (remove enrollee-supplied subject, restrict enrollment)
 
   o-tp:
@@ -142,10 +142,10 @@ nodes:
     anchor: "{{account}} obtained or used a certificate for {{target}} from {{src_host}} without authorisation."
     risk: The risk here is persistent impersonation of {{target}} that survives password resets until the certificate is revoked; containment is required now.
     actions:
-      - Revoke the certificate and publish the CRL
-      - Isolate {{src_host}} and disable {{account}}
-      - Fix the abused template
-      - Review logons as {{target}} since issuance
+      - { type: contain, text: "Revoke the certificate and publish the CRL", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{src_host}} and disable {{account}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Fix the abused template", approval: System owner or per client RACI }
+      - { type: enrich, text: "Review logons as {{target}} since issuance" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor for certificate-based logons as {{target}} and new requests on the abused template.

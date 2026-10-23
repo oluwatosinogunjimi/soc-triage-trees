@@ -6,7 +6,7 @@ summary: >-
   exists, and otherwise bucket the alert as benign, false positive, true positive or
   needs more work.
 applies_to: [Any alert, Unfamiliar detection, Custom analytics rule]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -386,7 +386,10 @@ nodes:
     title: True positive
     anchor: '{{alert}} reflects malicious activity involving {{entity}}.'
     risk: The risk here is follow-on compromise from {{entity}}; containment and escalation are required.
-    actions: [Contain per client RACI, Raise an incident ticket, Escalate to the customer or IR]
+    actions:
+      - { type: contain, text: "Contain per client RACI", approval: SOC lead or per client RACI }
+      - "Raise an incident ticket"
+      - "Escalate to the customer or IR"
     escalate: true
     monitor: I will monitor {{entity}} for further activity while the incident is worked.
 

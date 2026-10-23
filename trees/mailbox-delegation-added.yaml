@@ -11,7 +11,7 @@ applies_to:
   - Set-Mailbox GrantSendOnBehalfTo
   - Add-MailboxFolderPermission
 mitre: [T1098.002]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -122,8 +122,8 @@ nodes:
     anchor: Delegation on {{mailbox}} to {{delegate}} was added from a compromised or unusual session.
     risk: The risk here is covert reading and sending as {{mailbox}}, which survives the owner's password reset; containment is required now.
     actions:
-      - Remove the delegation
-      - Revoke sessions and reset {{actor}}; investigate {{delegate}}
-      - Review mail read or sent through the delegation (MailItemsAccessed, SendAs)
+      - { type: remediate, text: "Remove the delegation", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions and reset {{actor}}; investigate {{delegate}}", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Review mail read or sent through the delegation (MailItemsAccessed, SendAs)" }
     escalate: true
     monitor: I will monitor {{mailbox}} for further permission changes.

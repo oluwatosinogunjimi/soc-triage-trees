@@ -13,7 +13,7 @@ applies_to:
   - Stolen session cookie was used
   - Suspicious sign-in after a phishing click
 mitre: [T1557, T1539, T1550.004]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -222,10 +222,10 @@ nodes:
     anchor: The session for {{user}} was used from {{ip}}, consistent with token theft, and I found no persistence.
     risk: The risk here is the attacker returning with the stolen session; revoking tokens removes that access.
     actions:
-      - Revoke all sessions and refresh tokens (password reset alone does not invalidate stolen tokens)
-      - Reset the password and confirm the user as compromised in Entra ID Protection
-      - Purge the phishing email and check every other recipient who clicked
-      - Block {{ip}} and the phishing domain
+      - { type: contain, text: "Revoke all sessions and refresh tokens (password reset alone does not invalidate stolen tokens)", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Reset the password and confirm the user as compromised in Entra ID Protection", approval: System owner or per client RACI }
+      - { type: remediate, text: "Purge the phishing email and check every other recipient who clicked", approval: System owner or per client RACI }
+      - { type: contain, text: "Block {{ip}} and the phishing domain", approval: SOC lead or per client RACI }
     escalate: true
     monitor: I will monitor {{user}} for further sign-ins from {{ip}} or its ASN.
 
@@ -236,11 +236,11 @@ nodes:
     anchor: The session for {{user}} was used from {{ip}}, and the attacker established persistence on the account.
     risk: The risk here is ongoing access and business email compromise through the persistence mechanisms, which survive a password reset until removed.
     actions:
-      - Revoke all sessions and refresh tokens, then reset the password
-      - Remove attacker-registered MFA methods and devices
-      - Remove malicious inbox rules, forwarding and OAuth consents
-      - Review mail sent from the account and warn recipients if internal or vendor phishing went out
-      - Purge the lure, block {{ip}} and the phishing domain
+      - { type: contain, text: "Revoke all sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Remove attacker-registered MFA methods and devices", approval: System owner or per client RACI }
+      - { type: remediate, text: "Remove malicious inbox rules, forwarding and OAuth consents", approval: System owner or per client RACI }
+      - { type: enrich, text: "Review mail sent from the account and warn recipients if internal or vendor phishing went out" }
+      - { type: remediate, text: "Purge the lure, block {{ip}} and the phishing domain", approval: System owner or per client RACI }
       - Consider phishing-resistant MFA and token protection for this user group
     escalate: true
     monitor: I will monitor {{user}} and {{ip}} for re-entry attempts and new persistence.

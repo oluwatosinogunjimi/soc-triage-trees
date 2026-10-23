@@ -11,7 +11,7 @@ applies_to:
   - Possible Golden SAML attack
   - New domain added and verified
 mitre: [T1484.002, T1606.002]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -119,10 +119,10 @@ nodes:
     anchor: The authentication trust for {{domain}} was changed outside any approved project.
     risk: The risk here is forged tokens for any user in the domain, including admins, bypassing passwords and MFA; this is a tenant-level emergency.
     actions:
-      - Call the customer immediately
-      - Revert the domain authentication and remove any rogue certificates or domains
-      - Revoke sessions for {{actor}} and all privileged users
-      - Hunt for sign-ins issued by the rogue trust
+      - { type: notify, text: "Call the customer immediately" }
+      - { type: remediate, text: "Revert the domain authentication and remove any rogue certificates or domains", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{actor}} and all privileged users", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Hunt for sign-ins issued by the rogue trust" }
       - Raise a P1 incident
     escalate: true
     monitor: I will monitor for further domain, federation and privileged role changes.

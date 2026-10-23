@@ -10,7 +10,7 @@ applies_to:
   - Data compressed with password (7z -p / rar -hp)
   - Large archive created in staging directory
 mitre: [T1560.001, T1074.001]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -122,7 +122,7 @@ nodes:
     risk: The risk here is data staged for theft that has not been seen leaving yet, which stays open until the owner explains it.
     actions:
       - Ask the account owner about the archive
-      - Check whether the archive still exists and what it contains
+      - { type: enrich, text: "Check whether the archive still exists and what it contains" }
     monitor: I will monitor {{device}} for uploads and transfer tools over the next 7 days.
 
   o-tp:
@@ -132,9 +132,9 @@ nodes:
     anchor: Data on {{device}} was archived and uploaded by {{account}}, consistent with exfiltration.
     risk: The risk here is data theft ahead of extortion, often before ransomware; containment is required now.
     actions:
-      - Isolate {{device}} and disable {{account}}
-      - Block the upload destinations
-      - Scope what data was in the archives
+      - { type: contain, text: "Isolate {{device}} and disable {{account}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block the upload destinations", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Scope what data was in the archives" }
       - Raise a P1 incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same tools and destinations.

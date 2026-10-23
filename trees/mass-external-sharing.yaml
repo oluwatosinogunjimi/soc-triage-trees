@@ -9,7 +9,7 @@ applies_to:
   - Anonymous link created for sensitive file
   - Unusual external user file activity
 mitre: [T1567, T1537]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -118,7 +118,7 @@ nodes:
     risk: The risk here is data leakage, deliberate or careless, which stays open until the purpose is confirmed.
     actions:
       - Ask the user's manager to confirm the purpose
-      - Remove anonymous links to sensitive files
+      - { type: remediate, text: "Remove anonymous links to sensitive files", approval: System owner or per client RACI }
     monitor: I will monitor {{user}} for further external sharing.
 
   o-tp:
@@ -128,8 +128,8 @@ nodes:
     anchor: Files were shared externally from a suspicious session of {{user}}.
     risk: The risk here is data exfiltration through the account; containment is required now.
     actions:
-      - Remove the links and external permissions
-      - Revoke sessions and reset the password for {{user}}
-      - List the files exposed and escalate to the customer
+      - { type: remediate, text: "Remove the links and external permissions", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions and reset the password for {{user}}", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "List the files exposed and escalate to the customer" }
     escalate: true
     monitor: I will monitor {{user}} for further sharing and sign-ins from new infrastructure.

@@ -11,7 +11,7 @@ applies_to:
   - Lateral movement using PsExec / Impacket
   - Suspicious RDP session from unusual host
 mitre: [T1021.002, T1021.006, T1047, T1021.001]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -145,9 +145,9 @@ nodes:
     anchor: "{{account}} was used to execute code on {{device}} from {{src_host}} as part of an intrusion."
     risk: The risk here is an attacker spreading toward domain controllers and backups; containment is required now.
     actions:
-      - Isolate {{src_host}} and {{device}}
-      - Reset {{account}} and investigate where its credential was stolen
-      - Check every host the account touched
+      - { type: contain, text: "Isolate {{src_host}} and {{device}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Reset {{account}} and investigate where its credential was stolen", approval: System owner or per client RACI }
+      - { type: enrich, text: "Check every host the account touched" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{account}} for logons anywhere in the estate.

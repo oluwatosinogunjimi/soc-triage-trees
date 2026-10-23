@@ -11,7 +11,7 @@ applies_to:
   - Suspicious on-premises account enablement after disruption
   - Sign-in by disabled account
 mitre: [T1078, T1098]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -158,8 +158,8 @@ nodes:
     anchor: The activity on {{user}} came from a session or device that offboarding did not remove.
     risk: The risk here is a leaver retaining access to company data; revoking sessions and removing the device closes it.
     actions:
-      - Revoke sessions and refresh tokens for {{user}}
-      - Remove the account from devices and shared mailboxes it still reaches
+      - { type: contain, text: "Revoke sessions and refresh tokens for {{user}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Remove the account from devices and shared mailboxes it still reaches", approval: System owner or per client RACI }
       - Raise the gap with the customer's offboarding process owner
 
   o-tp:
@@ -169,8 +169,8 @@ nodes:
     anchor: "{{user}} was used from {{ip}} without any legitimate reason after offboarding."
     risk: The risk here is data theft or sabotage by a leaver or an attacker through an account nobody watches; containment is required now.
     actions:
-      - Disable the account again, revoke sessions and reset the password
-      - Scope what was accessed during the activity
-      - Inform the customer, including HR and legal if the leaver may be involved
+      - { type: contain, text: "Disable the account again, revoke sessions and reset the password", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Scope what was accessed during the activity" }
+      - { type: notify, text: "Inform the customer, including HR and legal if the leaver may be involved" }
     escalate: true
     monitor: I will monitor {{user}} and {{ip}} for further activity.

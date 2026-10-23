@@ -11,7 +11,7 @@ applies_to:
   - Malicious registration of an attacker controlled MFA device
   - User registered security info
 mitre: [T1098.005, T1556.006]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -141,10 +141,10 @@ nodes:
     anchor: An MFA method was registered on the account of {{user}} from {{ip}} without the user's knowledge.
     risk: The risk here is the attacker satisfying MFA at will; the method keeps working after a password reset until it is removed.
     actions:
-      - Remove the rogue method and any others added in the same session
-      - Revoke sessions and refresh tokens, then reset the password
+      - { type: remediate, text: "Remove the rogue method and any others added in the same session", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI }
       - Require re-registration of MFA with identity proofing
-      - Investigate how the attacker got the session (phishing, AiTM, helpdesk)
+      - { type: enrich, text: "Investigate how the attacker got the session (phishing, AiTM, helpdesk)" }
     escalate: true
     monitor: I will monitor {{user}} for new registrations and sign-ins from {{ip}}.
 

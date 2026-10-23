@@ -9,7 +9,7 @@ applies_to:
   - WMI event subscription created
   - Suspicious WMI persistence (CommandLineEventConsumer / ActiveScriptEventConsumer)
 mitre: [T1546.003]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -111,8 +111,8 @@ nodes:
     anchor: A malicious WMI event subscription was created on {{device}} and has not executed yet.
     risk: The risk here is fileless re-infection at the next trigger; removing the filter, consumer and binding closes it.
     actions:
-      - Remove the filter, consumer and binding
-      - Investigate how the attacker got the rights to create it
+      - { type: remediate, text: "Remove the filter, consumer and binding", approval: System owner or per client RACI }
+      - { type: enrich, text: "Investigate how the attacker got the rights to create it" }
     escalate: true
     monitor: I will monitor {{device}} for re-creation of WMI subscriptions.
 
@@ -123,8 +123,8 @@ nodes:
     anchor: A malicious WMI event subscription on {{device}} has executed its payload.
     risk: The risk here is an attacker with persistent code execution on {{device}}; containment is required now.
     actions:
-      - Isolate {{device}}
-      - Remove the subscription and investigate the payload
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Remove the subscription and investigate the payload", approval: System owner or per client RACI }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same consumer command.

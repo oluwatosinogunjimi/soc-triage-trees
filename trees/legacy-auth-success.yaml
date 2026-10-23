@@ -10,7 +10,7 @@ applies_to:
   - IMAP/POP sign-in from unusual location
   - SMTP AUTH client submission from unknown IP
 mitre: [T1078.004, T1110]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -153,9 +153,9 @@ nodes:
     anchor: The password for {{user}} was used successfully over a legacy protocol from {{ip}}, with no mailbox activity found.
     risk: The risk here is mailbox access that MFA cannot stop; the password is compromised.
     actions:
-      - Reset the password and revoke sessions
-      - Block {{ip}}
-      - Block legacy authentication for the user or tenant
+      - { type: remediate, text: "Reset the password and revoke sessions", approval: System owner or per client RACI }
+      - { type: contain, text: "Block {{ip}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block legacy authentication for the user or tenant", approval: SOC lead or per client RACI }
     escalate: true
     monitor: I will monitor {{user}} for further legacy protocol sign-ins.
 
@@ -166,9 +166,9 @@ nodes:
     anchor: An attacker at {{ip}} signed in as {{user}} over a legacy protocol and accessed the mailbox.
     risk: The risk here is data theft and business email compromise through the mailbox; containment is required now.
     actions:
-      - Reset the password, revoke sessions and block legacy authentication
-      - Scope the mail read, synced or sent
-      - Check for inbox rules and forwarding
+      - { type: remediate, text: "Reset the password, revoke sessions and block legacy authentication", approval: System owner or per client RACI }
+      - { type: enrich, text: "Scope the mail read, synced or sent" }
+      - { type: enrich, text: "Check for inbox rules and forwarding" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{user}} and {{ip}} for further access.

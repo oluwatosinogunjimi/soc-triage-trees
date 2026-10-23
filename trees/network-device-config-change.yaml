@@ -11,7 +11,7 @@ applies_to:
   - Logging disabled on firewall
   - Admin login to network device from unusual source
 mitre: [T1686, T1098]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -109,8 +109,8 @@ nodes:
     risk: The risk here is an attacker using a taken-over admin account inside a legitimate change window, which stays open until the account owner confirms the session.
     actions:
       - Ask the owner of {{admin}} and the network team to confirm they made the change from {{ip}}
-      - Compare the change on {{device}} with the ticket line by line
-      - Review how {{admin}} authenticated and any recent password or privilege changes
+      - { type: enrich, text: "Compare the change on {{device}} with the ticket line by line" }
+      - { type: enrich, text: "Review how {{admin}} authenticated and any recent password or privilege changes" }
       - Escalate to a senior analyst, and reset the account if the owner does not confirm
     monitor: I will monitor {{admin}} for logons to network devices and {{device}} for further changes.
 
@@ -131,9 +131,9 @@ nodes:
     anchor: "{{device}} was changed to open access, add accounts or reduce logging without authorisation."
     risk: The risk here is attacker-controlled network access and blind spots; containment is required now.
     actions:
-      - Revert the change and remove rogue accounts
-      - Rotate device admin credentials and check firmware for known CVEs
-      - Review traffic through any opened rule
+      - { type: remediate, text: "Revert the change and remove rogue accounts", approval: System owner or per client RACI }
+      - { type: remediate, text: "Rotate device admin credentials and check firmware for known CVEs", approval: System owner or per client RACI }
+      - { type: enrich, text: "Review traffic through any opened rule" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{device}} for admin logons and configuration changes.

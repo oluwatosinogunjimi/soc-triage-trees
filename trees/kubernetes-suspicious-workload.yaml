@@ -11,7 +11,7 @@ applies_to:
   - CredentialAccess:Kubernetes/AnomalousBehavior.SecretsAccessed
   - Policy:Kubernetes/AnonymousAccessGranted
 mitre: [T1609, T1610, T1611, T1552.007]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -130,9 +130,9 @@ nodes:
     anchor: "{{principal}} escalated privilege in {{cluster}} through privileged workloads, bindings or bulk secret reads."
     risk: The risk here is node and cluster takeover and theft of every secret in the cluster; containment is required now.
     actions:
-      - Delete the rogue pods and bindings; cordon affected nodes
-      - Revoke the principal's token and rotate secrets that were read
-      - Find the entry point (exposed dashboard, vulnerable app, leaked kubeconfig)
+      - { type: remediate, text: "Delete the rogue pods and bindings; cordon affected nodes", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke the principal's token and rotate secrets that were read", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Find the entry point (exposed dashboard, vulnerable app, leaked kubeconfig)" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{cluster}} for privileged pods, new bindings and exec into pods.

@@ -10,7 +10,7 @@ applies_to:
   - User clicked through to a malicious URL
   - Safe Links click allowed, URL later weaponized
 mitre: [T1204.001, T1566.002]
-version: 1.1.0
+version: 1.1.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -105,9 +105,9 @@ nodes:
     anchor: "{{user}} clicked {{url}}, which is malicious, and Safe Links blocked it before the page loaded."
     risk: The risk here is credential theft or malware from the page; it doesn't apply as the page never loaded.
     actions:
-      - Purge the message from all mailboxes
-      - Block the URL and domain
-      - Check other recipients' clicks
+      - { type: remediate, text: "Purge the message from all mailboxes", approval: System owner or per client RACI }
+      - { type: contain, text: "Block the URL and domain", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Check other recipients' clicks" }
 
   o-inconclusive:
     type: outcome
@@ -117,6 +117,6 @@ nodes:
     risk: The risk here is an unnoticed credential entry or download, which stays open until the user confirms what they saw.
     actions:
       - Ask the user whether they entered credentials or downloaded anything
-      - Revoke sessions as a precaution if they cannot say
-      - Block the URL and purge the message
+      - { type: contain, text: "Revoke sessions as a precaution if they cannot say", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Block the URL and purge the message", approval: SOC lead or per client RACI }
     monitor: I will monitor {{user}} for sign-ins from new infrastructure and new file executions over the next 7 days.

@@ -10,7 +10,7 @@ applies_to:
   - Reciprocal Temporary Access Pass creation between users
   - Admin registered security info (TAP)
 mitre: [T1098.005, T1556.006]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -142,9 +142,9 @@ nodes:
     anchor: A Temporary Access Pass for {{user}} was issued or used without legitimate verification.
     risk: The risk here is full takeover of {{user}} with attacker-registered MFA; containment is required now.
     actions:
-      - Delete the pass and any MFA methods registered with it
-      - Revoke sessions and reset the password for {{user}}
-      - Review the helpdesk interaction and the session of {{actor}}
+      - { type: remediate, text: "Delete the pass and any MFA methods registered with it", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions and reset the password for {{user}}", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Review the helpdesk interaction and the session of {{actor}}" }
       - Raise an incident and escalate, including the helpdesk lead
     escalate: true
     monitor: I will monitor {{user}} and {{actor}} for further authentication method changes.

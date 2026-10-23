@@ -10,7 +10,7 @@ applies_to:
   - Sensitive data uploaded to personal cloud storage
   - Sensitive data pasted into generative AI site
 mitre: [T1567.002, T1048]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -119,7 +119,7 @@ nodes:
     anchor: "{{user}} sent a small amount of sensitive data to an unapproved destination once."
     risk: The risk here is data leakage; the exposure is small but real and may need the data protection lead's review.
     actions:
-      - Notify the user's manager and the data protection lead per policy
+      - { type: notify, text: "Notify the user's manager and the data protection lead per policy" }
       - Ask for deletion at the destination if possible
 
   o-concealed:
@@ -130,7 +130,7 @@ nodes:
     risk: The risk here is deliberate data theft hidden from DLP; the small volume does not rule it out because the files were disguised.
     actions:
       - Escalate to the customer's data protection lead through the agreed channel
-      - Check the session of {{user}} for compromise signs and ask about leaver or HR context
+      - { type: enrich, text: "Check the session of {{user}} for compromise signs and ask about leaver or HR context" }
       - Ask for deletion at the destination if possible
     monitor: I will monitor {{user}} for further DLP matches, archives and encrypted uploads.
 
@@ -152,7 +152,7 @@ nodes:
     risk: The risk here is a reportable data breach; the business must act now.
     actions:
       - Escalate to the customer's security and data protection leads
-      - Contain the account if compromised; involve HR and legal if insider
+      - { type: contain, text: "Contain the account if compromised; involve HR and legal if insider", approval: SOC lead or per client RACI }
       - Preserve the DLP evidence
     escalate: true
     monitor: I will monitor {{user}} for further transfers across all channels.

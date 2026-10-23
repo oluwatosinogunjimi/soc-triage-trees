@@ -11,7 +11,7 @@ applies_to:
   - Suspicious NTLM authentication
   - Logon with LogonType 9 (NewCredentials) by admin tools
 mitre: [T1550.002, T1550.003]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -126,9 +126,9 @@ nodes:
     anchor: "{{account}} was used from {{src_host}} with stolen credential material."
     risk: The risk here is lateral movement toward domain admin with the reused credential; containment is required now.
     actions:
-      - Isolate {{src_host}}
-      - Reset {{account}} (twice for a Kerberos-heavy account) and purge its tickets
-      - Find where the credential was stolen from (LSASS dump on another host)
+      - { type: contain, text: "Isolate {{src_host}}", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Reset {{account}} (twice for a Kerberos-heavy account) and purge its tickets", approval: System owner or per client RACI }
+      - { type: enrich, text: "Find where the credential was stolen from (LSASS dump on another host)" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{account}} for logons from any host outside its baseline.

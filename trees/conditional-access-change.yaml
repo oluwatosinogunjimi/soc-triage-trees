@@ -11,7 +11,7 @@ applies_to:
   - Add or update named location
   - MFA disabled for user or tenant
 mitre: [T1556.009, T1685]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -167,9 +167,9 @@ nodes:
     anchor: "\"{{policy}}\" was weakened without approval or from a risky session of {{actor}}."
     risk: The risk here is attackers bypassing MFA and device controls tenant-wide; containment is required now.
     actions:
-      - Revert the policy to its previous state
-      - Revoke sessions for {{actor}} and investigate the compromise
-      - Review sign-ins that benefited from the weakened policy
+      - { type: remediate, text: "Revert the policy to its previous state", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{actor}} and investigate the compromise", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Review sign-ins that benefited from the weakened policy" }
       - Raise a P1 incident and escalate
     escalate: true
     monitor: I will monitor for further Conditional Access and authentication method changes.

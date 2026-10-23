@@ -10,7 +10,7 @@ applies_to:
   - Domain impersonation detected
   - Display name spoofing of executive
 mitre: [T1684.001, T1566.003]
-version: 1.2.1
+version: 1.2.2
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -100,9 +100,9 @@ nodes:
     risk: The risk here is an attacker inside the executive's accounts sending requests that staff will trust; it stays open until the mailbox activity is explained.
     actions:
       - Escalate to the customer and the executive's office
-      - Hold any payment or data request from {{sender}} until it is verified by phone
+      - { type: contain, text: "Hold any payment or data request from {{sender}} until it is verified by phone", approval: SOC lead or per client RACI }
       - Ask {{executive}} to confirm the sign-ins, rules and forwarding
-      - Run the inbox rule tree for any new rules or forwarding found
+      - { type: enrich, text: "Run the inbox rule tree for any new rules or forwarding found" }
     escalate: true
     monitor: I will monitor the mailbox of {{executive}} for new sign-ins, rules and forwarding over the next 7 days.
 
@@ -113,7 +113,7 @@ nodes:
     anchor: "{{sender}} impersonated {{executive}}, and no recipient engaged."
     risk: The risk here is payment fraud or data disclosure under executive pressure; it doesn't apply as nobody acted.
     actions:
-      - Purge the messages and block the sender
+      - { type: remediate, text: "Purge the messages and block the sender", approval: System owner or per client RACI }
       - Add {{executive}} to the impersonation protection list if missing
       - Let the targeted teams know the lure is circulating
 
@@ -125,7 +125,7 @@ nodes:
     risk: The risk here is financial loss or disclosure of payroll or personal data; the business must act now.
     actions:
       - Escalate urgently to the customer, including finance and the executive's office
-      - Advise contacting the bank immediately if money moved
-      - Purge the messages and block the sender
+      - { type: notify, text: "Advise contacting the bank immediately if money moved" }
+      - { type: remediate, text: "Purge the messages and block the sender", approval: System owner or per client RACI }
     escalate: true
     monitor: I will monitor for new lookalike senders impersonating {{executive}}.
