@@ -10,7 +10,9 @@ Usage: python tools/build.py
 """
 from __future__ import annotations
 
+import base64
 import json
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -22,6 +24,30 @@ from validate import ROOT, load_detections, load_osint, validate  # noqa: E402
 SITE = ROOT / "site"
 DIST = ROOT / "dist"
 MARKER = "/*__TREE_DATA__*/null"
+FONT_BLOCK = re.compile(r"/\*__FONTS__\*/.*?/\*__END_FONTS__\*/", re.S)
+# (file in site/fonts, CSS family name, licence file)
+FONTS = [
+    ("AtkinsonHyperlegibleNext.woff2", "Atkinson Hyperlegible Next", "OFL-AtkinsonHyperlegibleNext.txt"),
+    ("AtkinsonHyperlegibleMono.woff2", "Atkinson Hyperlegible Mono", "OFL-AtkinsonHyperlegibleMono.txt"),
+]
+
+
+def embedded_fonts() -> str:
+    """@font-face rules with the fonts inlined, so the built page needs no network.
+
+    Both fonts are SIL Open Font License 1.1. The copyright line and licence name stay with
+    each rule, and the full licence texts ship in site/fonts/.
+    """
+    rules = []
+    for file, family, licence in FONTS:
+        data = base64.b64encode((SITE / "fonts" / file).read_bytes()).decode("ascii")
+        notice = (SITE / "fonts" / licence).read_text(encoding="utf-8").split("\n", 1)[0].split(") ", 1)[0] + ")"
+        rules.append(
+            f"/* {family}. {notice}. Licensed under the SIL Open Font License 1.1, https://openfontlicense.org */\n"
+            f'@font-face {{ font-family: "{family}"; src: url(data:font/woff2;base64,{data}) format("woff2"); '
+            f"font-weight: 200 800; font-style: normal; font-display: swap; }}"
+        )
+    return "\n".join(rules)
 
 
 def main() -> int:
@@ -59,6 +85,8 @@ def main() -> int:
     if MARKER not in template:
         print(f"error: {MARKER} marker missing from site/viewer.html")
         return 1
+    if FONT_BLOCK.search(template):
+        template = FONT_BLOCK.sub(lambda _: embedded_fonts(), template, count=1)
     # Escape "</" so a query containing "</script>" cannot close the tag.
     safe = payload.replace("</", "<\\/")
     fragment = template.replace(MARKER, safe)
