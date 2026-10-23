@@ -133,4 +133,4 @@ What would tell us the trees work, if teams choose to measure it on their side: 
 - [x] Viewer functionality: typed actions, empty-result hints, alert condition box, version stamp in notes
 - [ ] Adopt typed actions and `on_empty` across the other trees (one tree done: impossible travel)
 - [ ] Guided and expert modes, and index tables for the OSINT and Detections pages
-- [ ] CI: contrast test, offline test, design lint
+- [x] CI: contrast test, offline test, design lint (in the pytest suite)

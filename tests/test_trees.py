@@ -333,3 +333,59 @@ def test_typed_actions_and_lifecycle(tmp_path):
     _write(tmp_path, "lifecycle", bad)
     _, errors, _ = validate(tmp_path)
     assert any("schema" in e for e in errors), "contain without approval should fail"
+
+
+# ---------- design guards (docs/DESIGN.md) ----------
+import re as _re
+
+VIEWER = ROOT / "site" / "viewer.html"
+
+
+def _tokens(block: str) -> dict[str, str]:
+    return dict(_re.findall(r"--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})", block))
+
+
+def _theme_blocks() -> tuple[dict, dict]:
+    css = VIEWER.read_text(encoding="utf-8")
+    day = _re.search(r":root \{(.*?)\n\}", css, _re.S).group(1)
+    night = _re.search(r':root\[data-theme="dark"\] \{(.*?)\n\}', css, _re.S).group(1)
+    return _tokens(day), _tokens(night)
+
+
+def _contrast(a: str, b: str) -> float:
+    def lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_text_and_control_tokens_meet_wcag_contrast():
+    text = ["ink", "ink-2", "muted", "faint", "accent", "pen", "tp", "inc", "btp", "fp"]
+    controls = ["line-strong", "tp-block", "inc-block", "btp-block", "fp-block"]
+    for name, tok in zip(("Day", "Night"), _theme_blocks()):
+        for surface in ("bg", "surface"):
+            for t in text:
+                r = _contrast(tok[t], tok[surface])
+                assert r >= 4.5, f"{name}: --{t} on --{surface} is {r:.2f}:1, needs 4.5:1"
+            for t in controls:
+                r = _contrast(tok[t], tok[surface])
+                assert r >= 3, f"{name}: --{t} on --{surface} is {r:.2f}:1, needs 3:1"
+
+
+def test_built_page_makes_no_external_requests():
+    subprocess.run([sys.executable, str(ROOT / "tools" / "build.py")], check=True, capture_output=True)
+    page = (ROOT / "dist" / "index.html").read_text(encoding="utf-8")
+    assert "fonts.googleapis.com" not in page and "fonts.gstatic.com" not in page
+    assert not _re.search(r'<(?:link|script|img)[^>]+(?:href|src)="https?://', page), "external asset in the built page"
+    assert "data:font/woff2;base64," in page, "fonts are not embedded"
+
+
+def test_viewer_avoids_default_ui_tells():
+    css = VIEWER.read_text(encoding="utf-8")
+    skin = css[css.index("Three inks skin"):]
+    assert "999px" not in skin, "pills are out (docs/DESIGN.md rule 7)"
+    assert "linear-gradient(to right" not in skin and "radial-gradient" not in skin, "no colour gradients"
+    assert "font-style: italic" not in skin, "no italics"
+    assert 'h("em"' not in css, "no italic accent words in headings"
