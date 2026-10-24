@@ -737,15 +737,17 @@ input.field { border-radius: var(--r); background: var(--surface); }
 .ptab[aria-pressed="true"] .pc, .ptab[aria-pressed="true"] svg { color: var(--accent); }
 .pt-triage { --tabc: var(--tab-triage); } .pt-email { --tabc: var(--tab-email); } .pt-identity { --tabc: var(--tab-identity); }
 .pt-endpoint { --tabc: var(--tab-endpoint); } .pt-network { --tabc: var(--tab-network); } .pt-cloud { --tabc: var(--tab-cloud); }
+.home-body { width: 100%; }
+.home-body > div, .browse-tbl { width: 100%; min-width: 0; }
 .pt-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 0 var(--r) var(--r) var(--r); }
-table.pt { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 16px; }
+table.pt { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 16px; }
 table.pt th { text-align: left; font-size: 14px; font-weight: 700; color: var(--ink-2); padding: 14px 16px 10px 0; border-bottom: 1.5px solid var(--line-strong); white-space: nowrap; }
 table.pt td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--line); vertical-align: baseline; }
 table.pt tr:last-child td { border-bottom: 0; }
 table.pt th:first-child, table.pt td:first-child { padding-left: 20px; }
 table.pt tbody tr:hover { background: var(--surface-2); }
 table.pt td { vertical-align: top; }
-.pt-card { width: 31%; }
+.pt-card { width: 52%; }
 .pt-cardin { display: flex; align-items: baseline; gap: 10px; }
 .pt-alerts { width: 38%; }
 .pt-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1485,7 +1487,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   CATS.forEach(([cat]) => bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title))
     .forEach((t, i) => { CODE[t.id] = CAT_CODE[cat] + "-" + String(i + 1).padStart(2, "0"); }));
   const HOME_TAB_KEY = "triage-trees-home-tab";
-  let homeTab = "identity", homeAll = false;
+  let homeTab = "triage", homeAll = false;
   try { const v = localStorage.getItem(HOME_TAB_KEY); if (v && CAT_TAB[v]) homeTab = v; } catch (e) {}
   const VSHAPE = { true_positive: '<path d="M8 1.5 15 14.5 1 14.5z"/>', inconclusive: '<path d="M8 1 15 8 8 15 1 8z"/>',
     benign_positive: '<circle cx="8" cy="8" r="7"/>', false_positive: '<rect x="1.5" y="1.5" width="13" height="13"/>' };
@@ -1502,15 +1504,15 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       const shown = VERDICTS.filter(v => c[v]);
       return h("tr", {},
         h("td", { class: "pt-card" }, h("div", { class: "pt-cardin" }, h("span", { class: "pt-code" }, CODE[t.id]),
-          h("button", { class: "pt-title", type: "button", onclick: () => openTree(t.id), title: t.summary, html: highlight(t.title, words) }))),
-        h("td", { class: "pt-alerts" }, h("span", { class: "pt-clamp", title: (t.applies_to || []).join("; "), html: highlight((t.applies_to || []).slice(0, 3).join("; "), words) })),
+          h("button", { class: "pt-title", type: "button", onclick: () => openTree(t.id),
+            title: t.summary + ((t.applies_to || []).length ? "\n\nAlert names: " + t.applies_to.join("; ") : ""), html: highlight(t.title, words) }))),
         h("td", { class: "pt-mitre" }, (t.mitre || []).slice(0, 2).map(id => h("a", { href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id))),
         h("td", { class: "pt-num" }, steps + " · " + outs.length),
         h("td", { class: "pt-ends" }, h("span", { class: "sr-only" }, shown.map(v => c[v] + " " + VLABEL[v].toLowerCase()).join(", ")),
           h("span", { class: "pt-vs", "aria-hidden": "true" }, shown.map(v => h("span", {}, vshape(v), String(c[v]))))));
     };
     return h("div", { class: "pt-wrap" }, h("table", { class: "pt" },
-      h("thead", {}, h("tr", {}, ["Card", "Matches alert titles", "ATT&CK", "Steps · endings", "Endings by verdict"].map(x => h("th", { scope: "col" }, x)))),
+      h("thead", {}, h("tr", {}, ["Card", "ATT&CK", "Steps · endings", "Endings by verdict"].map(x => h("th", { scope: "col" }, x)))),
       h("tbody", {}, list.map(row))));
   }
   function renderHome() {
