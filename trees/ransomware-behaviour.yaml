@@ -10,7 +10,7 @@ applies_to:
   - File backups were deleted (vssadmin, wbadmin)
   - Ransom note detected
 mitre: [T1486, T1490]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
           | summarize Files = count(), Extensions = make_set(tostring(split(FileName, ".")[-1]), 20)
                     by bin(Timestamp, 5m), InitiatingProcessFileName, InitiatingProcessAccountName
           | order by Files desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     yes: o-tp-live
     no: c-indicators
     notes:
@@ -67,6 +71,10 @@ nodes:
                                               "bcdedit", "recoveryenabled no", "ignoreallfailures", "Win32_ShadowCopy")
           | project Timestamp, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName
     note: I collected ransomware indicators on {{device}} for {{account}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     next: q-legit-backup
 
   q-legit-backup:
@@ -117,6 +125,10 @@ nodes:
           | where Title has_any ("ransomware", "shadow", "backup", "encrypt")
           | join kind=inner (AlertEvidence | where EntityType == "Machine") on AlertId
           | summarize Alerts = count(), Titles = make_set(Title, 10) by DeviceName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the alert tables only hold alerts from connected
+      products. Check the value matches how the table records it and the time window is long enough, and
+      confirm AlertInfo returns rows for any recent alert before you answer.
     yes: o-tp-spread
     no: o-tp-single
     notes:
@@ -140,9 +152,9 @@ nodes:
     anchor: "{{device}} is actively being encrypted."
     risk: The risk here is estate-wide encryption and data theft; immediate containment is required.
     actions:
-      - Isolate {{device}} now and call the customer on the P1 path
-      - Disable {{account}} and any account seen writing encrypted files
-      - Identify the source host if encryption comes over SMB and isolate it
+      - { type: contain, text: "Isolate {{device}} now and call the customer on the P1 path", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Disable {{account}} and any account seen writing encrypted files", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Identify the source host if encryption comes over SMB and isolate it" }
       - Protect backups (take them offline) and engage incident response
     escalate: true
     monitor: I will monitor the estate for encryption behaviour and recovery inhibition on other hosts.
@@ -154,9 +166,9 @@ nodes:
     anchor: Ransomware indicators on {{device}} are real and limited to that device so far.
     risk: The risk here is the operator moving to further hosts; the precursor activity (access, credentials) must be found.
     actions:
-      - Isolate {{device}} and disable {{account}}
-      - Find the initial access and lateral movement that led here
-      - Check backups and restore points
+      - { type: contain, text: "Isolate {{device}} and disable {{account}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Find the initial access and lateral movement that led here" }
+      - { type: enrich, text: "Check backups and restore points" }
       - Raise a P1 incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same process, account and commands.
@@ -169,8 +181,8 @@ nodes:
     risk: The risk here is organisation-wide outage; this is a major incident.
     actions:
       - Invoke the customer's major incident process and engage incident response
-      - Isolate every affected device and consider segmenting the network
-      - Disable compromised accounts, including domain admins if used
+      - { type: contain, text: "Isolate every affected device and consider segmenting the network", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Disable compromised accounts, including domain admins if used", approval: SOC lead or per client RACI, reversible: true }
       - Protect and verify backups
     escalate: true
     monitor: I will monitor for new devices showing encryption or recovery inhibition.

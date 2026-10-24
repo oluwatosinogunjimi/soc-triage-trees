@@ -10,7 +10,7 @@ applies_to:
   - Impact:EC2/BitcoinDomainRequest.Reputation
   - Firewall detected Stratum mining protocol
 mitre: [T1496]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -39,6 +39,10 @@ nodes:
           | summarize Sessions = count(), MB = round(sum(SentBytes + ReceivedBytes) / 1048576.0, 1), First = min(TimeGenerated)
                     by DestinationIP, DestinationPort, RequestURL, ApplicationProtocol
     note: I confirmed the mining pool traffic from {{src_ip}} and identified the device.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CommonSecurityLog only holds what the firewall,
+      proxy or IDS forwards. Check the value matches how the table records it and the time window is long
+      enough, and confirm CommonSecurityLog returns rows for another host before you answer.
     next: q-managed
 
   q-managed:
@@ -100,7 +104,7 @@ nodes:
     anchor: A personal or guest device at {{src_ip}} is mining cryptocurrency.
     risk: The risk here is resource abuse on the network; it is a policy matter as the device is not corporate.
     actions:
-      - Block the pool destinations at the firewall
+      - { type: contain, text: "Block the pool destinations at the firewall", approval: SOC lead or per client RACI, reversible: true }
       - Ask the network team to identify and remove the device
 
   o-tp-server:
@@ -110,9 +114,9 @@ nodes:
     anchor: "{{src_ip}}, an internet-facing server, appliance or workload, is mining cryptocurrency."
     risk: The risk here is an attacker with code execution on an exposed system; the miner is only the visible payload.
     actions:
-      - Isolate the system
-      - Find the exploited service or credential and patch or rotate it
-      - Block the pool destinations
+      - { type: contain, text: "Isolate the system", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Find the exploited service or credential and patch or rotate it" }
+      - { type: contain, text: "Block the pool destinations", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor the estate for pool traffic from any source.
 
@@ -123,10 +127,10 @@ nodes:
     anchor: "{{src_ip}}, a device without EDR, is mining cryptocurrency and talking to command-and-control infrastructure."
     risk: The risk here is remote attacker control of a device with no EDR visibility; the miner is one payload among others.
     actions:
-      - Block {{src_ip}} at the network edge or move it to a quarantine VLAN
-      - Block the pool and C2 destinations at the firewall
+      - { type: contain, text: "Block {{src_ip}} at the network edge or move it to a quarantine VLAN", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Block the pool and C2 destinations at the firewall", approval: SOC lead or per client RACI, reversible: true }
       - Ask the network team to identify the device and its owner
-      - Hunt for other hosts talking to the same C2 infrastructure
+      - { type: enrich, text: "Hunt for other hosts talking to the same C2 infrastructure" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for connections to the same C2 and pool destinations.

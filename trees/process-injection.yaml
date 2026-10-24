@@ -10,7 +10,7 @@ applies_to:
   - Process hollowing detected
   - A process was injected with potentially malicious code
 mitre: [T1055, T1055.012]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -44,6 +44,10 @@ nodes:
           | where DeviceName =~ "{{device}}" and InitiatingProcessFileName =~ "{{target}}" and RemoteIPType == "Public"
           | summarize Connections = count() by RemoteIP, RemoteUrl, RemotePort
     note: I reviewed injection from {{source}} into {{target}} on {{device}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceEvents returns rows for another device before you answer.
     next: q-known
 
   q-known:
@@ -118,9 +122,9 @@ nodes:
     anchor: "{{source}} injected code into {{target}} on {{device}}, which then behaved maliciously."
     risk: The risk here is an implant hiding in a trusted process with network and credential access; containment is required now.
     actions:
-      - Isolate {{device}}
-      - Collect memory or an investigation package before remediation
-      - Identify how {{source}} arrived and block its hash
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Collect memory or an investigation package before remediation" }
+      - { type: enrich, text: "Identify how {{source}} arrived and block its hash" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the injecting binary and the C2 destinations.

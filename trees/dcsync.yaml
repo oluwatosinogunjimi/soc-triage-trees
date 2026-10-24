@@ -10,7 +10,7 @@ applies_to:
   - Suspected DCSync attack
   - Directory Services replication from non-DC (Event 4662)
 mitre: [T1003.006]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -46,6 +46,11 @@ nodes:
           | where ActionType has "replication"
           | project Timestamp, ActionType, AccountName, DeviceName, IPAddress, DestinationDeviceName, AdditionalFields
     note: I confirmed the replication request by {{account}} from {{src_host}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects; the Identity tables need Defender for Identity sensors on every
+      domain controller. Check the value matches how the table records it and the time window is long
+      enough, and confirm SecurityEvent returns rows for another device before you answer.
     next: q-dc-or-sync
 
   q-dc-or-sync:
@@ -129,10 +134,10 @@ nodes:
     anchor: "{{account}} replicated directory secrets from a domain controller to {{src_host}}, which is not a replication partner."
     risk: The risk here is full domain compromise, including golden tickets from the krbtgt hash; this is a domain-level emergency.
     actions:
-      - Call the customer on the P1 path immediately
-      - Isolate {{src_host}} and disable {{account}}
+      - { type: notify, text: "Call the customer on the P1 path immediately" }
+      - { type: contain, text: "Isolate {{src_host}} and disable {{account}}", approval: SOC lead or per client RACI, reversible: true }
       - Plan a double krbtgt reset and reset privileged account passwords
-      - Remove replication rights from any account that should not hold them
+      - { type: remediate, text: "Remove replication rights from any account that should not hold them", approval: System owner or per client RACI }
       - Engage incident response
     escalate: true
     monitor: I will monitor for Kerberos ticket anomalies and further replication requests.

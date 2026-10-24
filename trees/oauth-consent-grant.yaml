@@ -11,7 +11,7 @@ applies_to:
   - Unusual addition of credentials to an OAuth app
   - App with suspicious OAuth scopes
 mitre: [T1528, T1550.001, T1098.001]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -52,6 +52,10 @@ nodes:
                     IsAdminConsent = tostring(Props["ConsentContext.IsAdminConsent"]),
                     Permissions = tostring(Props["ConsentAction.Permissions"]), Props
     note: I pulled the consent by {{user}} to {{app}} ({{app_id}}) and the permissions it granted.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AuditLogs returns rows for another user before you answer.
     next: q-known-app
 
   q-known-app:
@@ -82,6 +86,10 @@ nodes:
           | where tostring(TargetResources[0].displayName) =~ "{{app}}"
           | summarize Consents = count(), Users = make_set(tostring(InitiatedBy.user.userPrincipalName), 50),
                       First = min(TimeGenerated), Last = max(TimeGenerated)
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AuditLogs returns rows for another user before you answer.
     yes: c-consent-context
     no: q-app-credentials
     notes:
@@ -162,6 +170,10 @@ nodes:
           | project Timestamp, Url, ActionType, NetworkMessageId
           | order by Timestamp desc
     note: I reviewed how {{user}} came to consent to {{app}}, including preceding clicks and sign-ins.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm UrlClickEvents returns rows for another mailbox before you answer.
     next: q-app-used
 
   q-app-used:
@@ -190,6 +202,11 @@ nodes:
           | where Timestamp > ago(30d)
           | where tostring(RawEventData.AppId) == "{{app_id}}" or tostring(RawEventData.ClientAppId) == "{{app_id}}"
           | summarize Events = count(), Accounts = make_set(AccountDisplayName, 20), First = min(Timestamp) by ActionType
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings; CloudAppEvents needs the Defender for Cloud Apps app
+      connectors. Check the value matches how the table records it and the time window is long enough, and
+      confirm AADServicePrincipalSignInLogs returns rows for another service principal before you answer.
     yes: o-tp-active
     no: o-tp-unused
     notes:
@@ -227,7 +244,9 @@ nodes:
     title: Unsanctioned app, policy violation
     anchor: "{{app}} is legitimate but unsanctioned, and holds high-risk permissions with no accepted business need."
     risk: The risk here is data exposure through an unapproved third party; removing the grant closes it.
-    actions: [Revoke the grant per policy, Recommend restricting user consent to verified publishers]
+    actions:
+      - { type: contain, text: "Revoke the grant per policy", approval: SOC lead or per client RACI }
+      - "Recommend restricting user consent to verified publishers"
 
   o-tp-unused:
     type: outcome
@@ -236,10 +255,10 @@ nodes:
     anchor: "{{user}} granted consent to {{app}}, a consent phishing application, and the app has not yet used its access."
     risk: The risk here is persistent data access that survives password resets; disabling the app and revoking the grant removes it before use.
     actions:
-      - Disable the application (disable rather than delete so it cannot be re-consented)
-      - Revoke the delegated grants and app role assignments
-      - Revoke sessions for {{user}} and check for other consenting users
-      - Purge the lure and report the app to Microsoft
+      - { type: contain, text: "Disable the application (disable rather than delete so it cannot be re-consented)", approval: SOC lead or per client RACI, reversible: false }
+      - { type: contain, text: "Revoke the delegated grants and app role assignments", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{user}} and check for other consenting users", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Purge the lure and report the app to Microsoft", approval: System owner or per client RACI, reversible: false }
     escalate: true
     monitor: I will monitor for new consents to {{app}} or apps from the same publisher.
 
@@ -250,9 +269,9 @@ nodes:
     anchor: "{{app}} obtained consent from {{user}} through consent phishing and has already accessed data."
     risk: The risk here is ongoing mailbox and file theft through the app token, which a password reset does not stop.
     actions:
-      - Disable the application immediately and revoke all grants
-      - Scope what the app accessed (mail items, files, sent mail) and for which users
-      - Revoke sessions for every consenting user
+      - { type: contain, text: "Disable the application immediately and revoke all grants", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Scope what the app accessed (mail items, files, sent mail) and for which users" }
+      - { type: contain, text: "Revoke sessions for every consenting user", approval: SOC lead or per client RACI }
       - Escalate to the customer for data exposure assessment
       - Restrict user consent to verified publishers and enable the admin consent workflow
     escalate: true

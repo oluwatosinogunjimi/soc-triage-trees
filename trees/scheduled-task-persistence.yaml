@@ -10,7 +10,7 @@ applies_to:
   - Scheduled task created by unusual process
   - Persistence via scheduled task (Event 4698)
 mitre: [T1053.005]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
           | project Timestamp, TaskName = tostring(AF.TaskName), TaskContent = tostring(AF.TaskContent),
                     InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessAccountName
     note: I read task "{{task}}" on {{device}} and the process that created it.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceEvents returns rows for another device before you answer.
     next: q-known-software
 
   q-known-software:
@@ -136,7 +140,7 @@ nodes:
     anchor: Task "{{task}}" on {{device}} was created to run a malicious payload and has not run yet.
     risk: The risk here is the payload running at the next trigger; removing the task and payload closes it.
     actions:
-      - Delete the task and quarantine its payload
-      - Investigate the process and account that created it
+      - { type: remediate, text: "Delete the task and quarantine its payload", approval: System owner or per client RACI, reversible: false }
+      - { type: enrich, text: "Investigate the process and account that created it" }
     escalate: true
     monitor: I will monitor {{device}} for re-creation of the task.

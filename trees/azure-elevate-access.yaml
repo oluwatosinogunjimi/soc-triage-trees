@@ -10,7 +10,7 @@ applies_to:
   - Anomalous activity following Global Administrator elevation
   - Owner role assigned at subscription or management group
 mitre: [T1098.003, T1078.004]
-version: 1.2.0
+version: 1.2.2
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -48,6 +48,10 @@ nodes:
           | summarize Ops = count() by OperationNameValue
           | order by Ops desc
     note: I pulled the elevation or role assignment by {{actor}} for {{assignee}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: AzureActivity needs the subscription connected.
+      Check the value matches how the table records it and the time window is long enough, and confirm
+      AzureActivity returns rows for another resource before you answer.
     next: q-ticket
 
   q-ticket:
@@ -117,7 +121,7 @@ nodes:
     anchor: "{{actor}} elevated access for a ticketed task but left it in place or used it beyond the ticket."
     risk: The risk here is standing access to every subscription; removing it closes the exposure.
     actions:
-      - Remove the User Access Administrator assignment at root scope
+      - { type: remediate, text: "Remove the User Access Administrator assignment at root scope", approval: System owner or per client RACI }
       - Confirm the extra actions with the customer
 
   o-tp:
@@ -127,9 +131,9 @@ nodes:
     anchor: "{{actor}} gained or granted control over Azure subscriptions without authorisation."
     risk: The risk here is control of every Azure resource, including deletion of backups and data theft; this is a P1.
     actions:
-      - Remove the elevation and role assignments
-      - Revoke sessions for {{actor}} and {{assignee}}; treat the Global Administrator as compromised
-      - Review every action taken with the new rights
-      - Call the customer on the P1 path
+      - { type: remediate, text: "Remove the elevation and role assignments", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{actor}} and {{assignee}}; treat the Global Administrator as compromised", approval: SOC lead or per client RACI }
+      - { type: enrich, text: "Review every action taken with the new rights" }
+      - { type: notify, text: "Call the customer on the P1 path" }
     escalate: true
     monitor: I will monitor for further role assignments at subscription and management group scope.

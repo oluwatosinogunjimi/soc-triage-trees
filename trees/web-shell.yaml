@@ -10,7 +10,7 @@ applies_to:
   - Suspicious process launched by web server (w3wp.exe spawning cmd)
   - Web shell detected (Backdoor:ASP/Webshell)
 mitre: [T1505.003, T1190]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -41,6 +41,10 @@ nodes:
           | where DeviceName =~ "{{device}}"
           | order by Timestamp asc
     note: I gathered the new script files and web server child processes on {{device}}, including {{file}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     next: q-deployment
 
   q-deployment:
@@ -106,10 +110,10 @@ nodes:
     anchor: A web shell is present on {{device}} and the web server is executing commands.
     risk: The risk here is persistent remote access to an often internet-facing server and a route into the internal network; containment is required now.
     actions:
-      - Isolate {{device}} or take it out of the load balancer
+      - { type: contain, text: "Isolate {{device}} or take it out of the load balancer", approval: SOC lead or per client RACI, reversible: true }
       - Preserve the web shell and web logs, then remove it
-      - Identify the exploited vulnerability from web logs around the file's creation, and patch it
-      - Check for further shells and accounts created
+      - { type: enrich, text: "Identify the exploited vulnerability from web logs around the file's creation, and patch it" }
+      - { type: enrich, text: "Check for further shells and accounts created" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor {{device}} for new script files and web server child processes.

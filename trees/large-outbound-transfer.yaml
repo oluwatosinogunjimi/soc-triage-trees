@@ -10,7 +10,7 @@ applies_to:
   - Behavior:EC2/TrafficVolumeUnusual
   - Possible data exfiltration
 mitre: [T1048, T1567.002]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,6 +47,11 @@ nodes:
           | where (DeviceName =~ "{{host}}" or LocalIP == "{{host}}") and RemoteIP == "{{dst_ip}}"
           | summarize Connections = count() by InitiatingProcessFileName, InitiatingProcessCommandLine, RemoteUrl, RemotePort
     note: I measured the outbound transfer from {{host}} to {{dst_ip}} against its baseline.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CommonSecurityLog only holds what the firewall,
+      proxy or IDS forwards; Defender for Endpoint only reports devices that are onboarded and online.
+      Check the value matches how the table records it and the time window is long enough, and confirm
+      CommonSecurityLog returns rows for another host before you answer.
     next: q-known-dest
 
   q-known-dest:
@@ -118,9 +123,9 @@ nodes:
     anchor: Data left {{host}} for {{dst_ip}} through an unsanctioned tool or destination.
     risk: The risk here is data theft for extortion or competitive loss; containment is required now.
     actions:
-      - Block {{dst_ip}} and the service domain
-      - Isolate {{host}} and identify the account that ran the tool
-      - Scope the data sent (paths the tool read)
+      - { type: contain, text: "Block {{dst_ip}} and the service domain", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Isolate {{host}} and identify the account that ran the tool", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Scope the data sent (paths the tool read)" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for connections to the same service and tool.

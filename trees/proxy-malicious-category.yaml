@@ -10,7 +10,7 @@ applies_to:
   - Secure web gateway malware category hit
   - Access to phishing category allowed
 mitre: [T1071.001, T1189]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -37,6 +37,10 @@ nodes:
           | summarize Requests = count(), Actions = make_set(DeviceAction), Agents = make_set(RequestClientApplication, 5),
                       First = min(TimeGenerated), Last = max(TimeGenerated) by SourceIP, SourceUserName
     note: I pulled the proxy requests by {{user}} to {{url}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CommonSecurityLog only holds what the firewall,
+      proxy or IDS forwards. Check the value matches how the table records it and the time window is long
+      enough, and confirm CommonSecurityLog returns rows for another host before you answer.
     next: q-allowed
 
   q-allowed:
@@ -125,4 +129,4 @@ nodes:
     anchor: "{{user}} reached {{url}}, but no file or login page was delivered."
     risk: The risk here is drive-by compromise or credential phishing; it doesn't apply as nothing was delivered.
     actions:
-      - Block {{url}} at the proxy
+      - { type: contain, text: "Block {{url}} at the proxy", approval: SOC lead or per client RACI, reversible: true }

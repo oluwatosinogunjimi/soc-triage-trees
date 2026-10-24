@@ -15,6 +15,10 @@ Checks, in order:
  11. Detection rules in detections/ match schema/detection.schema.json and link to playbooks that exist.
  12. OSINT tools in osint/tools.yaml match schema/osint.schema.json, link to playbooks that exist,
      and were verified in the last 180 days (warning only).
+ 13. Lifecycle: review_by not passed (warning), deprecated trees name a replacement, no links to
+     deprecated trees (warning).
+ 14. Public safety: no unknown GUIDs, no email domains outside documentation examples, and no
+     terms from the private denylist (.public-safety-denylist or PUBLIC_SAFETY_DENYLIST).
 
 Usage: python tools/validate.py [trees_dir]
 Exit code 1 if any error.
@@ -22,6 +26,7 @@ Exit code 1 if any error.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from datetime import date
@@ -103,8 +108,9 @@ def load_trees(trees_dir: Path) -> tuple[dict[str, dict], list[str]]:
             errors.append(f"{rel}: YAML error: {exc}")
             continue
         # YAML parses dates into date objects; the schema wants strings.
-        if "last_reviewed" in data and not isinstance(data["last_reviewed"], str):
-            data["last_reviewed"] = str(data["last_reviewed"])
+        for key in ("last_reviewed", "review_by"):
+            if key in data and not isinstance(data[key], str):
+                data[key] = str(data[key])
 
         schema_errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
         for err in schema_errors:
@@ -175,6 +181,25 @@ def check_graphs(trees: dict[str, dict]) -> tuple[list[str], list[str]]:
             errors.append(f"{where}: placeholder '{{{{{key}}}}}' is not declared in entities")
         for key in sorted(declared - used):
             warnings.append(f"{where}: entity '{key}' is declared but never used")
+
+        # Lifecycle
+        if "review_by" in tree:
+            try:
+                due = date.fromisoformat(tree["review_by"])
+                if due < date.today():
+                    warnings.append(f"{where}: review_by {due} has passed. Review the tree and move the date on.")
+            except ValueError:
+                errors.append(f"{where}: review_by '{tree['review_by']}' is not a real date")
+        if tree.get("status") == "deprecated":
+            if "replaced_by" not in tree:
+                warnings.append(f"{where}: deprecated tree has no replaced_by")
+        if "replaced_by" in tree and tree["replaced_by"] not in trees:
+            errors.append(f"{where}: replaced_by '{tree['replaced_by']}' is not a tree")
+        if tree.get("status") != "deprecated":
+            for nid, node in nodes.items():
+                target = trees.get(node.get("tree", "")) if node["type"] == "link" else None
+                if target and target.get("status") == "deprecated":
+                    warnings.append(f"{where}: {nid} links to deprecated tree '{node['tree']}'")
 
     # Cycle detection across the whole forest (links become edges).
     def successors(tid: str, nid: str) -> list[tuple[str, str]]:
@@ -303,10 +328,67 @@ def load_osint(trees: dict[str, dict], path: Path = OSINT_PATH, today: date | No
     return data["tools"], errors, warnings
 
 
+# Public-safety lint. The repo is public and generic, so content must not carry real tenant IDs,
+# real mailboxes or anything from a client environment. Well-known public GUIDs and documentation
+# example domains are allowed. A private denylist (never committed) catches client names, hosts
+# and domains: put one term per line in .public-safety-denylist, or set PUBLIC_SAFETY_DENYLIST
+# to a newline-separated list (for example from a CI secret).
+GUID = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)\b")
+SAFE_GUIDS = {
+    "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2",  # DS-Replication-Get-Changes
+    "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2",  # DS-Replication-Get-Changes-All
+    "89e95b76-444d-4c62-991a-0facbeda640c",  # DS-Replication-Get-Changes-In-Filtered-Set
+    "00001111-aaaa-2222-bbbb-3333cccc4444",  # Microsoft documentation placeholder
+}
+SAFE_EMAIL_DOMAINS = {
+    "contoso.com", "contoso.onmicrosoft.com", "fabrikam.com", "example.com", "example.org", "example.net",
+    # Illustrative look-alike and personal-mail examples used in phishing and BEC trees.
+    "supplier-co.com", "micros0ft-support.com", "gmail.com",
+}
+DENYLIST_PATH = ROOT / ".public-safety-denylist"
+
+
+def load_denylist() -> list[str]:
+    terms = []
+    if DENYLIST_PATH.exists():
+        terms += DENYLIST_PATH.read_text(encoding="utf-8").splitlines()
+    terms += os.environ.get("PUBLIC_SAFETY_DENYLIST", "").splitlines()
+    return [t.strip().lower() for t in terms if t.strip() and not t.strip().startswith("#")]
+
+
+def check_public_safety(paths: list[Path], denylist: list[str] | None = None) -> list[str]:
+    """Return errors for content that looks environment-specific."""
+    denylist = load_denylist() if denylist is None else denylist
+    errors: list[str] = []
+    for path in paths:
+        rel = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        text = path.read_text(encoding="utf-8")
+        for g in sorted(set(GUID.findall(text))):
+            if g.lower() not in SAFE_GUIDS:
+                errors.append(f"{rel}: public safety: GUID {g} may be a real tenant or object ID. Use 00001111-aaaa-2222-bbbb-3333cccc4444.")
+        for domain in sorted({d.lower() for d in EMAIL.findall(text)}):
+            if domain not in SAFE_EMAIL_DOMAINS:
+                errors.append(f"{rel}: public safety: email domain '{domain}' is not a documentation example. Use contoso.com.")
+        lowered = text.lower()
+        for term in denylist:
+            if term in lowered:
+                errors.append(f"{rel}: public safety: contains a denylisted term")
+    return errors
+
+
+def content_paths(trees_dir: Path) -> list[Path]:
+    paths = sorted(trees_dir.glob("*.y*ml"))
+    paths += sorted((ROOT / "detections").glob("*.y*ml")) if (ROOT / "detections").exists() else []
+    if OSINT_PATH.exists():
+        paths.append(OSINT_PATH)
+    return paths
+
+
 def validate(trees_dir: Path = ROOT / "trees") -> tuple[dict[str, dict], list[str], list[str]]:
     trees, errors = load_trees(trees_dir)
     graph_errors, warnings = check_graphs(trees)
-    return trees, errors + graph_errors, warnings
+    return trees, errors + graph_errors + check_public_safety(sorted(trees_dir.glob("*.y*ml"))), warnings
 
 
 def main() -> int:
@@ -315,6 +397,9 @@ def main() -> int:
     dets, det_errors = load_detections(trees) if len(sys.argv) == 1 else ({}, [])
     osint, osint_errors, osint_warnings = load_osint(trees) if len(sys.argv) == 1 else ([], [], [])
     errors += det_errors + osint_errors
+    if len(sys.argv) == 1:
+        others = [p for p in content_paths(trees_dir) if p.parent != trees_dir]
+        errors += check_public_safety(others)
     warnings += osint_warnings
     for w in warnings:
         print(f"warning: {w}")

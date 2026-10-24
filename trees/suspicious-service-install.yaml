@@ -10,7 +10,7 @@ applies_to:
   - Suspicious service creation (Event 7045 / 4697)
   - PsExec service installed
 mitre: [T1543.003, T1569.002]
-version: 1.2.0
+version: 1.2.1
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -47,6 +47,10 @@ nodes:
           | where DeviceName =~ "{{device}}" and LogonType == "Network" and ActionType == "LogonSuccess"
           | project Timestamp, AccountName, RemoteIP, RemoteDeviceName, Protocol
     note: I read service "{{service}}" on {{device}} and its install context.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceEvents returns rows for another device before you answer.
     next: q-lsass
 
   q-lsass:

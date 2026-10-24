@@ -10,7 +10,7 @@ applies_to:
   - Phish detected, URL in QR code
   - User reported QR code phishing
 mitre: [T1566.002, T1204.001]
-version: 1.1.0
+version: 1.1.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
           | join kind=inner (EmailEvents | project NetworkMessageId, RecipientEmailAddress, SenderFromAddress, Subject, DeliveryAction) on NetworkMessageId
           | project Url, UrlDomain, RecipientEmailAddress, SenderFromAddress, Subject, DeliveryAction
     note: I pulled message {{network_message_id}}, the decoded QR code URL and every recipient.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailUrlInfo returns rows for another mailbox before you answer.
     next: q-delivered
 
   q-delivered:
@@ -70,6 +74,10 @@ nodes:
           | project TimeGenerated, ResultType, AppDisplayName, IPAddress, AutonomousSystemNumber,
                     OS = tostring(DeviceDetail.operatingSystem), DeviceId = tostring(DeviceDetail.deviceId), UserAgent
           | order by TimeGenerated asc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: l-aitm
     no: o-purged
     unknown: o-inconclusive
@@ -90,7 +98,7 @@ nodes:
     anchor: The QR code phishing message {{network_message_id}} was blocked before delivery.
     risk: The risk here is credential theft through an unmanaged phone; it doesn't apply as the message never reached an inbox.
     actions:
-      - Block the decoded URL and domain
+      - { type: contain, text: "Block the decoded URL and domain", approval: SOC lead or per client RACI, reversible: true }
 
   o-purged:
     type: outcome
@@ -99,9 +107,9 @@ nodes:
     anchor: The QR code phishing message {{network_message_id}} was delivered, and I found no sign that anyone scanned it.
     risk: The risk here is credential theft through a scan on an unmanaged phone that telemetry cannot see; purging the message closes further exposure.
     actions:
-      - Purge the message from all mailboxes
-      - Block the decoded URL and domain
-      - Remind recipients that IT never asks for MFA re-enrolment by QR code
+      - { type: remediate, text: "Purge the message from all mailboxes", approval: System owner or per client RACI, reversible: false }
+      - { type: contain, text: "Block the decoded URL and domain", approval: SOC lead or per client RACI, reversible: true }
+      - { type: notify, text: "Remind recipients that IT never asks for MFA re-enrolment by QR code" }
 
   o-inconclusive:
     type: outcome
@@ -111,6 +119,6 @@ nodes:
     risk: The risk here is an attacker holding a session for {{recipient}} captured through the phone, which stays open until confirmed.
     actions:
       - Ask the recipient whether they scanned the code and entered credentials
-      - Revoke sessions as a precaution
-      - Purge the message and block the URL
+      - { type: contain, text: "Revoke sessions as a precaution", approval: SOC lead or per client RACI }
+      - { type: remediate, text: "Purge the message and block the URL", approval: System owner or per client RACI, reversible: false }
     monitor: I will monitor {{recipient}} for sign-ins from new infrastructure over the next 7 days.

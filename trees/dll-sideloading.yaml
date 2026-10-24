@@ -10,7 +10,7 @@ applies_to:
   - DLL search order hijacking
   - Unsigned DLL loaded from user-writable path
 mitre: [T1574.001]
-version: 1.2.1
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -39,6 +39,10 @@ nodes:
           | join kind=leftouter (DeviceFileCertificateInfo | summarize arg_max(Timestamp, Signer, IsSigned) by SHA1) on SHA1
           | project Timestamp, FolderPath, SHA256, Signer, IsSigned, InitiatingProcessFileName, InitiatingProcessFolderPath
     note: I identified which executable loaded {{dll}} on {{device}} and from where.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceImageLoadEvents returns rows for another device before you answer.
     next: q-location
 
   q-location:
@@ -107,9 +111,9 @@ nodes:
     anchor: A malicious {{dll}} was sideloaded by a signed executable on {{device}}.
     risk: The risk here is an implant hiding behind a trusted signature; containment is required now.
     actions:
-      - Isolate {{device}}
-      - Quarantine the DLL and the copied executable, and find the persistence that launches them
-      - Hunt for the DLL hash and the folder pattern across the estate
+      - { type: contain, text: "Isolate {{device}}", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Quarantine the DLL and the copied executable, and find the persistence that launches them", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Hunt for the DLL hash and the folder pattern across the estate" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the DLL hash and its C2 destinations.

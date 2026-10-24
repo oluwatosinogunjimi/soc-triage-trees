@@ -11,7 +11,7 @@ applies_to:
   - An active 'Sliver' / 'BruteRatel' beacon was detected
   - Impacket toolkit usage
 mitre: [T1588.002, T1071.001]
-version: 1.1.0
+version: 1.1.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,6 +54,11 @@ nodes:
                | project Timestamp, Kind = "Network", Detail = strcat(InitiatingProcessFileName, " -> ", RemoteUrl, " ", RemoteIP, " x", Count))
           | order by Timestamp asc
     note: I reviewed execution, origin and network activity for {{tool}} on {{device}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the alert tables only hold alerts from connected
+      products; Defender for Endpoint only reports devices that are onboarded and online. Check the value
+      matches how the table records it and the time window is long enough, and confirm AlertInfo returns
+      rows for any recent alert before you answer.
     next: q-blocked
 
   q-blocked:
@@ -88,8 +93,8 @@ nodes:
     anchor: "{{tool}} was dropped on {{device}} and quarantined before it ran."
     risk: The risk here is a hands-on attacker; the tool was stopped, but someone put it there.
     actions:
-      - Find who or what dropped the tool and isolate {{device}} if that cannot be explained quickly
-      - Reset the account that dropped it
+      - { type: enrich, text: "Find who or what dropped the tool and isolate {{device}} if that cannot be explained quickly" }
+      - { type: remediate, text: "Reset the account that dropped it", approval: System owner or per client RACI, reversible: false }
     escalate: true
     monitor: I will monitor {{device}} for further tool drops and suspicious logons.
 
@@ -100,10 +105,10 @@ nodes:
     anchor: "{{tool}} executed on {{device}} without authorisation."
     risk: The risk here is an active intrusion with credential theft and lateral movement capability; containment is required now.
     actions:
-      - Isolate {{device}} and call the customer on the P1 path
-      - Block the C2 infrastructure
-      - Reset credentials used on the device
-      - Hunt for the same beacon or tool across the estate
+      - { type: contain, text: "Isolate {{device}} and call the customer on the P1 path", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Block the C2 infrastructure", approval: SOC lead or per client RACI, reversible: true }
+      - { type: remediate, text: "Reset credentials used on the device", approval: System owner or per client RACI, reversible: false }
+      - { type: enrich, text: "Hunt for the same beacon or tool across the estate" }
       - Engage incident response
     escalate: true
     monitor: I will monitor the estate for the C2 infrastructure and tool indicators.

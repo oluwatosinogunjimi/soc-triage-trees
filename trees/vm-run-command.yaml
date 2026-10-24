@@ -10,7 +10,7 @@ applies_to:
   - Suspicious Custom Script Extension deployed
   - SSM SendCommand from unusual principal
 mitre: [T1651]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -46,6 +46,11 @@ nodes:
           | where EventName in ("SendCommand", "StartSession") and (UserIdentityArn has "{{principal}}" or RequestParameters has "{{vm}}")
           | project TimeGenerated, EventName, UserIdentityArn, SourceIpAddress, RequestParameters
     note: I pulled the command run on {{vm}} by {{principal}} and its content.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: AzureActivity needs the subscription connected;
+      CloudTrail must cover every account and region you are checking. Check the value matches how the
+      table records it and the time window is long enough, and confirm AzureActivity returns rows for
+      another resource before you answer.
     next: q-routine
 
   q-routine:
@@ -115,9 +120,9 @@ nodes:
     anchor: "{{principal}} used control-plane execution to run offensive commands on {{vm}}."
     risk: The risk here is attacker control of VMs through a compromised cloud identity; containment is required now.
     actions:
-      - Revoke sessions for {{principal}}
-      - Isolate {{vm}} and reverse the script's changes
-      - Check other VMs for the same command
+      - { type: contain, text: "Revoke sessions for {{principal}}", approval: SOC lead or per client RACI }
+      - { type: contain, text: "Isolate {{vm}} and reverse the script's changes", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Check other VMs for the same command" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor for run commands across all subscriptions and accounts.

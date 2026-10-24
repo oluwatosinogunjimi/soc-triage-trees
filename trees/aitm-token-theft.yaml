@@ -13,7 +13,7 @@ applies_to:
   - Stolen session cookie was used
   - Suspicious sign-in after a phishing click
 mitre: [T1557, T1539, T1550.004]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -58,6 +58,10 @@ nodes:
                         AutonomousSystemNumber, Country, DeviceId, UserAgent, SessionId, AuthenticationRequirement)
           | order by TimeGenerated asc
     note: I built the interactive and non-interactive sign-in timeline for {{user}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-session-hop
 
   q-session-hop:
@@ -75,6 +79,10 @@ nodes:
           | summarize IPs = make_set(IPAddress), ASNs = make_set(AutonomousSystemNumber), UAs = make_set(UserAgent, 5),
                       First = min(TimeGenerated), Last = max(TimeGenerated) by SessionId
           | where array_length(IPs) > 1
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: c-lure
     no: q-unmanaged-officehome
     notes:
@@ -95,6 +103,10 @@ nodes:
           | where isempty(tostring(DeviceDetail.deviceId))
           | project TimeGenerated, AppDisplayName, IPAddress, AutonomousSystemNumber,
                     Country = tostring(LocationDetails.countryOrRegion), UserAgent, AuthenticationRequirement, MfaDetail
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: c-lure
     no: q-risk-detections
     notes:
@@ -113,6 +125,11 @@ nodes:
           | where UserPrincipalName =~ "{{user}}"
           | where RiskEventType in ("anomalousToken", "tokenIssuerAnomaly", "attackerinTheMiddle", "unfamiliarFeatures", "suspiciousBrowser")
           | project TimeGenerated, RiskEventType, RiskLevel, RiskState, IpAddress, DetectionTimingType, Source
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AADUserRiskEvents returns rows for another user before you
+      answer.
     yes: c-lure
     no: o-fp-no-token-indicators
     notes:
@@ -140,6 +157,10 @@ nodes:
           | where IPAddress == "{{ip}}" and ResultType == "0"
           | summarize SignIns = count(), First = min(TimeGenerated) by UserPrincipalName
     note: I looked for the phishing lure and for other users signing in from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm UrlClickEvents returns rows for another mailbox before you answer.
     next: q-persistence
 
   q-persistence:
@@ -170,6 +191,11 @@ nodes:
           | where UserId =~ "{{user}}"
           | where Operation in~ ("New-InboxRule", "Set-InboxRule", "UpdateInboxRules", "Set-Mailbox", "Send", "SendAs")
           | project TimeGenerated, Operation, ClientIP, Parameters
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings; OfficeActivity depends on the Microsoft 365 connector and
+      unified audit logging. Check the value matches how the table records it and the time window is long
+      enough, and confirm AuditLogs returns rows for another user before you answer.
     yes: o-tp-persistence
     no: q-user-confirm
     notes:
@@ -222,10 +248,10 @@ nodes:
     anchor: The session for {{user}} was used from {{ip}}, consistent with token theft, and I found no persistence.
     risk: The risk here is the attacker returning with the stolen session; revoking tokens removes that access.
     actions:
-      - Revoke all sessions and refresh tokens (password reset alone does not invalidate stolen tokens)
-      - Reset the password and confirm the user as compromised in Entra ID Protection
-      - Purge the phishing email and check every other recipient who clicked
-      - Block {{ip}} and the phishing domain
+      - { type: contain, text: "Revoke all sessions and refresh tokens (password reset alone does not invalidate stolen tokens)", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Reset the password and confirm the user as compromised in Entra ID Protection", approval: System owner or per client RACI, reversible: false }
+      - { type: remediate, text: "Purge the phishing email and check every other recipient who clicked", approval: System owner or per client RACI, reversible: false }
+      - { type: contain, text: "Block {{ip}} and the phishing domain", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor {{user}} for further sign-ins from {{ip}} or its ASN.
 
@@ -236,11 +262,11 @@ nodes:
     anchor: The session for {{user}} was used from {{ip}}, and the attacker established persistence on the account.
     risk: The risk here is ongoing access and business email compromise through the persistence mechanisms, which survive a password reset until removed.
     actions:
-      - Revoke all sessions and refresh tokens, then reset the password
-      - Remove attacker-registered MFA methods and devices
-      - Remove malicious inbox rules, forwarding and OAuth consents
-      - Review mail sent from the account and warn recipients if internal or vendor phishing went out
-      - Purge the lure, block {{ip}} and the phishing domain
+      - { type: contain, text: "Revoke all sessions and refresh tokens, then reset the password", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Remove attacker-registered MFA methods and devices", approval: System owner or per client RACI }
+      - { type: remediate, text: "Remove malicious inbox rules, forwarding and OAuth consents", approval: System owner or per client RACI }
+      - { type: enrich, text: "Review mail sent from the account and warn recipients if internal or vendor phishing went out" }
+      - { type: remediate, text: "Purge the lure, block {{ip}} and the phishing domain", approval: System owner or per client RACI, reversible: false }
       - Consider phishing-resistant MFA and token protection for this user group
     escalate: true
     monitor: I will monitor {{user}} and {{ip}} for re-entry attempts and new persistence.

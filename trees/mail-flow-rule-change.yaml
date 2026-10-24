@@ -10,7 +10,7 @@ applies_to:
   - Set-TransportRule
   - Mail flow rule redirecting mail externally
 mitre: [T1114.003, T1685]
-version: 1.2.1
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -37,6 +37,10 @@ nodes:
           | where Operation in~ ("New-TransportRule", "Set-TransportRule", "Enable-TransportRule", "Remove-TransportRule")
           | project TimeGenerated, Operation, UserId, ClientIP, Parameters
     note: I pulled mail flow rule "{{rule_name}}" changed by {{actor}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     next: q-dangerous
 
   q-dangerous:
@@ -114,9 +118,9 @@ nodes:
     anchor: Mail flow rule "{{rule_name}}" was created by {{actor}} to intercept mail or weaken filtering without approval.
     risk: The risk here is tenant-wide interception of mail, often finance traffic; containment is required now.
     actions:
-      - Disable and remove the rule
-      - Revoke sessions and reset {{actor}}; review their other admin actions
-      - Scope the mail that matched the rule since creation
+      - { type: contain, text: "Disable and remove the rule", approval: SOC lead or per client RACI, reversible: true }
+      - { type: contain, text: "Revoke sessions and reset {{actor}}; review their other admin actions", approval: SOC lead or per client RACI, reversible: false }
+      - { type: enrich, text: "Scope the mail that matched the rule since creation" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor for further transport rule changes.
@@ -128,8 +132,8 @@ nodes:
     anchor: Mail flow rule "{{rule_name}}" looks low risk on its own, but {{actor}} disabled audit logging or alert policies around the same time.
     risk: The risk here is an attacker blinding the tenant before or after changing mail flow; it stays open until the logging change is explained and reversed.
     actions:
-      - Re-enable audit logging and the affected alert policies
+      - { type: remediate, text: "Re-enable audit logging and the affected alert policies", approval: System owner or per client RACI }
       - Escalate to the customer and confirm whether {{actor}} made both changes on purpose
-      - Review other admin actions by {{actor}} in the same period
+      - { type: enrich, text: "Review other admin actions by {{actor}} in the same period" }
     escalate: true
     monitor: I will monitor for further audit, alert policy and transport rule changes by {{actor}}.

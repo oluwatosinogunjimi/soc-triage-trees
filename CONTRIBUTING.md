@@ -28,6 +28,24 @@ Optional on `outcome`: `monitor`, `escalate: true`, `tuning`.
 
 Node ids use a prefix for their type: `c-` check, `q-` question, `ch-` choice, `o-` outcome, `l-` link.
 
+## Lifecycle, empty results and typed actions
+
+Optional fields, all checked by the validator. See [docs/DESIGN.md](docs/DESIGN.md) for why they exist.
+
+- `status`: `draft`, `stable` or `deprecated` (omitted means stable). A deprecated tree names its replacement in `replaced_by` and is kept, not deleted.
+- `review_by`: the date the tree should be looked at again. The validator warns once it has passed.
+- `on_empty` on a question, check or choice: what it means when the query returns no rows. Usually a data gap (missing connector, retention, a different account name), not a clean result.
+- Typed actions on an outcome. A plain sentence still works. A typed action looks like this:
+
+```yaml
+actions:
+  - { type: contain, text: "Revoke all sessions for {{user}}", approval: SOC lead, reversible: true }
+  - { type: notify, text: "Tell the user by phone, not email", tip_off: true }
+  - { type: enrich, text: "Check other accounts signing in from {{ip}}" }
+```
+
+`type` is `enrich`, `contain`, `remediate` or `notify`. `contain` and `remediate` must name who approves them in `approval`. The viewer shows the approver and whether the action can be undone, and flags actions that could alert the attacker. The tool never runs actions.
+
 ## Entities and placeholders
 
 Declare the values an analyst fills in once under `entities`, then use them anywhere as `{{key}}`: in text, notes, outcomes and queries. The validator rejects any placeholder that is not declared. Keep keys consistent across trees (`user`, `ip`, `device`, `sha256`) so values carry over when a path links between trees.
@@ -85,7 +103,7 @@ You can also add or edit a file in `detections/` by hand. The site reads only th
 - [ ] `python tools/gen_router.py` has been run (CI fails if the router or catalogue is stale)
 - [ ] Every path reaches an outcome that a senior analyst would agree with
 - [ ] Queries were run against a real workspace
-- [ ] No client names, real IPs, real users or internal hostnames anywhere (use the examples format)
+- [ ] No client names, real IPs, real users or internal hostnames anywhere (use the examples format). The validator's public-safety lint catches unknown GUIDs and non-example email domains; add your own client names and hosts to a local `.public-safety-denylist` (it is git-ignored) so it catches those too.
 - [ ] `version` and `last_reviewed` updated
 
 ## OSINT tools

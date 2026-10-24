@@ -10,7 +10,7 @@ applies_to:
   - wevtutil cl executed
   - Audit policy changed
 mitre: [T1685.005]
-version: 1.2.1
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,11 @@ nodes:
           | where ProcessCommandLine has_any ("wevtutil cl", "Clear-EventLog", "Remove-EventLog", "auditpol /clear", "auditpol /set")
           | project Timestamp, AccountName, ProcessCommandLine, InitiatingProcessFileName
     note: I confirmed the log clear on {{device}} by {{account}} and reviewed what ran around it.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: SecurityEvent only holds events that the audit
+      policy logs and the agent collects; Defender for Endpoint only reports devices that are onboarded
+      and online. Check the value matches how the table records it and the time window is long enough, and
+      confirm SecurityEvent returns rows for another device before you answer.
     next: q-planned
 
   q-planned:
@@ -112,7 +117,7 @@ nodes:
     risk: The risk here is hidden attacker activity; the destroyed local logs mean other sources (EDR, SIEM copies) must be checked.
     actions:
       - Ask the account owner to explain the clear
-      - Review forwarded logs and EDR telemetry for the period before the clear
+      - { type: enrich, text: "Review forwarded logs and EDR telemetry for the period before the clear" }
     escalate: true
     monitor: I will monitor {{device}} and {{account}} for further clears and suspicious logons.
 
@@ -123,8 +128,8 @@ nodes:
     anchor: The log on {{device}} was cleared by {{account}} after other suspicious activity.
     risk: The risk here is an active intrusion hiding its footprint; containment is required now.
     actions:
-      - Isolate {{device}} and reset {{account}}
-      - Rebuild the timeline from EDR and forwarded logs
+      - { type: contain, text: "Isolate {{device}} and reset {{account}}", approval: SOC lead or per client RACI, reversible: false }
+      - { type: enrich, text: "Rebuild the timeline from EDR and forwarded logs" }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor the estate for the same account and commands.

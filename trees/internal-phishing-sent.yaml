@@ -10,7 +10,7 @@ applies_to:
   - Internal phishing campaign detected
   - Suspicious email sending patterns (suspiciousSendingPatterns)
 mitre: [T1534, T1566.002]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -39,6 +39,10 @@ nodes:
                       ThreatTypes = make_set(ThreatTypes) by bin(Timestamp, 1h), EmailDirection
           | order by Timestamp desc
     note: I measured the mail sent by {{sender}} and its recipients.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-content
 
   q-content:
@@ -83,6 +87,10 @@ nodes:
           | where TimeGenerated > ago(7d)
           | where UserId =~ "{{sender}}" and Operation in~ ("Send", "SendAs", "SendOnBehalf", "Create")
           | summarize Count = count(), First = min(TimeGenerated) by ClientIP, Operation
+    on_empty: >-
+      No rows can mean missing data, not a clean result: OfficeActivity depends on the Microsoft 365
+      connector and unified audit logging. Check the value matches how the table records it and the time
+      window is long enough, and confirm OfficeActivity returns rows for another user before you answer.
     yes: q-clicks
     no: q-clicks
     notes:
@@ -100,6 +108,10 @@ nodes:
           | where Timestamp > ago(7d) and SenderFromAddress =~ "{{sender}}"
           | join kind=inner (UrlClickEvents | where Timestamp > ago(7d)) on NetworkMessageId
           | project Timestamp1, AccountUpn, Url, ActionType, IsClickedThrough
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     yes: o-tp-spread
     no: o-tp
     notes:
@@ -122,10 +134,10 @@ nodes:
     anchor: "{{sender}} sent phishing lures to colleagues or contacts, and no recipient clicked."
     risk: The risk here is the campaign spreading through trusted internal mail; the sending account is compromised.
     actions:
-      - Revoke sessions, reset the password and check inbox rules for {{sender}}
-      - Purge the messages from all mailboxes and warn external recipients
-      - Block the phishing URLs
-      - Run the token theft tree for {{sender}}
+      - { type: contain, text: "Revoke sessions, reset the password and check inbox rules for {{sender}}", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Purge the messages from all mailboxes and warn external recipients", approval: System owner or per client RACI, reversible: false }
+      - { type: contain, text: "Block the phishing URLs", approval: SOC lead or per client RACI, reversible: true }
+      - { type: enrich, text: "Run the token theft tree for {{sender}}" }
     escalate: true
     monitor: I will monitor {{sender}} for further sends and sign-ins from new infrastructure.
 
@@ -136,9 +148,9 @@ nodes:
     anchor: "{{sender}} sent phishing lures and recipients clicked them."
     risk: The risk here is a spreading compromise across accounts; each clicker needs the same checks.
     actions:
-      - Contain {{sender}} (revoke sessions, reset, remove rules)
-      - Run the malicious URL click tree for every recipient who clicked
-      - Purge the messages and block the URLs
+      - { type: contain, text: "Contain {{sender}} (revoke sessions, reset, remove rules)", approval: SOC lead or per client RACI, reversible: false }
+      - { type: enrich, text: "Run the malicious URL click tree for every recipient who clicked" }
+      - { type: remediate, text: "Purge the messages and block the URLs", approval: System owner or per client RACI, reversible: false }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor every recipient who clicked for sign-ins from new infrastructure.

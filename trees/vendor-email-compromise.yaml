@@ -10,7 +10,7 @@ applies_to:
   - Invoice fraud from known vendor
   - Suspicious email from trusted partner domain
 mitre: [T1566, T1684.001]
-version: 1.2.1
+version: 1.2.4
 last_reviewed: 2026-10-19
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,10 @@ nodes:
           | where SenderFromDomain =~ dom or RecipientEmailAddress endswith dom
           | summarize Messages = count(), First = min(Timestamp), Last = max(Timestamp), Senders = make_set(SenderFromAddress, 10) by EmailDirection
     note: I compared the message from {{sender}} with the vendor's mail history.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-lookalike
 
   q-lookalike:
@@ -108,8 +112,8 @@ nodes:
     anchor: The request from {{sender}} to change payment details is fraudulent, and no change or payment was made.
     risk: The risk here is payment redirection to an attacker account; it doesn't apply as finance did not act.
     actions:
-      - Block the sender or lookalike domain
-      - Tell the real vendor their mailbox may be compromised (if their domain was used)
+      - { type: contain, text: "Block the sender or lookalike domain", approval: SOC lead or per client RACI, reversible: true }
+      - { type: notify, text: "Tell the real vendor their mailbox may be compromised (if their domain was used)", tip_off: true }
       - Flag the supplier record in finance for extra verification
 
   o-tp-loss:
@@ -120,8 +124,8 @@ nodes:
     risk: The risk here is direct financial loss; recovery depends on how fast the bank is contacted.
     actions:
       - Escalate urgently to the customer's finance lead
-      - Advise contacting the bank to recall the payment immediately and reporting to the authorities
-      - Revert the supplier bank details
-      - Notify the real vendor
+      - { type: notify, text: "Advise contacting the bank to recall the payment immediately and reporting to the authorities" }
+      - { type: remediate, text: "Revert the supplier bank details", approval: System owner or per client RACI }
+      - { type: notify, text: "Notify the real vendor", tip_off: true }
     escalate: true
     monitor: I will monitor for further messages from the vendor domain and lookalikes.

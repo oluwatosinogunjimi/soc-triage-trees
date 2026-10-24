@@ -11,7 +11,7 @@ applies_to:
   - Risky sign in followed by privilege role grant
   - PIM role activation outside business hours
 mitre: [T1098.003, T1078.004]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -46,6 +46,10 @@ nodes:
           | where Target =~ "{{user}}" or Actor =~ "{{actor}}"
           | project TimeGenerated, OperationName, Target, Role, Actor, ActorIP, Result
     note: I pulled the assignment of {{role}} to {{user}} by {{actor}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AuditLogs returns rows for another user before you answer.
     next: q-actor-session
 
   q-actor-session:
@@ -64,6 +68,10 @@ nodes:
             (AADUserRiskEvents | where TimeGenerated > ago(7d) | where UserPrincipalName =~ "{{actor}}"
                | summarize SignIns = count(), Risk = make_set(RiskEventType) by IPAddress = IpAddress
                | extend Country = "", Source = "Risk")
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: q-actor-mfa
     no: o-tp-takeover
     notes:
@@ -107,6 +115,10 @@ nodes:
           | where tostring(InitiatedBy.user.userPrincipalName) =~ "{{user}}"
           | summarize Count = count(), First = min(TimeGenerated) by OperationName
           | order by Count desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm AuditLogs returns rows for another user before you answer.
     yes: o-inconclusive
     no: q-audit-logging
     notes:
@@ -146,7 +158,7 @@ nodes:
     risk: The risk here is standing privilege that nobody reviewed; it is a process failure rather than an attack.
     actions:
       - Confirm the assignment with the customer's identity owner
-      - Remove it if not justified and recommend PIM with approval for this role
+      - { type: remediate, text: "Remove it if not justified and recommend PIM with approval for this role", approval: System owner or per client RACI }
     monitor: I will monitor {{user}} for privileged actions until the assignment is confirmed.
 
   o-inconclusive:
@@ -156,8 +168,8 @@ nodes:
     anchor: "{{user}} received {{role}} through the approved process but has since performed actions that need confirming."
     risk: The risk here is misuse of new privileges, which stays open until the customer confirms the actions.
     actions:
-      - Send the list of actions to the customer for confirmation
-      - Remove the role pending confirmation if the actions touch security settings
+      - { type: notify, text: "Send the list of actions to the customer for confirmation" }
+      - { type: remediate, text: "Remove the role pending confirmation if the actions touch security settings", approval: System owner or per client RACI }
     monitor: I will monitor {{user}} for further privileged changes until this is resolved.
 
   o-tp-takeover:
@@ -167,9 +179,9 @@ nodes:
     anchor: "{{role}} was assigned to {{user}} from a risky session of {{actor}}, consistent with tenant takeover."
     risk: The risk here is full tenant compromise, including new backdoor accounts, apps and federation changes; containment is required now.
     actions:
-      - Remove the role and disable {{user}} if it is attacker-created
-      - Revoke sessions for {{actor}} and {{user}}, reset passwords
-      - Review every change made by both accounts (users, apps, credentials, Conditional Access, federation)
+      - { type: remediate, text: "Remove the role and disable {{user}} if it is attacker-created", approval: System owner or per client RACI }
+      - { type: contain, text: "Revoke sessions for {{actor}} and {{user}}, reset passwords", approval: SOC lead or per client RACI, reversible: false }
+      - { type: enrich, text: "Review every change made by both accounts (users, apps, credentials, Conditional Access, federation)" }
       - Engage the customer's break-glass process
       - Raise a P1 incident and escalate
     escalate: true

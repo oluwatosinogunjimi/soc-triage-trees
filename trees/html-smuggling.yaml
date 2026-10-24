@@ -10,7 +10,7 @@ applies_to:
   - HTML smuggling detected
   - Malicious SVG attachment
 mitre: [T1027.006, T1566.001]
-version: 1.1.0
+version: 1.1.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -38,6 +38,10 @@ nodes:
           | where FileType in~ ("html", "htm", "svg", "shtml") or FileName has_any (".htm", ".svg")
           | project FileName, FileType, SHA256, ThreatTypes, DetectionMethods, RecipientEmailAddress
     note: I pulled the HTML or SVG attachment on message {{network_message_id}} to {{recipient}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailAttachmentInfo returns rows for another mailbox before you answer.
     next: q-opened
 
   q-opened:
@@ -55,6 +59,10 @@ nodes:
           | where FileName in~ ("msedge.exe", "chrome.exe", "firefox.exe")
           | where ProcessCommandLine has_any (".htm", ".svg") and ProcessCommandLine has_any ("Content.Outlook", "INetCache", "Temp")
           | project Timestamp, AccountName, ProcessCommandLine
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     yes: q-dropped
     no: o-not-opened
     notes:
@@ -77,6 +85,10 @@ nodes:
           | where InitiatingProcessFileName in~ ("msedge.exe", "chrome.exe", "firefox.exe")
           | where FileName has_any (".zip", ".iso", ".img", ".js", ".lnk", ".vhd", ".hta", ".exe")
           | project Timestamp, FileName, FolderPath, SHA256, FileOriginUrl
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     yes: l-edr
     no: q-login-page
     notes:
@@ -114,8 +126,8 @@ nodes:
     anchor: The HTML smuggling attachment on {{network_message_id}} was delivered to {{recipient}} but never opened.
     risk: The risk here is a payload assembled in the browser past the gateway; it doesn't apply as the file was never opened.
     actions:
-      - Purge the message from all mailboxes
-      - Block the sender and attachment hash
+      - { type: remediate, text: "Purge the message from all mailboxes", approval: System owner or per client RACI, reversible: false }
+      - { type: contain, text: "Block the sender and attachment hash", approval: SOC lead or per client RACI, reversible: true }
 
   o-opened-nothing:
     type: outcome
@@ -124,6 +136,6 @@ nodes:
     anchor: "{{recipient}} opened the HTML smuggling attachment, but it assembled no file and captured no credentials."
     risk: The risk here is a payload or credential capture from the attachment; it doesn't apply as nothing was produced.
     actions:
-      - Purge the message and block the sender and hash
-      - Brief the user
+      - { type: remediate, text: "Purge the message and block the sender and hash", approval: System owner or per client RACI, reversible: false }
+      - { type: notify, text: "Brief the user" }
     monitor: I will monitor {{device}} for new executable files from the browser over the next 7 days.

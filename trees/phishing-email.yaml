@@ -10,7 +10,7 @@ applies_to:
   - Email reported by user as malware or phish
   - Suspicious email sending patterns
 mitre: [T1566.001, T1566.002, T1204.001, T1204.002, T1534]
-version: 1.1.0
+version: 1.1.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -54,6 +54,10 @@ nodes:
           | where NetworkMessageId == "{{network_message_id}}"
           | project Timestamp, RecipientEmailAddress, Action, ActionType, ActionTrigger, ActionResult, DeliveryLocation
     note: I pulled message {{network_message_id}} from {{sender}} to {{recipient}} with subject "{{subject}}".
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: q-simulation
 
   q-simulation:
@@ -101,6 +105,10 @@ nodes:
                       Delivered = countif(DeliveryAction == "Delivered"),
                       Blocked = countif(DeliveryAction != "Delivered") by SenderFromAddress, Subject
     note: I checked for other copies of the campaign from {{sender}} across the tenant.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: o-blocked
 
   c-sender:
@@ -132,6 +140,10 @@ nodes:
           | where SenderFromAddress =~ "{{sender}}"
           | summarize FirstSeen = min(Timestamp), Messages = count(), Recipients = dcount(RecipientEmailAddress)
     note: I reviewed the sender authentication results and mail history for {{sender}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: c-campaign
 
   c-campaign:
@@ -152,6 +164,10 @@ nodes:
                       Delivered = countif(DeliveryAction == "Delivered"),
                       RecipientList = make_set(RecipientEmailAddress, 100) by SenderFromAddress, Subject
     note: I scoped the campaign from {{sender}} across all recipients.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     next: ch-payload
 
   ch-payload:
@@ -172,6 +188,10 @@ nodes:
           EmailUrlInfo
           | where NetworkMessageId == "{{network_message_id}}"
           | project Url, UrlDomain, UrlLocation
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailUrlInfo returns rows for another mailbox before you answer.
     yes: q-clicked
     no: q-sender-risky
     unknown: q-clicked
@@ -190,6 +210,10 @@ nodes:
           EmailAttachmentInfo
           | where NetworkMessageId == "{{network_message_id}}"
           | project FileName, FileType, SHA256, ThreatTypes, DetectionMethods, RecipientEmailAddress
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailAttachmentInfo returns rows for another mailbox before you answer.
     yes: q-opened
     no: q-sender-risky
     unknown: q-opened
@@ -230,6 +254,10 @@ nodes:
           | where Timestamp > ago(30d)
           | where NetworkMessageId == "{{network_message_id}}"
           | project Timestamp, AccountUpn, Url, ActionType, IsClickedThrough, IPAddress
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm UrlClickEvents returns rows for another mailbox before you answer.
     yes: q-credentials
     no: o-phish-no-interaction
     notes:
@@ -257,6 +285,10 @@ nodes:
           | summarize FirstSeen = min(TimeGenerated), SignIns = count(), Results = make_set(ResultType)
                     by IPAddress, AutonomousSystemNumber, Country = tostring(LocationDetails.countryOrRegion), AppDisplayName
           | order by FirstSeen desc
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     yes: l-aitm
     no: q-download
     unknown: o-clicked-inconclusive
@@ -279,6 +311,10 @@ nodes:
           | where InitiatingProcessAccountUpn =~ "{{recipient}}" or RequestAccountName =~ tostring(split("{{recipient}}", "@")[0])
           | where isnotempty(FileOriginUrl)
           | project Timestamp, DeviceName, FileName, FolderPath, SHA256, FileOriginUrl, InitiatingProcessFileName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceFileEvents returns rows for another device before you answer.
     yes: l-edr
     no: o-clicked-no-compromise
     notes:
@@ -299,6 +335,10 @@ nodes:
              or ProcessCommandLine has @"\INetCache\"
           | where AccountUpn =~ "{{recipient}}" or InitiatingProcessAccountUpn =~ "{{recipient}}"
           | project Timestamp, DeviceName, FileName, ProcessCommandLine, InitiatingProcessFileName
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceProcessEvents returns rows for another device before you answer.
     yes: l-edr
     no: o-phish-no-interaction
     notes:
@@ -318,6 +358,10 @@ nodes:
           | where SenderFromAddress =~ "{{recipient}}"
           | where RecipientEmailAddress endswith tostring(split("{{sender}}", "@")[1])
           | project Timestamp, RecipientEmailAddress, Subject
+    on_empty: >-
+      No rows can mean missing data, not a clean result: the Defender for Office 365 email tables need the
+      right licence. Check the value matches how the table records it and the time window is long enough,
+      and confirm EmailEvents returns rows for another mailbox before you answer.
     yes: o-bec-engaged
     no: o-phish-no-interaction
     notes:
@@ -367,7 +411,7 @@ nodes:
     risk: The risk here is credential theft or malware through the lure; it doesn't apply as no recipient interacted before remediation.
     actions:
       - Soft-delete or purge all copies of the campaign
-      - Block the sender, domain and URLs or hashes
+      - { type: contain, text: "Block the sender, domain and URLs or hashes", approval: SOC lead or per client RACI, reversible: true }
       - Report the message to Microsoft or the email vendor
     tuning: If the gateway missed it, submit it as a false negative so filtering improves.
 
@@ -378,9 +422,9 @@ nodes:
     anchor: "{{recipient}} clicked a malicious link from {{sender}}, but no credential use or download followed."
     risk: Due to the click on a credential-harvesting link, we will continue to monitor {{recipient}} for sign-ins from new infrastructure.
     actions:
-      - Purge the campaign and block the URL and domain
-      - Reset the password and revoke sessions as a precaution if credentials may have been entered
-      - Brief the user on the lure
+      - { type: remediate, text: "Purge the campaign and block the URL and domain", approval: System owner or per client RACI, reversible: false }
+      - { type: remediate, text: "Reset the password and revoke sessions as a precaution if credentials may have been entered", approval: System owner or per client RACI, reversible: false }
+      - { type: notify, text: "Brief the user on the lure" }
     monitor: I will monitor {{recipient}} for sign-ins from unfamiliar IPs and MFA method changes over the next 7 days.
 
   o-clicked-inconclusive:
@@ -391,8 +435,8 @@ nodes:
     risk: The risk here is an attacker holding valid credentials or a session for {{recipient}}, which stays open until the user confirms or sessions are revoked.
     actions:
       - Ask the user whether they entered credentials
-      - Revoke sessions and reset the password if the user cannot confirm
-      - Purge the campaign and block the URL
+      - { type: contain, text: "Revoke sessions and reset the password if the user cannot confirm", approval: SOC lead or per client RACI, reversible: false }
+      - { type: remediate, text: "Purge the campaign and block the URL", approval: System owner or per client RACI, reversible: false }
     monitor: I will monitor {{recipient}} for sign-ins from unfamiliar IPs, inbox rule creation and MFA changes.
 
   o-bec-engaged:
@@ -403,8 +447,8 @@ nodes:
     risk: The risk here is financial loss or data disclosure through the request; the recipient has already engaged so the business must act now.
     actions:
       - Escalate urgently to the customer, including finance if payment is involved
-      - Advise contacting the bank immediately if a payment was sent
-      - Purge the campaign and block the sender
-      - Check whether a vendor account is compromised (vendor email compromise)
+      - { type: notify, text: "Advise contacting the bank immediately if a payment was sent" }
+      - { type: remediate, text: "Purge the campaign and block the sender", approval: System owner or per client RACI, reversible: false }
+      - { type: enrich, text: "Check whether a vendor account is compromised (vendor email compromise)" }
     escalate: true
     monitor: I will monitor for further messages from {{sender}} or its domain to any recipient.

@@ -10,7 +10,7 @@ applies_to:
   - Break-glass account used
   - Sign-in by excluded privileged account
 mitre: [T1078.004]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -42,6 +42,10 @@ nodes:
                | project TimeGenerated, Kind = "Action", Detail = OperationName, IP = tostring(InitiatedBy.user.ipAddress))
           | order by TimeGenerated asc
     note: I pulled every sign-in and action by {{user}}, including the sign-in from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Entra ID sign-in, audit and risk logs reach
+      Sentinel only through diagnostic settings. Check the value matches how the table records it and the
+      time window is long enough, and confirm SigninLogs returns rows for another user before you answer.
     next: q-declared
 
   q-declared:
@@ -113,8 +117,8 @@ nodes:
     anchor: "{{user}} was used during a declared emergency but performed actions beyond it."
     risk: The risk here is misuse of the break-glass account under cover of the emergency, which stays open until the actions are confirmed.
     actions:
-      - Send the action list to the customer's identity owner for confirmation
-      - Rotate the credential after the emergency closes
+      - { type: notify, text: "Send the action list to the customer's identity owner for confirmation" }
+      - { type: remediate, text: "Rotate the credential after the emergency closes", approval: System owner or per client RACI, reversible: false }
     monitor: I will monitor {{user}} for any further use until the emergency is closed.
 
   o-tp-attempt:
@@ -124,8 +128,8 @@ nodes:
     anchor: Someone attempted to sign in to {{user}} from {{ip}} with no declared emergency, and the attempt failed.
     risk: The risk here is takeover of an unrestricted admin account; the account name is known to an attacker even though this attempt failed.
     actions:
-      - Tell the customer immediately
-      - Block {{ip}} and confirm the credential is strong and phishing-resistant
+      - { type: notify, text: "Tell the customer immediately" }
+      - { type: contain, text: "Block {{ip}} and confirm the credential is strong and phishing-resistant", approval: SOC lead or per client RACI, reversible: true }
     escalate: true
     monitor: I will monitor {{user}} for any further sign-in attempts.
 
@@ -136,9 +140,9 @@ nodes:
     anchor: "{{user}} was signed in from {{ip}} with no declared emergency or test."
     risk: The risk here is full tenant compromise through an account that bypasses Conditional Access; containment is required now.
     actions:
-      - Call the customer immediately on the agreed escalation path
-      - Reset the credential and revoke sessions
-      - Review every action taken by the account
+      - { type: notify, text: "Call the customer immediately on the agreed escalation path" }
+      - { type: remediate, text: "Reset the credential and revoke sessions", approval: System owner or per client RACI, reversible: false }
+      - { type: enrich, text: "Review every action taken by the account" }
       - Raise a P1 incident
     escalate: true
     monitor: I will monitor {{user}} and the tenant for further privileged changes.

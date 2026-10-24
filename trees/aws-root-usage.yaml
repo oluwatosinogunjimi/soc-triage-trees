@@ -10,7 +10,7 @@ applies_to:
   - Root console login
   - Root access key used
 mitre: [T1078.004]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -40,6 +40,10 @@ nodes:
                     MFAUsed = tostring(parse_json(AdditionalEventData).MFAUsed)
           | order by TimeGenerated asc
     note: I pulled every root action in account {{account_id}}, including from {{ip}}.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: CloudTrail must cover every account and region
+      you are checking. Check the value matches how the table records it and the time window is long
+      enough, and confirm AWSCloudTrail returns rows for another account or resource before you answer.
     next: q-planned
 
   q-planned:
@@ -114,7 +118,7 @@ nodes:
     anchor: The root user in {{account_id}} was used by its owner for work that does not need root, or without MFA.
     risk: The risk here is routine root use making compromise more likely; it is a policy failure to correct.
     actions:
-      - Tell the cloud owner to use IAM roles for this work and enforce hardware MFA on root
+      - { type: notify, text: "Tell the cloud owner to use IAM roles for this work and enforce hardware MFA on root" }
       - Confirm no root access keys exist
 
   o-tp:
@@ -124,9 +128,9 @@ nodes:
     anchor: The root user in {{account_id}} was used from {{ip}} without authorisation.
     risk: The risk here is total control of the AWS account, including deletion of resources and backups; this is a P1.
     actions:
-      - Call the customer on the P1 path
-      - Reset the root password, replace MFA and delete any root access keys
-      - Remove users, keys, roles and policies created by root
-      - Review all CloudTrail activity from {{ip}}
+      - { type: notify, text: "Call the customer on the P1 path" }
+      - { type: remediate, text: "Reset the root password, replace MFA and delete any root access keys", approval: System owner or per client RACI, reversible: false }
+      - { type: remediate, text: "Remove users, keys, roles and policies created by root", approval: System owner or per client RACI }
+      - { type: enrich, text: "Review all CloudTrail activity from {{ip}}" }
     escalate: true
     monitor: I will monitor for any further root activity and for activity from {{ip}}.

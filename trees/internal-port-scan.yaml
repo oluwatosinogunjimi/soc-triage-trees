@@ -10,7 +10,7 @@ applies_to:
   - Network discovery activity
   - Impact:EC2/PortSweep
 mitre: [T1046, T1018]
-version: 1.2.0
+version: 1.2.3
 last_reviewed: 2026-09-29
 authors: [Oluwatosin Ogunjimi]
 sources:
@@ -37,6 +37,10 @@ nodes:
                       Failed = countif(ActionType == "ConnectionFailed") by DeviceName, InitiatingProcessFileName, bin(Timestamp, 1h)
           | where Targets > 20 or Ports > 50
     note: I measured the connection fan-out from {{src_ip}} and the process behind it.
+    on_empty: >-
+      No rows can mean missing data, not a clean result: Defender for Endpoint only reports devices that
+      are onboarded and online. Check the value matches how the table records it and the time window is
+      long enough, and confirm DeviceNetworkEvents returns rows for another device before you answer.
     next: q-scanner
 
   q-scanner:
@@ -136,8 +140,8 @@ nodes:
     anchor: "{{src_ip}} ran an unauthorised network scan with a scanning tool."
     risk: The risk here is an attacker mapping targets for lateral movement, often shortly before ransomware; containment is required now.
     actions:
-      - Isolate the host and investigate how the tool arrived
-      - Reset the account that ran it
+      - { type: contain, text: "Isolate the host and investigate how the tool arrived", approval: SOC lead or per client RACI, reversible: true }
+      - { type: remediate, text: "Reset the account that ran it", approval: System owner or per client RACI, reversible: false }
       - Raise an incident and escalate
     escalate: true
     monitor: I will monitor for remote execution and logons from {{src_ip}}.
