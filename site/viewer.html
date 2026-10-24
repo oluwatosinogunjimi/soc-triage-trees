@@ -1487,7 +1487,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   CATS.forEach(([cat]) => bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title))
     .forEach((t, i) => { CODE[t.id] = CAT_CODE[cat] + "-" + String(i + 1).padStart(2, "0"); }));
   const HOME_TAB_KEY = "triage-trees-home-tab";
-  let homeTab = "identity", homeAll = false;
+  let homeTab = "triage", homeAll = false;
   try { const v = localStorage.getItem(HOME_TAB_KEY); if (v && CAT_TAB[v]) homeTab = v; } catch (e) {}
   const VSHAPE = { true_positive: '<path d="M8 1.5 15 14.5 1 14.5z"/>', inconclusive: '<path d="M8 1 15 8 8 15 1 8z"/>',
     benign_positive: '<circle cx="8" cy="8" r="7"/>', false_positive: '<rect x="1.5" y="1.5" width="13" height="13"/>' };
