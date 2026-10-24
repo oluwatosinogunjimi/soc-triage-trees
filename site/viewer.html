@@ -142,7 +142,7 @@ a.btn:not(.primary):not(.ghost) { color: var(--ink-2); }
 .case-crumbs button { all: unset; cursor: pointer; color: var(--accent); }
 .case-crumbs button:hover { text-decoration: underline; }
 .case-crumbs button:focus-visible { outline: 2px solid var(--accent); border-radius: 3px; }
-section[id^="cat-"] { scroll-margin-top: 84px; }
+section[id^="cat-"], #browse { scroll-margin-top: 84px; }
 .credit { font-size: 14px !important; }
 .credit a, footer.foot a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
 .credit a:hover, footer.foot a:hover { color: var(--accent); text-decoration-color: currentColor; }
@@ -721,6 +721,47 @@ input.field { border-radius: var(--r); background: var(--surface); }
 :root[data-theme="dark"] .esc { color: #111316; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .esc { color: #111316; } }
 .act-type { font-weight: 700; }
+/* Home index: folder tabs over one table */
+:root { --tab-triage: #7c8186; --tab-email: #b8963a; --tab-identity: #5b45a0; --tab-endpoint: #4b8794; --tab-network: #9a5c7d; --tab-cloud: #94744f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tab-triage: #8f949a; --tab-email: #d9b85a; --tab-identity: #b5a3f2; --tab-endpoint: #6fb3c0; --tab-network: #c98aaa; --tab-cloud: #c49a6c; } }
+:root[data-theme="dark"] { --tab-triage: #8f949a; --tab-email: #d9b85a; --tab-identity: #b5a3f2; --tab-endpoint: #6fb3c0; --tab-network: #c98aaa; --tab-cloud: #c49a6c; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ptabs { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; }
+.ptab { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 16px; font-size: 15px; color: var(--ink-2);
+  border-top: 3px solid var(--tabc); border-radius: var(--r) var(--r) 0 0; }
+.ptab svg { width: 15px; height: 15px; }
+.ptab .pc { font-variant-numeric: tabular-nums; color: var(--muted); }
+.ptab:hover { color: var(--ink); background: var(--surface-2); }
+.ptab[aria-pressed="true"] { color: var(--accent); font-weight: 700; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--tabc);
+  border-bottom-color: var(--surface); margin-bottom: -1px; position: relative; z-index: 1; }
+.ptab[aria-pressed="true"] .pc, .ptab[aria-pressed="true"] svg { color: var(--accent); }
+.pt-triage { --tabc: var(--tab-triage); } .pt-email { --tabc: var(--tab-email); } .pt-identity { --tabc: var(--tab-identity); }
+.pt-endpoint { --tabc: var(--tab-endpoint); } .pt-network { --tabc: var(--tab-network); } .pt-cloud { --tabc: var(--tab-cloud); }
+.pt-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 0 var(--r) var(--r) var(--r); }
+table.pt { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 16px; }
+table.pt th { text-align: left; font-size: 14px; font-weight: 700; color: var(--ink-2); padding: 14px 16px 10px 0; border-bottom: 1.5px solid var(--line-strong); white-space: nowrap; }
+table.pt td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+table.pt tr:last-child td { border-bottom: 0; }
+table.pt th:first-child, table.pt td:first-child { padding-left: 20px; }
+table.pt tbody tr:hover { background: var(--surface-2); }
+table.pt td { vertical-align: top; }
+.pt-card { width: 31%; }
+.pt-cardin { display: flex; align-items: baseline; gap: 10px; }
+.pt-alerts { width: 38%; }
+.pt-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pt-code { flex: none; display: inline-block; font-family: var(--font-mono); font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 2px; background: var(--accent-soft); color: var(--accent); }
+.pt-title { all: unset; cursor: pointer; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.pt-title:hover { color: var(--accent); }
+.pt-alerts { font-family: var(--font-mono); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+.pt-mitre { font-family: var(--font-mono); font-size: 14px; white-space: nowrap; }
+.pt-mitre a { margin-right: 6px; text-decoration-color: var(--cond-line); }
+.pt-num { font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.pt-vs { display: inline-flex; gap: 12px; font-family: var(--font-mono); font-size: 14px; white-space: nowrap; }
+.pt-vs > span { display: inline-flex; align-items: center; gap: 4px; }
+svg.vs { width: 12px; height: 12px; }
+.vs-true_positive { fill: var(--tp-block); } .vs-inconclusive { fill: var(--inc-block); } .vs-benign_positive { fill: var(--btp-block); } .vs-false_positive { fill: var(--fp-block); }
+.pt-more { margin-top: 14px; font-size: 15px; color: var(--ink-2); }
+.pt-more .linkish { color: var(--ink); font-weight: 600; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
 .mode-seg { display: inline-flex; border: 1.5px solid var(--line-strong); border-radius: var(--r); overflow: hidden; }
 .mode-seg button { all: unset; box-sizing: border-box; cursor: pointer; padding: 0 12px; min-height: 36px; display: inline-flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .mode-seg button + button { border-left: 1.5px solid var(--line-strong); }
@@ -1190,8 +1231,9 @@ const EMBEDDED = /*__TREE_DATA__*/null;
   function goHome() { S.view = "home"; save(); setHash("library"); closeMap(); closeOverlays(); render(); window.scrollTo(0, 0); }
   function goCategory(cat) {
     if (cat === "triage") { openTree("universal-triage"); return; }
+    homeTab = cat; homeAll = false; try { localStorage.setItem(HOME_TAB_KEY, cat); } catch (e) {}
     query = ""; goHome();
-    requestAnimationFrame(() => { const el = document.getElementById("cat-" + cat); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    requestAnimationFrame(() => { const el = document.getElementById("browse"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); });
   }
   function openDetections(id) {
     S.view = "detections"; ruleId = id && DETS.has(id) ? id : null; save();
@@ -1406,7 +1448,6 @@ const EMBEDDED = /*__TREE_DATA__*/null;
       h("div", { class: "foot" }, vbar(verdictCounts(outs)),
         h("div", { class: "stats" }, h("span", {}, steps + " steps · " + outs.length + " endings"))));
   }
-  const WALKED = ["atypical-signin", "phishing-email", "mfa-fatigue", "lsass-credential-dumping"];
   function heroTree() {
     const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     el.setAttribute("viewBox", "0 0 700 380"); el.setAttribute("class", "tree"); el.setAttribute("role", "img");
@@ -1436,6 +1477,41 @@ const EMBEDDED = /*__TREE_DATA__*/null;
     });
     el.innerHTML = out;
     return el;
+  }
+  // Home index: one table per domain, behind folder tabs. Codes are positional (category + alphabetical order).
+  const CAT_TAB = { triage: "Universal", email: "Email", identity: "Identity", endpoint: "Endpoint", network: "Network", cloud: "Cloud" };
+  const CAT_CODE = { triage: "UT", email: "EM", identity: "ID", endpoint: "EP", network: "NW", cloud: "CL" };
+  const CODE = {};
+  CATS.forEach(([cat]) => bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title))
+    .forEach((t, i) => { CODE[t.id] = CAT_CODE[cat] + "-" + String(i + 1).padStart(2, "0"); }));
+  const HOME_TAB_KEY = "triage-trees-home-tab";
+  let homeTab = "identity", homeAll = false;
+  try { const v = localStorage.getItem(HOME_TAB_KEY); if (v && CAT_TAB[v]) homeTab = v; } catch (e) {}
+  const VSHAPE = { true_positive: '<path d="M8 1.5 15 14.5 1 14.5z"/>', inconclusive: '<path d="M8 1 15 8 8 15 1 8z"/>',
+    benign_positive: '<circle cx="8" cy="8" r="7"/>', false_positive: '<rect x="1.5" y="1.5" width="13" height="13"/>' };
+  function vshape(v) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    el.setAttribute("viewBox", "0 0 16 16"); el.setAttribute("class", "vs vs-" + v); el.setAttribute("aria-hidden", "true"); el.innerHTML = VSHAPE[v];
+    return el;
+  }
+  function playbookTable(list, words) {
+    const row = t => {
+      const outs = Object.values(t.nodes).filter(n => n.type === "outcome").map(n => ({ node: n }));
+      const steps = Object.values(t.nodes).filter(n => ["check", "question", "choice"].includes(n.type)).length;
+      const c = verdictCounts(outs);
+      const shown = VERDICTS.filter(v => c[v]);
+      return h("tr", {},
+        h("td", { class: "pt-card" }, h("div", { class: "pt-cardin" }, h("span", { class: "pt-code" }, CODE[t.id]),
+          h("button", { class: "pt-title", type: "button", onclick: () => openTree(t.id), title: t.summary, html: highlight(t.title, words) }))),
+        h("td", { class: "pt-alerts" }, h("span", { class: "pt-clamp", title: (t.applies_to || []).join("; "), html: highlight((t.applies_to || []).slice(0, 3).join("; "), words) })),
+        h("td", { class: "pt-mitre" }, (t.mitre || []).slice(0, 2).map(id => h("a", { href: "https://attack.mitre.org/techniques/" + id.replace(".", "/") + "/", target: "_blank", rel: "noopener" }, id))),
+        h("td", { class: "pt-num" }, steps + " · " + outs.length),
+        h("td", { class: "pt-ends" }, h("span", { class: "sr-only" }, shown.map(v => c[v] + " " + VLABEL[v].toLowerCase()).join(", ")),
+          h("span", { class: "pt-vs", "aria-hidden": "true" }, shown.map(v => h("span", {}, vshape(v), String(c[v]))))));
+    };
+    return h("div", { class: "pt-wrap" }, h("table", { class: "pt" },
+      h("thead", {}, h("tr", {}, ["Card", "Matches alert titles", "ATT&CK", "Steps · endings", "Endings by verdict"].map(x => h("th", { scope: "col" }, x)))),
+      h("tbody", {}, list.map(row))));
   }
   function renderHome() {
     const app = document.getElementById("app"); app.replaceChildren();
@@ -1468,7 +1544,7 @@ const EMBEDDED = /*__TREE_DATA__*/null;
             h("span", { class: "count" }, "of " + bundle.trees.length),
             !hits.length ? h("p", {}, "Try the alert name as your SIEM shows it, a technique ID like T1110, or start with Universal Triage.") : null,
             h("button", { class: "btn ghost sm", type: "button", onclick: () => { query = ""; input.value = ""; renderResults(); input.focus(); } }, "Clear search")),
-          h("div", { class: "cards" }, hits.map(([t]) => card(t, ws)))));
+          playbookTable(hits.map(([t]) => t), ws)));
         const rhits = [...DETS.values()].map(d => [d, scoreRule(d, ws)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
         if (rhits.length) results.append(h("section", {},
           h("div", { class: "section-head" }, svg(ICON.rule), h("h2", {}, rhits.length + " matching detection rule" + (rhits.length > 1 ? "s" : "")), h("span", { class: "count" }, "of " + DETS.size)),
@@ -1476,25 +1552,18 @@ const EMBEDDED = /*__TREE_DATA__*/null;
         return;
       }
       const count = c => bundle.trees.filter(t => t.category === c).length;
-      const contents = h("nav", { class: "contents", "aria-label": "Contents" }, h("div", { class: "label-rule" }, "Contents"),
-        CATS.map(([cat, label], i) => h("button", { class: "crow", type: "button", onclick: () => goCategory(cat) },
-          h("span", { class: "cn" }, String(i).padStart(2, "0")), catIcon(cat),
-          h("span", { class: "cname" }, cat === "triage" ? ["Universal Triage ", h("span", { class: "cnote" }, "start here")] : label),
-          cat === "triage" ? null : h("span", { class: "cc" }, count(cat)))),
-        DETS.size ? h("button", { class: "crow", type: "button", onclick: () => openDetections() },
-          h("span", { class: "cn" }, String(CATS.length).padStart(2, "0")), svg(ICON.rule, "ci-rule"),
-          h("span", { class: "cname" }, "Detection rules ", h("span", { class: "cnote" }, "what fires")), h("span", { class: "cc" }, DETS.size)) : null);
-      const walked = h("section", { class: "walked", "aria-label": "Most walked" }, h("div", { class: "label-rule" }, "Most walked"),
-        h("div", { class: "cards two" }, WALKED.filter(id => TREES[id]).map(id => card(TREES[id], []))));
-      results.append(h("div", { class: "twocol" }, contents, walked));
-      CATS.forEach(([cat, label, blurb]) => {
-        if (cat === "triage") return;
-        const items = bundle.trees.filter(t => t.category === cat).sort((a, b) => a.title.localeCompare(b.title));
-        if (!items.length) return;
-        results.append(h("section", { id: "cat-" + cat },
-          h("div", { class: "section-head" }, catIcon(cat), h("h2", {}, label), h("span", { class: "count" }, items.length + " playbooks"), h("p", {}, blurb)),
-          h("div", { class: "cards" }, items.map(t => card(t, [])))));
-      });
+      const LIMIT = 10;
+      const items = bundle.trees.filter(t => t.category === homeTab).sort((a, b) => a.title.localeCompare(b.title));
+      const pick = cat => () => { homeTab = cat; homeAll = false; try { localStorage.setItem(HOME_TAB_KEY, cat); } catch (e) {} renderResults(); const b = document.querySelector('.ptabs [data-cat="' + cat + '"]'); if (b) b.focus(); };
+      const tabs = h("nav", { class: "ptabs", "aria-label": "Browse by domain" }, CATS.map(([cat, label]) =>
+        h("button", { type: "button", class: "ptab pt-" + cat, "data-cat": cat, "aria-pressed": cat === homeTab ? "true" : "false", title: label, onclick: pick(cat) },
+          catIcon(cat), CAT_TAB[cat], h("span", { class: "pc" }, count(cat)))));
+      const shown = homeAll ? items : items.slice(0, LIMIT);
+      const more = items.length > shown.length
+        ? h("p", { class: "pt-more" }, "Showing " + shown.length + " of " + items.length + " " + CAT_TAB[homeTab].toLowerCase() + " cards. ",
+            h("button", { class: "linkish", type: "button", onclick: () => { homeAll = true; renderResults(); } }, "Show all"))
+        : h("p", { class: "pt-more" }, items.length + " " + CAT_TAB[homeTab].toLowerCase() + " card" + (items.length === 1 ? "" : "s") + ". " + (CATS.find(c => c[0] === homeTab) || [])[2]);
+      results.append(h("section", { id: "browse", class: "browse-tbl" }, tabs, playbookTable(shown, []), more));
     }
     renderResults();
   }
